@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getSeedV2LessonBySlug, type LessonV2WithSteps } from "@shecancode/lesson-engine";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentAppUser } from "@/features/auth/server/data";
+import { VoiceLessonClient } from "@/features/lesson-v2/components/voice-lesson-client";
 
 export const dynamic = "force-dynamic";
 
@@ -66,11 +67,7 @@ export default async function LessonV2DetailPage({ params }: LessonV2DetailPageP
         </Card>
       </div>
 
-      {/* TODO: S5 will replace this placeholder panel with the real VoiceLessonClient workspace. */}
-      <section className="rounded-[1.4rem] border-4 border-dashed border-black bg-[#fffdf3] p-8 text-center shadow-[8px_8px_0_#121212]">
-        <p className="text-sm font-black uppercase tracking-[0.2em] text-black">Workspace giọng nói</p>
-        <p className="mt-3 font-heading text-3xl uppercase text-black sm:text-4xl">Workspace giọng nói sẽ xuất hiện ở đây (S5)</p>
-      </section>
+      <VoiceLessonClient lesson={lesson} />
 
       <section className="grid gap-4 xl:grid-cols-2">
         {lesson.steps.map((step) => (

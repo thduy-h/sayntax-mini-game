@@ -472,3 +472,4 @@ export function evaluateLessonStep(
 
   return evaluateCompletionLogic(step.completionLogic, program, executionResult);
 }
+export * from "./seed-v2";

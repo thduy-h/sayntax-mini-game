@@ -138,3 +138,4 @@ export function parseVoiceCommand(transcript: string): VoiceParseResult {
 
   return unsupported(normalizedTranscript, "Lệnh này hiện chưa được hỗ trợ trong phiên bản đầu tiên.");
 }
+export * from "./parse-intent";

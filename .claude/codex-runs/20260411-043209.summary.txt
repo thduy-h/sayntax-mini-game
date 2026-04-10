@@ -1,0 +1,405 @@
+=== CODEX RUN COMPLETE ===
+Prompt file: .claude/tasks/current-task.txt
+JSON log: /home/thduy-h/mnt/d/THANHDUY/SheCanCode/.claude/codex-runs/20260411-043209.events.jsonl
+
+=== GIT STATUS ===
+ M .claude/overnight-report.md
+ M .claude/tasks/current-task.txt
+?? .claude/codex-runs/20260411-043209.events.jsonl
+?? .claude/codex-runs/20260411-043209.summary.txt
+?? packages/lesson-engine/src/action-model.test.ts
+?? packages/lesson-engine/src/action-model.ts
+
+=== DIFF STAT ===
+ .claude/overnight-report.md    |   6 +-
+ .claude/tasks/current-task.txt | 348 ++++++++++++++++++++++++-----------------
+ 2 files changed, 209 insertions(+), 145 deletions(-)
+
+=== LAST DIFF ===
+diff --git a/.claude/overnight-report.md b/.claude/overnight-report.md
+index 94adcc3..de7f5e7 100644
+--- a/.claude/overnight-report.md
++++ b/.claude/overnight-report.md
+@@ -39,9 +39,9 @@ Dừng và ghi report (không cố tiếp) khi:
+ 
+ ### Setup optimizations
+ - [x] SETUP-1: Raise codex-dispatcher `maxTurns` 8→20 ✓
+-- [ ] SETUP-2: Git baseline commit (129 files staged, not committed)
+-- [x] SETUP-3: Probe `lesson-architect` + `voice-parser-designer` agents ✓ (both loaded, plan mode, 12 turns)
+-- [ ] SETUP-4: Persist key memories (skip — memory dir may hit Write prompt; non-critical)
++- [x] SETUP-2: Git baseline commit `2eb3d31` ✓ (129 files, inline author `-c user.name=...`)
++- [x] SETUP-3: Probe `lesson-architect` + `voice-parser-designer` agents ✓
++- [~] SETUP-4: SKIPPED — memory files need Write-create which downgrades bypass mode
+ 
+ ### Slices
+ - [ ] S1: LessonStepAction model + evaluator (shared-types + lesson-engine)
+diff --git a/.claude/tasks/current-task.txt b/.claude/tasks/current-task.txt
+index 58a5ccd..aeab2d9 100644
+--- a/.claude/tasks/current-task.txt
++++ b/.claude/tasks/current-task.txt
+@@ -1,159 +1,223 @@
+ # Title
+-Extract shared lesson-engine text/block helpers into internal helpers.ts
++S1: Add LessonStepAction model, LessonStepV2, and evaluateStepAction (voice-first V2 foundation)
+ 
+ # Goal
+-Eliminate the helper duplication between `packages/lesson-engine/src/index.ts`
+-and `packages/lesson-engine/src/evaluate-runtime.ts` by moving five pure
+-helpers into a new internal module. No behavior change — this is a pure
+-refactor to remove duplicate source.
+-
+-The helpers to extract are (copy them VERBATIM from `index.ts` — character-
+-identical — so semantics cannot drift):
+-
+-1. `normalizeText(value: string): string`
+-2. `comparableValue(value: string | number | boolean): string | number | boolean`
+-3. `validatePrintText(output: string[], text: string): boolean`
+-4. `flattenBlocks(blocks: WorkspaceBlock[]): WorkspaceBlock[]`
+-5. `findVariableBlock(blocks: WorkspaceBlock[], expectedName: string)`
+-
+-Reference source of truth for verbatim copies: `index.ts` lines ~311–356:
++Build the foundation for the voice-first lesson V2 redesign: a new pure
++TypeScript module `action-model.ts` in `packages/lesson-engine` that exports
++`LessonStepAction` (6 variants), `LessonStepV2`, and a pure evaluator
++`evaluateStepAction(action, workspace, executionResult): LessonStepEvaluationResult`.
++
++This runs ALONGSIDE the existing legacy `LessonCompletionLogic` /
++`evaluateCompletionLogic` path — do NOT modify any existing file in
++`lesson-engine`, `shared-types`, or anywhere else. Legacy stays at
++`/lessons/*`; V2 will live at `/lessons-v2/*` (built in later slices).
++
++# Required type: LessonStepAction (discriminated union of 6 variants)
++
++Use `kind` as discriminator (NOT `type`, to avoid confusion with legacy
++`completionLogic.type`). All 6 variants must be exported as a single union:
++
++```ts
++export type LessonStepAction =
++  | { kind: "add_block"; blockType: BlockKind; label?: string }
++  | {
++      kind: "insert_into";
++      parentBlockType: BlockKind;
++      childBlockType: BlockKind;
++      slot?: string;  // reserved for future; ignored by evaluator in V1
++    }
++  | { kind: "set_text"; blockId: string; field: string; expectedText: string }
++  | { kind: "set_number"; blockId: string; field: string; expectedNumber: number }
++  | { kind: "run_program"; expectedOutput?: string[] }
++  | { kind: "ask_hint" };
++```
+ 
+-```typescript
+-function flattenBlocks(blocks: WorkspaceBlock[]): WorkspaceBlock[] {
+-  return blocks.flatMap((block) => [block, ...flattenBlocks(block.children ?? [])]);
++`BlockKind` must be imported from `@shecancode/shared-types`. Do NOT
++redeclare it.
++
++# Required type: LessonStepV2
++
++```ts
++export interface LessonStepV2 {
++  id: string;
++  databaseStepId: string;
++  orderIndex: number;
++  title: string;
++  instructions: string;          // Vietnamese prompt shown to learner
++  hints: string[];
++  starterWorkspace: ProgramWorkspace;
++  action: LessonStepAction;
+ }
++```
+ 
+-function normalizeText(value: string) {
+-  return value
+-    .trim()
+-    .toLowerCase()
+-    .normalize("NFD")
+-    .replace(/[\u0300-\u036f]/g, "")
+-    .replace(/đ/g, "d")
+-    .replace(/\s+/g, " ");
+-}
++`ProgramWorkspace` imported from `@shecancode/shared-types`.
+ 
+-function comparableValue(value: string | number | boolean) {
+-  if (typeof value === "string") {
+-    const trimmed = value.trim();
+-    const num = Number(trimmed);
+-    if (trimmed !== "" && Number.isFinite(num)) return num;
+-    return normalizeText(trimmed);
+-  }
+-  return value;
+-}
++# Required function: evaluateStepAction (pure)
+ 
+-function findVariableBlock(blocks: WorkspaceBlock[], expectedName: string) {
+-  const normalizedName = normalizeText(expectedName);
+-  return blocks.find(
+-    (block) =>
+-      block.type === "variable" &&
+-      typeof block.fields?.name === "string" &&
+-      normalizeText(block.fields.name) === normalizedName,
+-  );
+-}
++```ts
++export function evaluateStepAction(
++  action: LessonStepAction,
++  workspace: ProgramWorkspace,
++  executionResult: ProgramExecutionResult,
++): LessonStepEvaluationResult;
++```
+ 
+-function validatePrintText(output: string[], text: string) {
+-  return output.length === 1 && normalizeText(output[0] ?? "") === normalizeText(text);
+-}
++All three parameter types and the return type come from
++`@shecancode/shared-types`. Do NOT redeclare any of them. The function is
++pure — no I/O, no Date, no globals, no mutation.
++
++Use a `switch (action.kind)` that is exhaustive via
++`const _exhaustive: never = action;` in the default branch.
++
++## Per-variant pass rules (match the design spec exactly)
++
++Helper: import `flattenBlocks` from `./helpers` for recursive block search.
++Do NOT redefine it.
++
++### add_block
++`flattenBlocks(workspace.blocks).some((b) => b.type === action.blockType)`
++→ pass. Loose per charter — disconnected block groups DO count.
++
++### insert_into
++`flattenBlocks(workspace.blocks)` has some block `p` with
++`p.type === action.parentBlockType` AND `p.children` is a non-empty array
++AND `p.children.some((c) => c.type === action.childBlockType)`.
++Ignore `action.slot` in V1 (reserved for future). If NO parent of that type
++exists, fail.
++
++### set_text
++Find a block in `flattenBlocks(workspace.blocks)` whose `id === action.blockId`.
++If not found → fail. Read `block.fields?.[action.field]`. If undefined or not
++a string → fail. Pass if
++`String(fieldValue).trim() === action.expectedText.trim()` (exact,
++case-sensitive, NO diacritic stripping).
++
++### set_number
++Find a block in `flattenBlocks(workspace.blocks)` whose `id === action.blockId`.
++If not found → fail. Read `block.fields?.[action.field]`. Coerce via
++`Number(fieldValue)`. Pass if `Number.isFinite(n) && n === action.expectedNumber`.
++
++### run_program
++If `executionResult.success !== true` → fail. If `action.expectedOutput` is
++undefined → pass. Otherwise:
++`executionResult.output.length === action.expectedOutput.length` AND
++every index `i` passes
++`normalizeText(executionResult.output[i] ?? "") === normalizeText(action.expectedOutput[i])`.
++Use `normalizeText` from `./helpers`.
++
++### ask_hint
++Always `{ completed: true, feedback: ASK_HINT_PASS_FEEDBACK }`. No failing
++state — this action exists only as an onboarding step to teach learners
++that hints are available.
++
++## Feedback strings (Vietnamese, verbatim)
++
++Use these exact strings (declare as `const` at top of file for reuse). Do
++NOT change any punctuation or wording:
++
++```ts
++const FEEDBACK = {
++  add_block_pass: "Bạn đã thêm đúng khối cần thiết.",
++  add_block_fail: "Bạn vẫn chưa thêm khối được yêu cầu.",
++  insert_into_pass: "Khối con đã nằm đúng bên trong khối cha.",
++  insert_into_fail: "Hãy kéo khối con vào bên trong khối cha.",
++  set_text_pass: "Nội dung văn bản đã đúng.",
++  set_text_fail: "Nội dung văn bản chưa khớp với yêu cầu.",
++  set_number_pass: "Giá trị số đã đúng.",
++  set_number_fail: "Giá trị số chưa đúng với yêu cầu.",
++  run_program_pass: "Chương trình đã chạy thành công.",
++  run_program_fail: "Chương trình chưa chạy đúng như mong đợi.",
++  ask_hint_pass: "Bạn đã mở gợi ý — tiếp tục nhé!",
++} as const;
+ ```
+ 
+-These five definitions are ALSO present in `evaluate-runtime.ts` (lines ~8–44
+-at time of writing). They must be identical after the refactor.
+-
+-## Scope of changes
+-
+-**New file**: `packages/lesson-engine/src/helpers.ts`
+-- Export exactly these 5 functions (named exports, no default export).
+-- Import `WorkspaceBlock` from `@shecancode/shared-types`.
+-- No other symbols, no side effects, no dependencies beyond shared-types.
+-
+-**Modify**: `packages/lesson-engine/src/index.ts`
+-- Delete the local definitions of `flattenBlocks`, `normalizeText`,
+-  `comparableValue`, `findVariableBlock`, `validatePrintText`.
+-- Add an import from `./helpers` for those 5 names.
+-- KEEP `hasBlockTypes` and `orderedTopLevelTypes` local to `index.ts` (they
+-  are index.ts-specific and used only by `evaluateCompletionLogic`).
+-- Do NOT change any other function in `index.ts`. In particular the
+-  `evaluateCompletionLogic` switch body must be byte-identical except for
+-  any minor import reshuffling.
+-- Do NOT re-export the helpers from `index.ts`.
+-
+-**Modify**: `packages/lesson-engine/src/evaluate-runtime.ts`
+-- Delete the local definitions of the 5 helpers.
+-- Add an import from `./helpers` for those 5 names.
+-- Do NOT change the `evaluateRuntimeLogic` function body.
+-
+-## Do NOT touch
+-
+-- `packages/lesson-engine/src/evaluate-block-structure.ts` — it already uses
+-  its own minimal helpers (`someBlock`, `includesOrderedTypes`) and does NOT
+-  duplicate the 5 target helpers. Leaving it alone also preserves a
+-  pre-existing semantic difference (it uses plain `.trim()` equality for
+-  variable names while the new helpers.ts uses `normalizeText`) — that
+-  divergence is out of scope for this refactor and will be revisited later.
+-- `completion-logic-helpers.ts` / `.test.ts`
+-- `evaluate-step.ts` / `.test.ts`
+-- Any `*.test.ts` file
+-- `packages/shared-types/*`
+-- `apps/web/*`, `packages/voice-parser/*`, `supabase/*`
+-- Any `package.json`, `tsconfig.json`, root config
+-
+-## Allowed files
+-- packages/lesson-engine/src/helpers.ts          (NEW)
+-- packages/lesson-engine/src/index.ts            (MODIFY — import + delete locals only)
+-- packages/lesson-engine/src/evaluate-runtime.ts (MODIFY — import + delete locals only)
+-
+-## Forbidden files
+-- packages/lesson-engine/src/evaluate-block-structure.ts
+-- packages/lesson-engine/src/evaluate-block-structure.test.ts
+-- packages/lesson-engine/src/completion-logic-helpers.ts
+-- packages/lesson-engine/src/completion-logic-helpers.test.ts
+-- packages/lesson-engine/src/evaluate-runtime.test.ts
+-- packages/lesson-engine/src/evaluate-step.ts
+-- packages/lesson-engine/src/evaluate-step.test.ts
++Return shape per call: `{ completed: boolean, feedback: string }`.
++
++# Allowed files
++- packages/lesson-engine/src/action-model.ts       (NEW)
++- packages/lesson-engine/src/action-model.test.ts  (NEW)
++
++# Forbidden files
++- ANY existing file under packages/lesson-engine/src/ (index.ts, helpers.ts,
++  completion-logic-helpers.ts, evaluate-block-structure.ts,
++  evaluate-runtime.ts, evaluate-step.ts, and their .test.ts pairs)
+ - packages/shared-types/*
+ - packages/voice-parser/*
++- packages/block-engine/*
++- packages/ui/*
+ - apps/web/*
+ - supabase/*
+ - Any package.json, tsconfig.json, or root config files
+ 
+-## Constraints
+-- TypeScript strict. No `any`. No unsafe `as` casts (the single narrow
+-  `fields.value as string | number | boolean` cast may remain where it is).
+-- `helpers.ts` must contain ONLY the 5 functions listed — no extras.
+-- Function bodies in `helpers.ts` must be character-identical to the
+-  originals in `index.ts`. Do NOT refactor, rename, add comments, or
+-  "improve" them.
+-- In `index.ts` and `evaluate-runtime.ts`, the only changes are: (a) one
+-  new import line from `./helpers`, (b) deletion of the now-duplicate
+-  function definitions. No other edits. No reordering of unrelated code.
+-- After the refactor, grepping `packages/lesson-engine/src/` for
+-  `function normalizeText` must return exactly ONE hit (in `helpers.ts`).
+-  Same for `function comparableValue`, `function validatePrintText`,
+-  `function flattenBlocks`, `function findVariableBlock`.
+-- Do NOT add new dependencies.
+-- `helpers.ts` under ~60 lines.
+-
+-## Verification
+-1. `npx tsc --noEmit -p packages/lesson-engine` exits 0
+-   (runs inside nix-shell via `scripts/run-codex-task.sh`).
+-2. Run every existing test file still green:
+-   - `npx tsx packages/lesson-engine/src/completion-logic-helpers.test.ts`
+-   - `npx tsx packages/lesson-engine/src/evaluate-block-structure.test.ts`
+-   - `npx tsx packages/lesson-engine/src/evaluate-runtime.test.ts`
+-   - `npx tsx packages/lesson-engine/src/evaluate-step.test.ts`
+-   All four must exit 0 and print their respective `*** tests passed` lines.
+-   (Sandbox fallback to `node --import tsx <file>` is acceptable if `npx tsx`
+-   fails due to IPC/EPERM.)
+-3. `grep -n 'function normalizeText\|function comparableValue\|function validatePrintText\|function flattenBlocks\|function findVariableBlock' packages/lesson-engine/src/*.ts`
+-   must output exactly 5 lines — all from `helpers.ts`.
+-4. Git diff check: `git diff packages/lesson-engine/src/index.ts` must show
+-   ONLY (a) added import line and (b) deleted helper definitions. No other
+-   modified regions. Same for `evaluate-runtime.ts`.
+-
+-## Final summary must include
+-- changed files (new + modified)
+-- confirmation of grep result (exactly 5 single-definition lines in helpers.ts)
+-- which test files were re-run and their exit status
+-- any unexpected edits required outside the plan (there should be none)
++# Constraints
++- TypeScript strict. No `any`. No unsafe `as` casts except one narrow
++  `fields.value as string | number | boolean` if Codex judges it necessary
++  for `set_number`'s `Number(...)` input — but prefer computing via
++  `Number(block.fields?.[action.field])` directly without a cast.
++- Pure function: no I/O, no globals, no `Date`, no mutation of inputs.
++- Import all types from `@shecancode/shared-types`:
++  `BlockKind`, `WorkspaceBlock`, `ProgramWorkspace`, `ProgramExecutionResult`,
++  `LessonStepEvaluationResult`. Do NOT redeclare.
++- Import `flattenBlocks` and `normalizeText` from `./helpers`. Do NOT
++  duplicate them locally.
++- Exhaustive `switch (action.kind)` with `const _exhaustive: never = action;`
++  in the default branch.
++- Do NOT add any new dependency to any package.json.
++- `action-model.ts` under ~130 lines.
++- `action-model.test.ts` under ~180 lines.
++
++# Required test coverage (action-model.test.ts)
++
++The test file must use `node:assert/strict` and log a final success line
++`"action-model tests passed"`. It must cover, at minimum:
++
++- **add_block**: pass with target block at top level; pass with target block
++  nested inside a parent's children (loose rule); fail when workspace empty;
++  fail when only a different block type present.
++- **insert_into**: pass with `repeat` parent and `print` child; fail when
++  `repeat` parent exists but `children` is empty; fail when matching parent
++  type is absent; fail when parent has children but none of the required
++  child type.
++- **set_text**: pass exact match on a seeded `print` block's `text` field;
++  fail on mismatch; fail on missing blockId; fail when field is undefined;
++  case-sensitive fail (e.g. "Xin chào" vs "xin chào").
++- **set_number**: pass on numeric equal (5 and 5); pass when field is string
++  `"5"` coerced to 5; fail on non-numeric string `"abc"`; fail on wrong
++  number; fail on missing blockId.
++- **run_program**: pass when `success=true` and no `expectedOutput` set;
++  pass when `expectedOutput` present and matches exactly (with normalizeText
++  diacritic folding); fail when `success=false`; fail when output length
++  differs; fail when one index mismatches.
++- **ask_hint**: always returns `{ completed: true, feedback: ASK_HINT_PASS }`.
++- **exhaustive**: a trivial compile-time check — the test file imports the
++  type and has a type-level never check on an exhaustive switch (can be a
++  commented-out section or a dead const).
++
++Each case must assert BOTH `completed` and `feedback` (exact string match).
++
++# Verification
++1. From repo root inside nix-shell (auto via run-codex-task.sh):
++   `npx tsc --noEmit -p packages/lesson-engine` exits 0.
++2. From `packages/lesson-engine`:
++   `npx tsx src/action-model.test.ts` exits 0 and prints
++   `action-model tests passed`.
++   (Sandbox fallback: `node --import tsx src/action-model.test.ts`.)
++3. Run existing test files — all must stay green:
++   - `npx tsx src/completion-logic-helpers.test.ts`
++   - `npx tsx src/evaluate-block-structure.test.ts`
++   - `npx tsx src/evaluate-runtime.test.ts`
++   - `npx tsx src/evaluate-step.test.ts`
++4. `git status --short` shows exactly 2 new untracked files under
++   `packages/lesson-engine/src/`:
++   - `action-model.ts`
++   - `action-model.test.ts`
++   NO other file touched (not even index.ts).
++
++# Final summary (what to report back)
++- Changed files (both new, path-absolute)
++- Confirmation that NO existing file was modified
++- `npx tsc --noEmit` result
++- Test exit status for action-model.test.ts
++- Test exit status for the 4 pre-existing test files (all must still be green)
++- Any assumption Codex made that's not explicitly in this task
++

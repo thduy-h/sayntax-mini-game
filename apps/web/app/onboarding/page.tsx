@@ -1,0 +1,166 @@
+import { redirect } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SwitchField } from "@/components/ui/switch-field";
+import { Textarea } from "@/components/ui/textarea";
+import { AuthMessage } from "@/features/auth/components/auth-message";
+import { getCurrentAppUser } from "@/features/auth/server/data";
+import { completeOnboardingAction } from "@/features/onboarding/server/actions";
+
+interface OnboardingPageProps {
+  searchParams: Promise<{
+    error?: string;
+  }>;
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function OnboardingPage({ searchParams }: OnboardingPageProps) {
+  const appUser = await getCurrentAppUser();
+  if (!appUser) {
+    redirect("/sign-in");
+  }
+
+  if (appUser.onboarding_completed) {
+    redirect(appUser.role === "admin" ? "/admin" : "/dashboard");
+  }
+
+  const params = await searchParams;
+
+  return (
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-8 sm:px-10">
+      <Card className="bg-slate-900 text-white">
+        <CardHeader>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-teal-200">Thiết lập ban đầu</p>
+          <CardTitle className="text-white">
+            {appUser.role === "admin" ? "Thiết lập không gian quản trị" : "Hãy cho chúng tôi biết cách hỗ trợ việc học của bạn"}
+          </CardTitle>
+          <CardDescription className="text-slate-200">
+            {appUser.role === "admin"
+              ? "Quản trị viên có thể xác nhận thiết lập cốt lõi ngay bây giờ và quản lý nội dung sau khi hoàn tất."
+              : "Học sinh có thể lưu hồ sơ và thiết lập trợ năng trước khi vào bảng học tập."}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-6">
+          <AuthMessage message={params.error} tone="error" />
+          <form action={completeOnboardingAction} className="space-y-8">
+            <section className="space-y-5">
+              <div>
+                <h2 className="font-heading text-2xl text-slate-900">Hồ sơ</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Phần này giúp cá nhân hóa trải nghiệm học tập và lưu tiến độ của riêng bạn.
+                </p>
+              </div>
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Tên hiển thị</Label>
+                  <Input id="displayName" name="displayName" placeholder="Chúng tôi nên gọi bạn là gì?" required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ageRange">Độ tuổi</Label>
+                  <select
+                    className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+                    defaultValue=""
+                    id="ageRange"
+                    name="ageRange"
+                  >
+                    <option value="">Chọn độ tuổi</option>
+                    <option value="8-10">8-10</option>
+                    <option value="11-13">11-13</option>
+                    <option value="14-16">14-16</option>
+                    <option value="17-19">17-19</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gradeLevel">Khối lớp</Label>
+                  <Input id="gradeLevel" name="gradeLevel" placeholder="Ví dụ: Lớp 7" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="schoolName">Trường hoặc chương trình học</Label>
+                  <Input id="schoolName" name="schoolName" placeholder="Không bắt buộc" />
+                </div>
+              </div>
+              {appUser.role === "student" ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="goals">Mục tiêu học tập</Label>
+                    <Textarea id="goals" name="goals" placeholder="Bạn muốn học hoặc tạo ra điều gì trước?" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="disabilitySupportNotes">Ghi chú hỗ trợ</Label>
+                    <Textarea
+                      id="disabilitySupportNotes"
+                      name="disabilitySupportNotes"
+                      placeholder="Chia sẻ các hỗ trợ hoặc điều chỉnh tương tác có thể giúp bạn học tốt hơn."
+                    />
+                  </div>
+                </>
+              ) : null}
+            </section>
+
+            <section className="space-y-5">
+              <div>
+                <h2 className="font-heading text-2xl text-slate-900">Thiết lập trợ năng</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Các thiết lập này sẽ được lưu và áp dụng khi hoàn thiện workspace và giao diện bài học.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fontScale">Cỡ chữ</Label>
+                <select
+                  className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
+                  defaultValue="default"
+                  id="fontScale"
+                  name="fontScale"
+                >
+                  <option value="default">Mặc định</option>
+                  <option value="large">Lớn</option>
+                  <option value="x-large">Rất lớn</option>
+                </select>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <SwitchField
+                  defaultChecked
+                  description="Tăng kích thước vùng bấm để thao tác dễ hơn."
+                  label="Nút bấm lớn"
+                  name="largeTouchTargets"
+                />
+                <SwitchField
+                  description="Tăng độ tương phản trong giao diện."
+                  label="Chế độ tương phản cao"
+                  name="highContrast"
+                />
+                <SwitchField
+                  description="Giảm hiệu ứng chuyển động khi có thể."
+                  label="Giảm chuyển động"
+                  name="reducedMotion"
+                />
+                <SwitchField
+                  defaultChecked
+                  description="Phát hoặc hỗ trợ hướng dẫn bằng âm thanh khi có."
+                  label="Hướng dẫn âm thanh"
+                  name="audioInstructions"
+                />
+                <SwitchField
+                  defaultChecked
+                  description="Hiển thị gợi ý điều hướng bằng bàn phím ở các màn hình tương tác."
+                  label="Gợi ý bàn phím"
+                  name="keyboardNavigationHints"
+                />
+              </div>
+            </section>
+
+            <Button size="lg" type="submit">
+              Hoàn tất thiết lập
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

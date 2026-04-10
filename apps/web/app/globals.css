@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fff8da;
+  --foreground: #121212;
+  --surface: #fffdf3;
+  --surface-strong: #ffffff;
+  --muted: #3f3f46;
+  --accent: #ff5f87;
+  --accent-soft: #ffd7e2;
+  --accent-alt: #7df2c3;
+  --accent-warm: #ffb84d;
+  --border: #121212;
+  --shadow-brutal: 8px 8px 0 #121212;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-border: var(--border);
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(18, 18, 18, 0.08) 1px, transparent 1px),
+    linear-gradient(rgba(18, 18, 18, 0.08) 1px, transparent 1px),
+    linear-gradient(135deg, #fff8da 0%, #ffe0eb 46%, #e7fff3 100%);
+  background-size: 34px 34px, 34px 34px, 100% 100%;
+  color: var(--foreground);
+  font-family: var(--font-body), sans-serif;
+}
+
+a,
+button,
+input,
+select,
+textarea {
+  outline-offset: 4px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 4px solid #121212;
+}
+
+::selection {
+  background: #ffb84d;
+  color: #121212;
+}
+
+.font-heading {
+  font-family: var(--font-heading), sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.grid-sheen {
+  position: relative;
+}
+
+.grid-sheen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image:
+    linear-gradient(rgba(18, 18, 18, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 18, 18, 0.09) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+
+.soft-orb {
+  position: relative;
+  overflow: hidden;
+}
+
+.soft-orb > * {
+  position: relative;
+  z-index: 1;
+}
+
+.blocklyToolboxDiv,
+.blocklyFlyout,
+.blocklyWidgetDiv .blocklyMenu {
+  scrollbar-color: #121212 #fffdf3;
+  scrollbar-width: auto;
+}
+
+.blocklyFlyoutScrollbar,
+.blocklyFlyout .blocklyScrollbarHorizontal,
+.blocklyFlyout .blocklyScrollbarVertical {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.blocklyToolboxDiv::-webkit-scrollbar,
+.blocklyFlyout::-webkit-scrollbar,
+.blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.blocklyScrollbarBackground {
+  fill: #fff6fb !important;
+  stroke: #121212 !important;
+  stroke-width: 1px !important;
+}
+
+.blocklyScrollbarHandle {
+  fill: #121212 !important;
+}
+
+.blocklyScrollbarKnob {
+  fill: #ff5f87 !important;
+}

@@ -1,0 +1,17 @@
+node_modules/
+.next/
+coverage/
+dist/
+.turbo/
+.vercel/
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+!.env.example
+supabase/.temp/
+

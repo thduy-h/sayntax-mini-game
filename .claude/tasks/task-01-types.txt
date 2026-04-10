@@ -1,0 +1,31 @@
+Implement TypeScript types for the new voice-first lesson flow.
+
+Goal:
+Create shared types for a block-based step learning system where the learner uses voice commands to manipulate blocks.
+
+Allowed files:
+- packages/shared-types/src/lesson.ts
+- packages/shared-types/src/index.ts
+
+Forbidden files:
+- apps/web/*
+- packages/voice-parser/*
+- packages/lesson-engine/*
+
+Required types:
+- Lesson
+- LessonStep
+- VoiceExample
+- PassCondition
+- Hint
+- WorkspaceAction
+
+Constraints:
+- keep naming consistent with the repo
+- no UI changes
+- no unrelated refactors
+- export all public types
+
+After finishing:
+- summarize changed files
+- explain assumptions

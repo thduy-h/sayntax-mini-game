@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Write",
+      "Agent",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Read",
+      "Bash"
+    ]
+  },
+  "hooks": {
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p \"$CLAUDE_PROJECT_DIR/.claude/logs\" && echo \"[$(date '+%F %T')] Task completed\" >> \"$CLAUDE_PROJECT_DIR/.claude/logs/tasks.log\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p \"$CLAUDE_PROJECT_DIR/.claude/logs\" && echo \"[$(date '+%F %T')] Claude edited files\" >> \"$CLAUDE_PROJECT_DIR/.claude/logs/write.log\""
+          }
+        ]
+      }
+    ]
+  }
+}

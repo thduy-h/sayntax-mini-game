@@ -1,0 +1,159 @@
+# Title
+Extract shared lesson-engine text/block helpers into internal helpers.ts
+
+# Goal
+Eliminate the helper duplication between `packages/lesson-engine/src/index.ts`
+and `packages/lesson-engine/src/evaluate-runtime.ts` by moving five pure
+helpers into a new internal module. No behavior change — this is a pure
+refactor to remove duplicate source.
+
+The helpers to extract are (copy them VERBATIM from `index.ts` — character-
+identical — so semantics cannot drift):
+
+1. `normalizeText(value: string): string`
+2. `comparableValue(value: string | number | boolean): string | number | boolean`
+3. `validatePrintText(output: string[], text: string): boolean`
+4. `flattenBlocks(blocks: WorkspaceBlock[]): WorkspaceBlock[]`
+5. `findVariableBlock(blocks: WorkspaceBlock[], expectedName: string)`
+
+Reference source of truth for verbatim copies: `index.ts` lines ~311–356:
+
+```typescript
+function flattenBlocks(blocks: WorkspaceBlock[]): WorkspaceBlock[] {
+  return blocks.flatMap((block) => [block, ...flattenBlocks(block.children ?? [])]);
+}
+
+function normalizeText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/\s+/g, " ");
+}
+
+function comparableValue(value: string | number | boolean) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    const num = Number(trimmed);
+    if (trimmed !== "" && Number.isFinite(num)) return num;
+    return normalizeText(trimmed);
+  }
+  return value;
+}
+
+function findVariableBlock(blocks: WorkspaceBlock[], expectedName: string) {
+  const normalizedName = normalizeText(expectedName);
+  return blocks.find(
+    (block) =>
+      block.type === "variable" &&
+      typeof block.fields?.name === "string" &&
+      normalizeText(block.fields.name) === normalizedName,
+  );
+}
+
+function validatePrintText(output: string[], text: string) {
+  return output.length === 1 && normalizeText(output[0] ?? "") === normalizeText(text);
+}
+```
+
+These five definitions are ALSO present in `evaluate-runtime.ts` (lines ~8–44
+at time of writing). They must be identical after the refactor.
+
+## Scope of changes
+
+**New file**: `packages/lesson-engine/src/helpers.ts`
+- Export exactly these 5 functions (named exports, no default export).
+- Import `WorkspaceBlock` from `@shecancode/shared-types`.
+- No other symbols, no side effects, no dependencies beyond shared-types.
+
+**Modify**: `packages/lesson-engine/src/index.ts`
+- Delete the local definitions of `flattenBlocks`, `normalizeText`,
+  `comparableValue`, `findVariableBlock`, `validatePrintText`.
+- Add an import from `./helpers` for those 5 names.
+- KEEP `hasBlockTypes` and `orderedTopLevelTypes` local to `index.ts` (they
+  are index.ts-specific and used only by `evaluateCompletionLogic`).
+- Do NOT change any other function in `index.ts`. In particular the
+  `evaluateCompletionLogic` switch body must be byte-identical except for
+  any minor import reshuffling.
+- Do NOT re-export the helpers from `index.ts`.
+
+**Modify**: `packages/lesson-engine/src/evaluate-runtime.ts`
+- Delete the local definitions of the 5 helpers.
+- Add an import from `./helpers` for those 5 names.
+- Do NOT change the `evaluateRuntimeLogic` function body.
+
+## Do NOT touch
+
+- `packages/lesson-engine/src/evaluate-block-structure.ts` — it already uses
+  its own minimal helpers (`someBlock`, `includesOrderedTypes`) and does NOT
+  duplicate the 5 target helpers. Leaving it alone also preserves a
+  pre-existing semantic difference (it uses plain `.trim()` equality for
+  variable names while the new helpers.ts uses `normalizeText`) — that
+  divergence is out of scope for this refactor and will be revisited later.
+- `completion-logic-helpers.ts` / `.test.ts`
+- `evaluate-step.ts` / `.test.ts`
+- Any `*.test.ts` file
+- `packages/shared-types/*`
+- `apps/web/*`, `packages/voice-parser/*`, `supabase/*`
+- Any `package.json`, `tsconfig.json`, root config
+
+## Allowed files
+- packages/lesson-engine/src/helpers.ts          (NEW)
+- packages/lesson-engine/src/index.ts            (MODIFY — import + delete locals only)
+- packages/lesson-engine/src/evaluate-runtime.ts (MODIFY — import + delete locals only)
+
+## Forbidden files
+- packages/lesson-engine/src/evaluate-block-structure.ts
+- packages/lesson-engine/src/evaluate-block-structure.test.ts
+- packages/lesson-engine/src/completion-logic-helpers.ts
+- packages/lesson-engine/src/completion-logic-helpers.test.ts
+- packages/lesson-engine/src/evaluate-runtime.test.ts
+- packages/lesson-engine/src/evaluate-step.ts
+- packages/lesson-engine/src/evaluate-step.test.ts
+- packages/shared-types/*
+- packages/voice-parser/*
+- apps/web/*
+- supabase/*
+- Any package.json, tsconfig.json, or root config files
+
+## Constraints
+- TypeScript strict. No `any`. No unsafe `as` casts (the single narrow
+  `fields.value as string | number | boolean` cast may remain where it is).
+- `helpers.ts` must contain ONLY the 5 functions listed — no extras.
+- Function bodies in `helpers.ts` must be character-identical to the
+  originals in `index.ts`. Do NOT refactor, rename, add comments, or
+  "improve" them.
+- In `index.ts` and `evaluate-runtime.ts`, the only changes are: (a) one
+  new import line from `./helpers`, (b) deletion of the now-duplicate
+  function definitions. No other edits. No reordering of unrelated code.
+- After the refactor, grepping `packages/lesson-engine/src/` for
+  `function normalizeText` must return exactly ONE hit (in `helpers.ts`).
+  Same for `function comparableValue`, `function validatePrintText`,
+  `function flattenBlocks`, `function findVariableBlock`.
+- Do NOT add new dependencies.
+- `helpers.ts` under ~60 lines.
+
+## Verification
+1. `npx tsc --noEmit -p packages/lesson-engine` exits 0
+   (runs inside nix-shell via `scripts/run-codex-task.sh`).
+2. Run every existing test file still green:
+   - `npx tsx packages/lesson-engine/src/completion-logic-helpers.test.ts`
+   - `npx tsx packages/lesson-engine/src/evaluate-block-structure.test.ts`
+   - `npx tsx packages/lesson-engine/src/evaluate-runtime.test.ts`
+   - `npx tsx packages/lesson-engine/src/evaluate-step.test.ts`
+   All four must exit 0 and print their respective `*** tests passed` lines.
+   (Sandbox fallback to `node --import tsx <file>` is acceptable if `npx tsx`
+   fails due to IPC/EPERM.)
+3. `grep -n 'function normalizeText\|function comparableValue\|function validatePrintText\|function flattenBlocks\|function findVariableBlock' packages/lesson-engine/src/*.ts`
+   must output exactly 5 lines — all from `helpers.ts`.
+4. Git diff check: `git diff packages/lesson-engine/src/index.ts` must show
+   ONLY (a) added import line and (b) deleted helper definitions. No other
+   modified regions. Same for `evaluate-runtime.ts`.
+
+## Final summary must include
+- changed files (new + modified)
+- confirmation of grep result (exactly 5 single-definition lines in helpers.ts)
+- which test files were re-run and their exit status
+- any unexpected edits required outside the plan (there should be none)

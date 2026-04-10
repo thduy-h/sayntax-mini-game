@@ -36,6 +36,9 @@ export default async function DashboardPage() {
             <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#ff5f87] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/lessons">
               Vào bài học
             </Link>
+            <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#a8e6ff] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/lessons-v2">
+              Bài học V2 (voice)
+            </Link>
             <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#7df2c3] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/role-models">
               Góc truyền cảm hứng
             </Link>

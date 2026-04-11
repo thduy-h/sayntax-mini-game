@@ -63,34 +63,42 @@ export function evaluateStepAction(
         ? { completed: true, feedback: FEEDBACK.insert_into_pass }
         : { completed: false, feedback: FEEDBACK.insert_into_fail };
     case "set_text": {
-      const target = blocks.find((block) => block.id === action.blockId);
-      // Loose semantics: any non-empty text passes. Look in both the
-      // literal `fields[<field>]` AND a Scratch-style reporter sub-block
-      // at `inputs[<field>]` (text_literal -> fields.value). This lets
-      // beginners write whatever they want instead of matching an exact
-      // expectedText string.
-      const literal = target?.fields?.[action.field];
-      const reporter = target?.inputs?.[action.field];
-      const reporterValue =
-        reporter?.type === "text_literal" || reporter?.type === "variable_get"
-          ? reporter.fields?.value ?? reporter.fields?.name
-          : undefined;
-      const candidate = reporterValue ?? literal;
-      const text = typeof candidate === "string" ? candidate : candidate !== undefined ? String(candidate) : "";
-      return text.trim().length > 0
+      // Loose + ID-agnostic semantics: pass if ANY block in the workspace
+      // has a non-empty value at fields[<field>] OR inputs[<field>] (a
+      // Scratch-style reporter such as text_literal or variable_get).
+      // The action.blockId is intentionally ignored here — the user-added
+      // blocks have Blockly-generated ids that don't match seed ids, so we
+      // match by field name instead. blockId stays in the type only as a
+      // hint for the UI (set_text from voice still tries blockId first).
+      const found = blocks.some((block) => {
+        const literal = block.fields?.[action.field];
+        const reporter = block.inputs?.[action.field];
+        const reporterValue =
+          reporter?.type === "text_literal" || reporter?.type === "variable_get"
+            ? reporter.fields?.value ?? reporter.fields?.name
+            : undefined;
+        const candidate = reporterValue ?? literal;
+        if (candidate === undefined) return false;
+        const text = typeof candidate === "string" ? candidate : String(candidate);
+        return text.trim().length > 0;
+      });
+      return found
         ? { completed: true, feedback: FEEDBACK.set_text_pass }
         : { completed: false, feedback: FEEDBACK.set_text_fail };
     }
     case "set_number": {
-      const target = blocks.find((block) => block.id === action.blockId);
-      const literal = target?.fields?.[action.field];
-      const reporter = target?.inputs?.[action.field];
-      const reporterValue = reporter?.type === "number_literal" ? reporter.fields?.value : undefined;
-      const candidate = reporterValue ?? literal;
-      const n = Number(candidate);
-      // Loose semantics: any finite number passes. Lets beginners experiment
-      // with their own values instead of matching an exact expectedNumber.
-      return Number.isFinite(n)
+      // Loose + ID-agnostic: pass if ANY block has a finite number at
+      // fields[<field>] OR inputs[<field>] (number_literal value).
+      const found = blocks.some((block) => {
+        const literal = block.fields?.[action.field];
+        const reporter = block.inputs?.[action.field];
+        const reporterValue = reporter?.type === "number_literal" ? reporter.fields?.value : undefined;
+        const candidate = reporterValue ?? literal;
+        if (candidate === undefined) return false;
+        const n = Number(candidate);
+        return Number.isFinite(n);
+      });
+      return found
         ? { completed: true, feedback: FEEDBACK.set_number_pass }
         : { completed: false, feedback: FEEDBACK.set_number_fail };
     }

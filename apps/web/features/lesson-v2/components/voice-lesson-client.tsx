@@ -304,10 +304,45 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     }
   }
 
-  function resolveTargetBlock(workspace: Blockly.WorkspaceSvg, action: LessonStepAction) {
-    if ((action.kind === "set_text" || action.kind === "set_number") && action.blockId) {
-      return workspace.getBlockById(action.blockId);
+  function inferBlocklyTypeFromField(action: LessonStepAction): string | null {
+    if (action.kind !== "set_text" && action.kind !== "set_number") return null;
+    switch (action.field) {
+      case "text":
+        return "scc_print";
+      case "name":
+        return "scc_variable";
+      case "value":
+        return "scc_variable";
+      case "times":
+        return "scc_repeat";
+      case "condition":
+        return "scc_if";
+      default:
+        return null;
     }
+  }
+
+  function resolveTargetBlock(workspace: Blockly.WorkspaceSvg, action: LessonStepAction) {
+    if (action.kind === "set_text" || action.kind === "set_number") {
+      // 1. Try the seed's blockId first (works when starter loaded fresh).
+      if (action.blockId) {
+        const byId = workspace.getBlockById(action.blockId);
+        if (byId) return byId;
+      }
+      // 2. Fallback: infer the Blockly type from the action's field name
+      // and pick the most recent matching block. This handles the
+      // persist-forward case where the user added blocks themselves —
+      // their Blockly-generated ids don't match the seed's expected id.
+      const inferred = inferBlocklyTypeFromField(action);
+      if (inferred) {
+        const all = workspace.getAllBlocks(false) as Blockly.BlockSvg[];
+        for (let i = all.length - 1; i >= 0; i--) {
+          const b = all[i];
+          if (b && b.type === inferred) return b;
+        }
+      }
+    }
+    // 3. Final fallback: currently selected block (for free-form usage).
     const selected = Blockly.common.getSelected();
     return selected instanceof Blockly.Block ? selected : null;
   }

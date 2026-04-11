@@ -1,1351 +1,194 @@
 # Title
-S5b: Wire voice + action evaluation + auto-advance into VoiceLessonClient
+R1.3: Update lesson 5 step 6 seed to use variable_get reporter (closes "print variable" gap)
 
 # Goal
-Extend the `VoiceLessonClient` component (created in S5a) with:
+With R1.1 (data-model reporter support) and R1.2 (Blockly wiring) in
+place, the V1 limitation noted in the lesson-architect spec —
+"V1 action model can't express 'print variable value'" — is no longer
+true. Update lesson 5 ("Cơ bản về biến") so the final step actually
+prints the variable's value (10) instead of a literal label.
 
-1. Voice button + transcript display via the existing `useSpeechRecognition`
-   hook
-2. Parse transcript via `parseVoiceIntent` (S2)
-3. Apply matched intent to the Blockly workspace
-4. Evaluate each step via `evaluateStepAction` (S1) after relevant
-   workspace changes or run-program actions
-5. Auto-advance to the next step on success feedback
-6. Track fail count per step, show a "Skip" button after 3 consecutive
-   fails
-7. Run-program path uses `executeProgram` from `@shecancode/block-engine`
-8. Browser support warning: if `useSpeechRecognition().isSupported`
-   is false, disable the voice button and show a Vietnamese message
-   "Trình duyệt hiện tại chưa hỗ trợ nhận giọng nói. Bạn có thể tiếp tục bằng chuột."
+This is the SMALLEST possible behavioral payoff slice that exercises
+the new reporter system end-to-end.
 
-This is a MODIFY-only slice. No new files. Only `voice-lesson-client.tsx`
-changes.
+# Files to modify
 
-## Files to modify
+**MODIFY**: `packages/lesson-engine/src/seed-v2.ts`
 
-**MODIFY**: `apps/web/features/lesson-v2/components/voice-lesson-client.tsx`
+Two changes within the same file:
 
-Add imports at top:
+## Change 1: lesson 5 step 5 (set print to use variable reporter)
+
+Currently step 5 is "Đặt nhãn cho khối in" which has the learner type
+the literal text "diem" into a print field. With reporters available,
+this step is now redundant — and confusing. Replace it with a step that
+SETS UP the variable reporter inside the print block via voice.
+
+OLD step 5 (in lessonsV2 array, lesson index 4 = lesson 5, steps[4]):
 ```ts
-import { executeProgram } from "@shecancode/block-engine";
-import {
-  evaluateStepAction,
-  type LessonStepAction,
-} from "@shecancode/lesson-engine";
-import { parseVoiceIntent, type VoiceIntent } from "@shecancode/voice-parser";
-import type {
-  ProgramExecutionResult,
-  ProgramWorkspace,
-} from "@shecancode/shared-types";
-import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
-import { Mic, MicOff, Lightbulb } from "lucide-react";
+{
+  id: "v2-lesson-5-step-5",
+  databaseStepId: "40000000-0000-0000-0000-000000000505",
+  orderIndex: 5,
+  title: "Đặt nhãn cho khối in",
+  instructions: "Chọn khối in và hãy nói: **Đặt chữ diem** để ghi nhớ biến bạn đang theo dõi.",
+  hints: [...],
+  action: { kind: "set_text", blockId: "v2-l5-print", field: "text", expectedText: "diem" },
+  starterWorkspace: { ...starter with empty text print... },
+}
 ```
 
-## New state (added to existing component)
+NEW step 5 — change to a `set_text` step that asks the learner to drag
+a "biến diem" reporter into the print's text slot. Since we don't yet
+have a voice intent for "drag reporter", the simplest correct
+formulation is to seed the print block in the starter ALREADY
+containing a variable_get reporter (so the workspace LOOKS done) and
+then have the learner adjust it. But that's not satisfying as a step.
+
+ALTERNATIVE: keep step 5 as a `set_text` step, but change `expectedText`
+to a literal value the learner can speak ("xem điểm"). And keep the
+"print the value" mechanic as a SEPARATE thing in step 6.
+
+Actually, the cleanest minimal change is:
+
+1. KEEP step 5 unchanged (it currently sets the print text to the literal
+   "diem"). It's still a meaningful step.
+
+2. ONLY change step 6 (the run_program step) so that:
+   - The starterWorkspace's print block has `inputs.text = { type: "variable_get", fields: { name: "diem" } }` INSTEAD of `fields: { text: "diem" }`. This means by step 6, the print block has been "upgraded" from literal to reporter — implying step 5's outcome is actually wired through.
+   - The action's `expectedOutput` is set to `["10"]` (the value of the diem variable, which is 10 from step 3).
+
+Wait — but if step 5's eval is `set_text(expectedText: "diem")` against
+a workspace where the print block has `inputs.text = variable_get(name="diem")`
+(no `fields.text`), then `evaluateStepAction` set_text branch will
+look for `fields.text` and find undefined → fail. Step 5 will be
+unreachable.
+
+So step 5 ALSO needs to change OR step 5's starter must keep
+fields.text and step 6's starter is the one that switches to inputs.
+
+CLEANEST minimal-change approach:
+
+- Step 5 keeps `set_text(expectedText: "diem")` and its starter has
+  the print with `fields: { text: "" }` (existing). Learner says
+  "Đặt chữ diem" → print text becomes "diem" → eval passes → advance.
+- Step 6 starter is updated: print block now has
+  `inputs: { text: { id: "v2-l5-print-var", type: "variable_get",
+  fields: { name: "diem" } } }` and NO `fields.text`. The action stays
+  run_program but now has `expectedOutput: ["10"]`.
+
+This way:
+- Step 5 still works (set_text on literal field).
+- Step 6 starter shows the print with a "biến diem" reporter dropped in.
+- Running the program produces output ["10"] because executeProgram
+  resolves the print's text via inputs.text -> variable_get(name="diem")
+  -> variables["diem"] = "10" (set in step 3).
+
+Also update step 6's title and instructions so it's clear the learner
+is now USING the variable, not just labeling it:
+
+- title: "In ra giá trị của biến"
+  (was: "Chạy chương trình")
+- instructions: "Hãy nói: **Chạy chương trình** để in ra giá trị của biến diem (sẽ là 10)."
+  (was: "Hãy nói: **Chạy chương trình** để kiểm tra mọi thứ hoạt động.")
+- hints (3 lines, Vietnamese):
+  [
+    "Khối in giờ chứa biến diem chứ không phải chữ.",
+    "Giá trị của biến diem là 10 (đặt từ bước 3).",
+    "Thử: Chạy chương trình."
+  ]
+
+## Change 2: nothing else
+
+Do NOT change lessons 1-4. Do NOT change lesson 5 steps 1-5. Do NOT
+touch any other file.
+
+# Concrete diff scope (step 6 ONLY)
+
+The current step 6 in seed-v2.ts looks like:
 
 ```ts
-const [failCount, setFailCount] = useState(0);
-const [lastFeedback, setLastFeedback] = useState<string | null>(null);
-const [voiceLog, setVoiceLog] = useState<string[]>([]);  // last 5 transcripts
-const [showSkip, setShowSkip] = useState(false);
-
-const speech = useSpeechRecognition();
-
-// Reset fail count + feedback when step changes
-useEffect(() => {
-  setFailCount(0);
-  setLastFeedback(null);
-  setShowSkip(false);
-}, [currentStepIndex]);
-
-useEffect(() => {
-  if (failCount >= 3) setShowSkip(true);
-}, [failCount]);
+{
+  id: "v2-lesson-5-step-6",
+  databaseStepId: "40000000-0000-0000-0000-000000000506",
+  orderIndex: 6,
+  title: "Chạy chương trình",
+  instructions: "Hãy nói: **Chạy chương trình** để kiểm tra mọi thứ hoạt động.",
+  hints: ["Chương trình tạo biến rồi in nhãn.", "Nếu có lỗi, kiểm tra lại khối biến.", "Thử: Chạy chương trình."],
+  action: { kind: "run_program" },
+  starterWorkspace: {
+    version: 1,
+    blocks: [
+      { id: "v2-l5-start", type: "start" },
+      { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } },
+      { id: "v2-l5-print", type: "print", fields: { text: "diem" } },
+    ],
+  },
+},
 ```
 
-## Voice handling
+REPLACE with:
 
-When `speech.transcript` changes (via `useEffect` on `speech.transcript`),
-and the transcript is non-empty:
-
-1. Append to `voiceLog` (keep last 5)
-2. `const intent = parseVoiceIntent(speech.transcript)`
-3. Apply intent to workspace (see below)
-4. After applying (or immediately for `run_program`), call
-   `evaluateAndMaybeAdvance()` which:
-   - Builds current `program` via `toProgram(workspace)`
-   - If intent.kind is "run_program", `exec = executeProgram(program)`
-     else uses a dummy success result: `{ success: true, output: [], errors: [], variables: {} }`
-   - Calls `evaluateStepAction(currentStep.action, program, exec)`
-   - Sets `lastFeedback` to the result's `feedback`
-   - If `completed === true`: advance step (if not last), reset fail/feedback/skip
-   - Else: `setFailCount(n => n + 1)`
-
-## Intent → Blockly action mapping
-
-Inside a helper function `applyIntentToWorkspace(intent: VoiceIntent)`
-(defined at component-level with `workspaceRef.current` access):
-
-- **add_block**: use the existing `addBlockFromVoice`-style pattern:
-  ```ts
-  const typeMap = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" };
-  const b = workspace.newBlock(typeMap[intent.blockType]) as Blockly.BlockSvg;
-  b.initSvg(); b.render();
-  const { x, y } = getInsertPosition(workspace); // copy from legacy file or inline
-  b.moveBy(x, y);
-  ```
-- **insert_into**: find the first top-level block with type
-  `intent.parentHint` (if provided). If found, and its first
-  `input_statement` exists, create a child block of type... but we don't
-  know child type from the intent alone (childHint is undefined in V1).
-  For S5b, only handle the case where the learner says "đặt vào trong khối lặp"
-  AFTER the child block already exists as a top-level block: find the
-  most recent top-level child of a compatible type (print is the default
-  child type) and connect it. If no suitable child exists, show a
-  feedback message "Hãy thêm khối con trước" and don't change workspace.
-  SIMPLIFICATION: if this gets too tangled, just do a no-op and
-  `setLastFeedback("Đang thêm vào trong khối — hãy dùng chuột để kéo thả nếu cần.")`.
-  The loose-pass semantics of `evaluateStepAction` insert_into will rely
-  on the learner doing it via mouse OR already having nested blocks via
-  starterWorkspace. That's acceptable for S5b — voice-driven insert_into
-  is hard and can wait.
-- **set_text**: find the currently SELECTED block in Blockly via
-  `Blockly.common.getSelected()`. If none, show feedback
-  "Hãy chọn khối trước khi đặt chữ." If a block is selected and has a
-  field matching the currentStep.action's field name (or the default
-  "TEXT"/"NAME" Blockly field names), set the field value via
-  `block.setFieldValue(intent.text, fieldName)`. Helper to resolve
-  target field from the current step action: if the step action is
-  `set_text` with a specific `blockId` + `field`, prefer setting THAT
-  block's field directly (find by blockId in the workspace via
-  `workspace.getBlockById(blockId)` mapping). Otherwise fall back to the
-  selected block.
-- **set_number**: same logic as set_text but `String(intent.value)` into
-  the field. For step-targeted number fields, use the step action's
-  `blockId` + `field`.
-- **run_program**: no workspace mutation. The evaluate step will run
-  `executeProgram`.
-- **ask_hint**: cycle through `currentStep.hints` (state: `hintIndex`),
-  show the next hint in the hints card. Do NOT call evaluateStepAction
-  here — ask_hint's evaluator always returns completed true, which would
-  auto-advance unfairly. Special-case: if current step's action kind is
-  "ask_hint", do call the evaluator (that's the intended completion
-  path).
-- **unknown**: show feedback `"Chưa hiểu câu lệnh. Thử nói lại hoặc nhấn ${intent.reason}."`
-  with reason translated minimally:
-  - "empty" → "im lặng"
-  - "no_match" → "rõ hơn"
-  - "ambiguous" → "rõ hơn"
-  - "partial_add_block" → "thêm khối gì"
-
-## UI additions (append to existing layout)
-
-Inside the workspace Card content, ABOVE the Prev/Next buttons, add a
-"voice zone":
-
-```jsx
-<div className="mt-4 flex flex-col gap-2">
-  {!speech.isSupported && (
-    <p className="text-sm text-red-600">Trình duyệt hiện tại chưa hỗ trợ nhận giọng nói. Bạn có thể tiếp tục bằng chuột.</p>
-  )}
-  <div className="flex items-center gap-2">
-    <Button
-      onClick={() => (speech.isListening ? speech.stopListening() : speech.startListening())}
-      disabled={!speech.isSupported}
-    >
-      {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-      {speech.isListening ? "Dừng ghi âm" : "Bắt đầu nói"}
-    </Button>
-    {showSkip && (
-      <Button variant="secondary" onClick={() => { nextStep(); setFailCount(0); setShowSkip(false); }}>
-        Bỏ qua bước này
-      </Button>
-    )}
-  </div>
-  {speech.errorMessage && <p className="text-sm text-red-600">{speech.errorMessage}</p>}
-  {speech.transcript && <p className="text-sm font-mono">Bạn nói: "{speech.transcript}"</p>}
-  {lastFeedback && <p className="text-sm font-semibold">{lastFeedback}</p>}
-</div>
+```ts
+{
+  id: "v2-lesson-5-step-6",
+  databaseStepId: "40000000-0000-0000-0000-000000000506",
+  orderIndex: 6,
+  title: "In ra giá trị của biến",
+  instructions: "Hãy nói: **Chạy chương trình** để in ra giá trị của biến diem (sẽ là 10).",
+  hints: [
+    "Khối in giờ chứa biến diem chứ không phải chữ.",
+    "Giá trị của biến diem là 10 (đặt từ bước 3).",
+    "Thử: Chạy chương trình.",
+  ],
+  action: { kind: "run_program", expectedOutput: ["10"] },
+  starterWorkspace: {
+    version: 1,
+    blocks: [
+      { id: "v2-l5-start", type: "start" },
+      { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } },
+      {
+        id: "v2-l5-print",
+        type: "print",
+        inputs: {
+          text: {
+            id: "v2-l5-print-var",
+            type: "variable_get",
+            fields: { name: "diem" },
+          },
+        },
+      },
+    ],
+  },
+},
 ```
 
-Hints card: add a button "Gợi ý" that when clicked shows the hint at
-`hintIndex`, incrementing hintIndex each click (cycle mod hints.length).
-This mirrors the voice ask_hint path for mouse users.
-
-## Allowed files
-- apps/web/features/lesson-v2/components/voice-lesson-client.tsx (MODIFY ONLY)
+# Allowed files
+- packages/lesson-engine/src/seed-v2.ts (MODIFY only — single step)
 
 # Forbidden files
 - All other files in the repo
 
 # Constraints
 - TypeScript strict.
-- Keep "use client" directive at top.
-- Reuse useSpeechRecognition hook — do NOT reimplement it.
-- Reuse Blockly setup from S5a — do NOT duplicate again.
-- Keep the existing parseBlock/readChain/toProgram/buildBlocklyChain
-  helpers — extend them with any new helper you need (e.g.
-  `getInsertPosition`, `resolveStepTargetBlock`).
-- Do NOT add new NPM dependencies.
-- Keep the file under 520 lines total (was 234, adding voice wiring).
-- Do NOT introduce any global state outside the component.
-
-# Verification
-1. `nix-shell -p nodejs_22 --run "cd apps/web && npx tsc --noEmit 2>&1 | tail -30"` exits 0.
-2. `git status --short apps/web/` shows ONLY
-   `M apps/web/features/lesson-v2/components/voice-lesson-client.tsx`
-   (no other files).
-3. `git diff apps/web/features/block-workspace/components/lesson-workspace.tsx` empty (legacy untouched).
-4. `wc -l apps/web/features/lesson-v2/components/voice-lesson-client.tsx` < 520.
-5. lesson-engine tsc still green.
-6. grep confirms these symbols appear in the file:
-   `parseVoiceIntent`, `evaluateStepAction`, `executeProgram`,
-   `useSpeechRecognition`, `setFailCount`, `showSkip`.
-
-# Final summary
-- File line count before/after
-- apps/web tsc result
-- Any assumption made about insert_into simplification
-- Any assumption about hint index / ask_hint evaluator loophole
-- Deviation (ideally none)
-
-
-# Goal
-Create the V2 interactive client component that renders:
-1. A Blockly workspace (drag/drop enabled, toolbox) loaded with the
-   current step's `starterWorkspace`
-2. A step navigation sidebar showing all steps in the lesson, highlighting
-   the current step
-3. The current step's title, instructions, and hints
-4. Prev / Next step buttons (simple manual nav — auto-advance and voice
-   wiring land in S5b, NOT this slice)
-
-This slice does NOT include:
-- Voice recognition UI or intent parsing
-- `evaluateStepAction` calls or auto-advance
-- Fail counting or skip-after-3 logic
-- Running programs via `executeProgram`
-
-Those are S5b scope. S5a must be functional-but-static: learner can view
-the lesson, navigate steps with mouse, play with blocks in workspace for
-each step. No evaluation yet.
-
-## Files to create / modify
-
-**NEW**: `apps/web/features/lesson-v2/components/voice-lesson-client.tsx`
-
-**MODIFY**: `apps/web/app/lessons-v2/[slug]/page.tsx` — replace the
-placeholder `<section>` with `<VoiceLessonClient lesson={lesson} />` and
-add the corresponding import. Do NOT remove any other part of the page;
-just swap the placeholder.
-
-## VoiceLessonClient component contract
-
-```ts
-"use client";
-
-import type { LessonV2WithSteps, LessonStepV2 } from "@shecancode/lesson-engine";
-
-interface VoiceLessonClientProps {
-  lesson: LessonV2WithSteps;
-}
-
-export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Element;
-```
-
-### Component behavior
-
-- `useState<number>(0)` for `currentStepIndex`.
-- `const currentStep = lesson.steps[currentStepIndex]`. If undefined
-  (shouldn't happen with seed data) render a safe fallback message.
-- Blockly workspace inits ONCE via `useEffect` on mount. Container is a
-  `<div ref={containerRef}>` with fixed height 520px.
-- Reuse the legacy Blockly setup verbatim (theme, toolbox, block
-  definitions, parseBlock, readChain, toProgram, buildBlocklyChain,
-  domainBlockToBlockly, starterStateFromWorkspace). Duplicate these
-  helpers at the top of the new file. DO NOT refactor them into a shared
-  module this slice — that's a future refactor. Copy them byte-identical
-  from `apps/web/features/block-workspace/components/lesson-workspace.tsx`.
-- The `registered` flag for `ensureBlocks()` must be module-local to this
-  new file (so it doesn't collide with the legacy workspace if both are
-  ever rendered on the same page).
-- When `currentStepIndex` changes, load `currentStep.starterWorkspace`
-  into the Blockly workspace via
-  `Blockly.serialization.workspaces.load(starterStateFromWorkspace(currentStep.starterWorkspace), workspace)`
-  wrapped in a `useEffect`.
-
-### Layout (Tailwind, neo-brutalism, match legacy visual style)
-
-```
-<section className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
-  <div>
-    <Card>
-      <CardHeader>
-        <p>Bước {currentStepIndex + 1} / {lesson.steps.length}</p>
-        <CardTitle>{currentStep.title}</CardTitle>
-        <CardDescription>{currentStep.instructions}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div ref={containerRef} style={{ height: 520 }} className="w-full border-4 border-black" />
-        <div className="mt-4 flex gap-2">
-          <Button onClick={prevStep} disabled={currentStepIndex === 0}>← Bước trước</Button>
-          <Button onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Bước sau →</Button>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-  <aside>
-    <Card>
-      <CardHeader><CardTitle>Các bước</CardTitle></CardHeader>
-      <CardContent>
-        <ol className="flex flex-col gap-2">
-          {lesson.steps.map((step, i) => (
-            <li key={step.id}>
-              <button onClick={() => setCurrentStepIndex(i)}
-                className={i === currentStepIndex ? "font-black underline" : ""}>
-                Bước {i + 1}: {step.title}
-              </button>
-            </li>
-          ))}
-        </ol>
-      </CardContent>
-    </Card>
-    <Card className="mt-4 bg-[#fff6fb]">
-      <CardHeader><CardTitle>Gợi ý</CardTitle></CardHeader>
-      <CardContent>
-        <ul className="flex flex-col gap-1 text-sm">
-          {currentStep.hints.map((h, i) => <li key={i}>{i + 1}. {h}</li>)}
-        </ul>
-      </CardContent>
-    </Card>
-  </aside>
-</section>
-```
-
-Use shared UI components from `@/components/ui/card` and `@/components/ui/button`.
-
-## Detail page edit
-
-In `apps/web/app/lessons-v2/[slug]/page.tsx`:
-1. Add import at top:
-   `import { VoiceLessonClient } from "@/features/lesson-v2/components/voice-lesson-client";`
-2. Replace the placeholder `<section>` that currently says
-   "Workspace giọng nói sẽ xuất hiện ở đây (S5)" with:
-   `<VoiceLessonClient lesson={lesson} />`
-3. DO NOT change anything else. Leave the header, back link, stats card,
-   and the static step list untouched (the static step list is fine as a
-   read-only reference alongside the interactive client).
-
-## Allowed files
-- apps/web/features/lesson-v2/components/voice-lesson-client.tsx (NEW)
-- apps/web/app/lessons-v2/[slug]/page.tsx                         (MODIFY: 1 import + placeholder swap)
-
-# Forbidden files
-- apps/web/features/block-workspace/**  (legacy — DO NOT TOUCH)
-- apps/web/features/voice-control/**    (legacy hook — don't import yet)
-- apps/web/app/lessons/**               (legacy routes)
-- apps/web/app/lessons-v2/page.tsx      (V2 listing — don't touch)
-- Any package under packages/
-- supabase/*, package.json, tsconfig, next.config, middleware, .env
-
-# Constraints
-- TypeScript strict.
-- "use client" at top of voice-lesson-client.tsx.
-- Reuse `blockly` package — it's already a dep. Import via
-  `import * as Blockly from "blockly";`
-- No new NPM deps.
-- File under 380 lines (duplicated Blockly helpers are acceptable).
-- Do NOT import anything from `@shecancode/block-engine` or
-  `@shecancode/voice-parser` in this slice (those are S5b wiring).
-- Do NOT call `evaluateStepAction` yet. Do NOT call `executeProgram` yet.
-  S5a is static.
-- Do NOT add any test file (client components are integration-tested in S7).
-- Use `useState`, `useEffect`, `useRef` — no new hooks beyond what React
-  and the component need.
-
-# Verification
-1. `nix-shell -p nodejs_22 --run "cd apps/web && npx tsc --noEmit 2>&1 | tail -30"` exits 0.
-2. `git status --short apps/web/` shows:
-   - NEW: `features/lesson-v2/components/voice-lesson-client.tsx`
-   - MODIFIED: `app/lessons-v2/[slug]/page.tsx`
-   - NO other apps/web file touched
-3. `git diff apps/web/app/lessons-v2/[slug]/page.tsx` shows at most:
-   - 1 added import line
-   - removal of the placeholder `<section>...</section>` block
-   - 1 added `<VoiceLessonClient lesson={lesson} />` line (or a small wrapper)
-4. Legacy lesson-workspace.tsx at `apps/web/features/block-workspace/components/lesson-workspace.tsx` must be byte-identical.
-5. `nix-shell -p nodejs_22 --run "cd packages/lesson-engine && npx tsc --noEmit"` still exits 0 (no package regression).
-
-# Final summary
-- Changed files (1 new, 1 modified)
-- Line count of voice-lesson-client.tsx
-- apps/web tsc exit status
-- Any assumption about Blockly helper duplication
-- Any deviation from spec (none expected)
-
-
-# Goal
-Create two NEW Next.js App Router pages under `apps/web/app/lessons-v2/`:
-
-1. `apps/web/app/lessons-v2/page.tsx` — listing page (grid of 5 V2 lessons)
-2. `apps/web/app/lessons-v2/[slug]/page.tsx` — detail page server shell
-   that fetches a single V2 lesson by slug, renders lesson header + step
-   list + a clearly-marked placeholder panel for the interactive voice
-   workspace (S5 will replace the placeholder with the real client).
-
-These live side-by-side with legacy `/lessons/*` — do NOT modify or delete
-anything under `apps/web/app/lessons/`.
-
-Both pages are server components with `export const dynamic = "force-dynamic";`,
-auth gate via `getCurrentAppUser`, redirect to `/sign-in` if unauthenticated,
-redirect to `/onboarding` if onboarding incomplete — matching the legacy
-pattern exactly.
-
-## Data source
-
-Both pages import V2 helpers from `@shecancode/lesson-engine` (they are now
-exported via the `export * from "./seed-v2"` line added in S3):
-
-- `listSeedV2Lessons()` returns `LessonV2Preview[]`
-- `getSeedV2LessonBySlug(slug: string)` returns `LessonV2WithSteps | null`
-- Types: `LessonV2Preview`, `LessonV2WithSteps`, `LessonStepV2`,
-  `LessonStepAction`
-
-## Listing page spec (apps/web/app/lessons-v2/page.tsx)
-
-Layout: mirror `apps/web/app/lessons/page.tsx` visual style (neo-brutalism
-cards, Vietnamese copy, grid of lesson cards). Key differences:
-
-- Header banner: different color from legacy (use `bg-[#a8e6ff]` instead
-  of `bg-[#ff5f87]`) so learners can visually distinguish V2
-- Banner title: `Bài học V2 — học bằng giọng nói`
-- Banner description: `Mỗi bước chỉ dạy một hành động. Nói câu lệnh, xem khối xuất hiện, và tiếp tục.`
-- Each lesson card linked to `/lessons-v2/${slug}` (use slug, NOT id, for
-  route)
-- Card shows: "Bài N", title, summary, step count, estimated minutes
-- Use `Link` from `next/link` with `Route` type from `next`
-  (`next`'s `Route<T>` generic). If the cast causes TS issues, use
-  `as Route` like legacy does
-- NO progress summary for now (V2 has separate database IDs; progress
-  tracking lands in S8)
-
-## Detail page spec (apps/web/app/lessons-v2/[slug]/page.tsx)
-
-```ts
-interface LessonV2DetailPageProps {
-  params: Promise<{ slug: string }>;
-}
-```
-
-Flow:
-
-1. Auth gate (redirect sign-in / onboarding as above)
-2. Await params, get slug
-3. `const lesson = getSeedV2LessonBySlug(slug)`
-4. If null → `notFound()` from next/navigation
-5. Render layout:
-   - Back link: `← Quay lại danh sách bài học V2` → `/lessons-v2`
-   - `<h1>` with lesson.title
-   - A stats card (bg-[#e7fff3]) showing: stepCount + estimatedMinutes +
-     first learning goal
-   - **Placeholder panel** clearly labeled: a `<section>` with a big
-     dashed border and text `"Workspace giọng nói sẽ xuất hiện ở đây (S5)"`
-     — this is the slot S5 will later replace with the real
-     `VoiceLessonClient` component. Add a TODO comment in the JSX
-     explaining the stub.
-   - **Step list** (static): map over `lesson.steps`, render a card per
-     step showing:
-     - Step N title
-     - instructions (with the `**bold**` markdown left as literal text —
-       DO NOT parse it, a future slice will)
-     - The first hint in smaller text
-     - A pill showing `action.kind` (e.g. "add_block", "set_text")
-6. Structure matches legacy `lessons/[lessonId]/page.tsx` with the same
-   `<main>` wrapper classes.
-
-## Allowed files
-- apps/web/app/lessons-v2/page.tsx                (NEW)
-- apps/web/app/lessons-v2/[slug]/page.tsx         (NEW)
-
-# Forbidden files
-- apps/web/app/lessons/** (legacy, DO NOT TOUCH)
-- Any other file in apps/web/
-- packages/** (S4 is pure web-layer consumer of S1-S3)
-- supabase/*
-- package.json, tsconfig.json, eslint config, next config, middleware
-
-# Constraints
-- TypeScript strict (apps/web uses its own strict config).
-- Both files must have `export const dynamic = "force-dynamic";`
-- Import auth from `@/features/auth/server/data` (function `getCurrentAppUser`)
-  and redirects from `next/navigation`
-- Import types and functions from `@shecancode/lesson-engine` using the
-  package root (NOT relative paths) — e.g.
-  `import { listSeedV2Lessons, getSeedV2LessonBySlug, type LessonV2WithSteps, type LessonStepV2, type LessonStepAction } from "@shecancode/lesson-engine";`
-- Use shared UI components from `@/components/ui/card` — `Card`,
-  `CardHeader`, `CardTitle`, `CardDescription`, `CardContent` — as legacy does
-- Vietnamese copy only. NO English fallback text.
-- Do NOT add new NPM deps.
-- Do NOT add client components with `"use client"` — both pages are pure
-  server components this slice. S5 adds the client component.
-- Each file under ~120 lines.
-
-# Verification
-
-1. `nix-shell -p nodejs_22 --run "cd apps/web && npx tsc --noEmit"`
-   exits 0 (the web app uses its own tsconfig).
-2. `nix-shell -p nodejs_22 --run "cd . && npm run build 2>&1 | tail -20"`
-   → Next.js build should NOT fail. This is the critical gate since server
-   components have their own type checks.
-3. `git status --short apps/web/app/lessons-v2/` shows exactly 2 new files:
-   - `page.tsx`
-   - `[slug]/page.tsx`
-4. `grep -c "Hãy nói" apps/web/app/lessons-v2/` via
-   `find apps/web/app/lessons-v2 -name '*.tsx' -exec cat {} \; | grep -c "lessons-v2"`
-   should be > 0.
-5. Legacy lesson tests + lesson-engine tsc still green (no regression):
-   - `nix-shell -p nodejs_22 --run "cd packages/lesson-engine && npx tsc --noEmit"`
-     exits 0
-   - All 6 lesson-engine test files still pass
-
-# Final summary
-- Changed files (2 new)
-- TypeScript check status (apps/web tsc)
-- Build status (optional — note if not run)
-- Any assumptions Codex made about Route types, component prop
-  destructuring, or the placeholder JSX
-- Deviation from the spec (none expected)
-
-
-# Goal
-Create a NEW file `packages/lesson-engine/src/seed-v2.ts` that exports:
-
-1. A `lessonsV2` const (array of 5 `LessonV2WithSteps` objects — full lesson
-   data including steps and starterWorkspaces)
-2. `listSeedV2Lessons(): LessonV2Preview[]` — previews for lesson listing UI
-3. `getSeedV2LessonById(id: string): LessonV2WithSteps | null` — by numeric id
-4. `getSeedV2LessonBySlug(slug: string): LessonV2WithSteps | null` — by slug
-
-Also create `packages/lesson-engine/src/seed-v2.test.ts` with basic checks.
-
-Do NOT modify any existing file. Do NOT export from `index.ts`. Consumers
-will import directly from `@shecancode/lesson-engine/seed-v2` is NOT valid
-(no exports field), so consumers will need to import via package root once
-we later re-export — but THAT is a future slice, NOT this one.
-
-For now, tests import from the file path directly, and S4 (web route) will
-temporarily import from an absolute path until index.ts re-export happens.
-
-Actually wait — to simplify S4, add ONE re-export line to
-`packages/lesson-engine/src/index.ts` at the very end, EXACTLY this line:
-
-```
-export * from "./seed-v2";
-```
-
-And nothing else.
-
-# Required types (define locally in seed-v2.ts)
-
-```ts
-import type {
-  LessonStepV2,
-} from "./action-model";
-
-export interface LessonV2Preview {
-  id: string;
-  slug: string;
-  databaseLessonId: string;
-  orderIndex: number;
-  stepCount: number;
-  title: string;
-  summary: string;
-}
-
-export interface LessonV2WithSteps extends LessonV2Preview {
-  description: string;
-  estimatedMinutes: number;
-  learningGoals: string[];
-  steps: LessonStepV2[];
-}
-```
-
-Use `v2-lesson-N` as `id`, `<slug>-v2` as `slug` (e.g.
-`start-and-sequence-v2`), and fabricate stable database-style UUIDs like
-`"40000000-0000-0000-0000-00000000000<n>"` for `databaseLessonId` (don't
-conflict with legacy `20000000-...` or step `30000000-...`).
-
-Use `LessonStepV2` directly for steps. Each step's `databaseStepId` uses
-`"40000000-0000-0000-0000-000000000<L><NN>"` where L is lesson number and
-NN is step number.
-
-# THE 5 LESSONS TO SEED (verbatim from lesson-architect spec)
-
-## Lesson 1 — start-and-sequence-v2
-
-- id: `v2-lesson-1`
-- slug: `start-and-sequence-v2`
-- databaseLessonId: `40000000-0000-0000-0000-000000000001`
-- orderIndex: 1
-- title: `Bắt đầu và tuần tự`
-- summary: `Học cách tạo điểm khởi động và nối một lệnh in đầu tiên bằng giọng nói.`
-- description: `Làm quen với khái niệm chương trình cần một khối bắt đầu, sau đó đến các khối chạy theo thứ tự. Học sinh học bốn thao tác nền tảng trong một bài.`
-- estimatedMinutes: 10
-- learningGoals: `["Biết mọi chương trình cần một khối bắt đầu", "Thêm khối bằng giọng nói", "Đổi nội dung văn bản của một khối in", "Chạy thử và quan sát kết quả"]`
-- stepCount: 4
-
-### Steps (4)
-
-1. id=`v2-lesson-1-step-1`, databaseStepId=`40000000-0000-0000-0000-000000000101`, orderIndex=1
-   - title: `Thêm khối bắt đầu`
-   - instructions: `Chào mừng! Hãy nói: **Thêm khối bắt đầu** để tạo điểm khởi động cho chương trình.`
-   - hints: `["Mỗi chương trình đều cần một điểm bắt đầu.", "Bạn chỉ cần nói câu lệnh hoặc kéo khối bắt đầu từ hộp bên trái.", "Thử chính xác: Thêm khối bắt đầu."]`
-   - action: `{ kind: "add_block", blockType: "start" }`
-   - starterWorkspace: `{ version: 1, blocks: [] }`
-
-2. id=`v2-lesson-1-step-2`, databaseStepId=`40000000-0000-0000-0000-000000000102`, orderIndex=2
-   - title: `Thêm khối in`
-   - instructions: `Tuyệt vời! Giờ hãy nói: **Thêm khối in** để chuẩn bị in ra một lời chào.`
-   - hints: `["Khối in sẽ hiển thị chữ ra màn hình.", "Thêm khối mới, không cần xoá khối bắt đầu.", "Thử: Thêm khối in."]`
-   - action: `{ kind: "add_block", blockType: "print" }`
-   - starterWorkspace: `{ version: 1, blocks: [{ id: "v2-l1-start", type: "start" }] }`
-
-3. id=`v2-lesson-1-step-3`, databaseStepId=`40000000-0000-0000-0000-000000000103`, orderIndex=3
-   - title: `Đặt lời chào`
-   - instructions: `Chọn khối in rồi hãy nói: **Đặt chữ Xin chào** để nhập nội dung.`
-   - hints: `["Câu lệnh bắt đầu bằng 'Đặt chữ'.", "Nội dung cần đúng là: Xin chào.", "Thử nguyên câu: Đặt chữ Xin chào."]`
-   - action: `{ kind: "set_text", blockId: "v2-l1-print", field: "text", expectedText: "Xin chào" }`
-   - starterWorkspace:
-     ```
-     { version: 1, blocks: [
-       { id: "v2-l1-start", type: "start" },
-       { id: "v2-l1-print", type: "print", fields: { text: "" } }
-     ]}
-     ```
-
-4. id=`v2-lesson-1-step-4`, databaseStepId=`40000000-0000-0000-0000-000000000104`, orderIndex=4
-   - title: `Chạy chương trình`
-   - instructions: `Bạn sẵn sàng rồi! Hãy nói: **Chạy chương trình** để xem kết quả.`
-   - hints: `["Chương trình sẽ chạy từ khối bắt đầu xuống dưới.", "Nếu chưa thấy kết quả, kiểm tra khối in.", "Thử: Chạy chương trình."]`
-   - action: `{ kind: "run_program", expectedOutput: ["Xin chào"] }`
-   - starterWorkspace:
-     ```
-     { version: 1, blocks: [
-       { id: "v2-l1-start", type: "start" },
-       { id: "v2-l1-print", type: "print", fields: { text: "Xin chào" } }
-     ]}
-     ```
-
-## Lesson 2 — print-output-v2
-
-- id: `v2-lesson-2`, slug: `print-output-v2`
-- databaseLessonId: `40000000-0000-0000-0000-000000000002`
-- orderIndex: 2
-- title: `In và đầu ra`
-- summary: `Học cách dùng hai khối in để hiển thị nhiều dòng theo thứ tự.`
-- description: `Luyện tập thao tác in nhiều thông điệp và hiểu rằng đầu ra chạy tuần tự từ trên xuống dưới.`
-- estimatedMinutes: 14
-- learningGoals: `["Biết mỗi khối in cho ra một dòng", "Đặt nhiều nội dung khác nhau", "Hiểu đầu ra theo thứ tự khối", "Chạy chương trình nhiều dòng"]`
-- stepCount: 5
-
-### Steps (5)
-
-1. step id=`v2-lesson-2-step-1`, dbId=`40000000-0000-0000-0000-000000000201`, order=1
-   - title: `Thêm khối in đầu tiên`
-   - instructions: `Hãy nói: **Thêm khối in** để chuẩn bị dòng đầu tiên.`
-   - hints: `["Khối in sẽ nằm sau khối bắt đầu.", "Chỉ cần một khối in mới.", "Thử: Thêm khối in."]`
-   - action: `{ kind: "add_block", blockType: "print" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l2-start", type: "start" }] }`
-
-2. step id=`v2-lesson-2-step-2`, dbId=`40000000-0000-0000-0000-000000000202`, order=2
-   - title: `Đặt nội dung dòng 1`
-   - instructions: `Chọn khối in đầu tiên và hãy nói: **Đặt chữ Xin chào**.`
-   - hints: `["Nội dung cần đúng chính tả: Xin chào.", "Dùng câu lệnh bắt đầu bằng 'Đặt chữ'.", "Thử: Đặt chữ Xin chào."]`
-   - action: `{ kind: "set_text", blockId: "v2-l2-print-1", field: "text", expectedText: "Xin chào" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "" } }]}`
-
-3. step id=`v2-lesson-2-step-3`, dbId=`40000000-0000-0000-0000-000000000203`, order=3
-   - title: `Thêm khối in thứ hai`
-   - instructions: `Bây giờ hãy nói: **Thêm khối in** để tạo dòng thứ hai.`
-   - hints: `["Khối mới sẽ nằm dưới khối in cũ.", "Không cần sửa khối in đầu tiên.", "Thử: Thêm khối in."]`
-   - action: `{ kind: "add_block", blockType: "print" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "Xin chào" } }]}`
-
-4. step id=`v2-lesson-2-step-4`, dbId=`40000000-0000-0000-0000-000000000204`, order=4
-   - title: `Đặt nội dung dòng 2`
-   - instructions: `Chọn khối in thứ hai và hãy nói: **Đặt chữ Bạn làm được**.`
-   - hints: `["Đây là nội dung cho dòng thứ hai.", "Viết đúng: Bạn làm được.", "Thử: Đặt chữ Bạn làm được."]`
-   - action: `{ kind: "set_text", blockId: "v2-l2-print-2", field: "text", expectedText: "Bạn làm được" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "Xin chào" } }, { id: "v2-l2-print-2", type: "print", fields: { text: "" } }]}`
-
-5. step id=`v2-lesson-2-step-5`, dbId=`40000000-0000-0000-0000-000000000205`, order=5
-   - title: `Chạy để xem hai dòng`
-   - instructions: `Hãy nói: **Chạy chương trình** để xem cả hai dòng xuất hiện.`
-   - hints: `["Đầu ra sẽ có hai dòng.", "Dòng đầu là 'Xin chào', dòng sau là 'Bạn làm được'.", "Thử: Chạy chương trình."]`
-   - action: `{ kind: "run_program", expectedOutput: ["Xin chào", "Bạn làm được"] }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "Xin chào" } }, { id: "v2-l2-print-2", type: "print", fields: { text: "Bạn làm được" } }]}`
-
-## Lesson 3 — repeat-loops-v2
-
-- id: `v2-lesson-3`, slug: `repeat-loops-v2`
-- databaseLessonId: `40000000-0000-0000-0000-000000000003`
-- orderIndex: 3
-- title: `Vòng lặp lặp lại`
-- summary: `Học cách đặt khối in vào bên trong vòng lặp để tiết kiệm thao tác.`
-- description: `Bài đầu tiên giới thiệu thao tác 'đưa vào trong'. Học sinh lồng khối in trong khối lặp và điều chỉnh số lần lặp.`
-- estimatedMinutes: 16
-- learningGoals: `["Biết khối lặp chạy đi chạy lại", "Lồng khối in vào bên trong khối lặp", "Đổi số lần lặp bằng giọng nói", "Quan sát nhiều dòng cùng nội dung"]`
-- stepCount: 5 (NOTE: spec listed 6 but only 5 actual steps shown — use the 5 steps below)
-
-### Steps (5)
-
-1. `v2-lesson-3-step-1` / `40000000-0000-0000-0000-000000000301`
-   - title: `Thêm khối lặp`
-   - instructions: `Hãy nói: **Thêm khối lặp** để tạo một vòng lặp.`
-   - hints: `["Khối lặp sẽ chạy đi chạy lại các khối bên trong nó.", "Chỉ cần thêm, chưa cần đặt gì vào trong.", "Thử: Thêm khối lặp."]`
-   - action: `{ kind: "add_block", blockType: "repeat" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l3-start", type: "start" }] }`
-
-2. `v2-lesson-3-step-2` / `40000000-0000-0000-0000-000000000302`
-   - title: `Đặt khối in vào trong vòng lặp`
-   - instructions: `Hãy nói: **Đặt vào trong khối lặp** rồi thêm khối in, hoặc kéo khối in vào bên trong khối lặp.`
-   - hints: `["Khối in phải nằm bên trong vùng chứa của khối lặp.", "Có thể kéo khối in từ hộp bên trái vào trong.", "Thử: Đặt vào trong khối lặp."]`
-   - action: `{ kind: "insert_into", parentBlockType: "repeat", childBlockType: "print" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l3-start", type: "start" }, { id: "v2-l3-repeat", type: "repeat", fields: { times: 2 }, children: [] }]}`
-
-3. `v2-lesson-3-step-3` / `40000000-0000-0000-0000-000000000303`
-   - title: `Đặt số lần lặp`
-   - instructions: `Chọn khối lặp và hãy nói: **Đặt số 3** để lặp ba lần.`
-   - hints: `["Số lần lặp cần là 3.", "Câu lệnh bắt đầu bằng 'Đặt số'.", "Thử: Đặt số 3."]`
-   - action: `{ kind: "set_number", blockId: "v2-l3-repeat", field: "times", expectedNumber: 3 }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l3-start", type: "start" }, { id: "v2-l3-repeat", type: "repeat", fields: { times: 2 }, children: [{ id: "v2-l3-inner-print", type: "print", fields: { text: "" } }]}]}`
-
-4. `v2-lesson-3-step-4` / `40000000-0000-0000-0000-000000000304`
-   - title: `Đặt nội dung cho khối in bên trong`
-   - instructions: `Chọn khối in bên trong vòng lặp và hãy nói: **Đặt chữ Cố lên**.`
-   - hints: `["Nội dung cần là: Cố lên.", "Đây là dòng sẽ lặp ba lần.", "Thử: Đặt chữ Cố lên."]`
-   - action: `{ kind: "set_text", blockId: "v2-l3-inner-print", field: "text", expectedText: "Cố lên" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l3-start", type: "start" }, { id: "v2-l3-repeat", type: "repeat", fields: { times: 3 }, children: [{ id: "v2-l3-inner-print", type: "print", fields: { text: "" } }]}]}`
-
-5. `v2-lesson-3-step-5` / `40000000-0000-0000-0000-000000000305`
-   - title: `Chạy vòng lặp`
-   - instructions: `Hãy nói: **Chạy chương trình** để thấy 'Cố lên' xuất hiện 3 lần.`
-   - hints: `["Đầu ra có ba dòng giống nhau.", "Nếu chỉ thấy một dòng, kiểm tra số trong khối lặp.", "Thử: Chạy chương trình."]`
-   - action: `{ kind: "run_program", expectedOutput: ["Cố lên", "Cố lên", "Cố lên"] }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l3-start", type: "start" }, { id: "v2-l3-repeat", type: "repeat", fields: { times: 3 }, children: [{ id: "v2-l3-inner-print", type: "print", fields: { text: "Cố lên" } }]}]}`
-
-## Lesson 4 — if-basics-v2
-
-- id: `v2-lesson-4`, slug: `if-basics-v2`
-- databaseLessonId: `40000000-0000-0000-0000-000000000004`
-- orderIndex: 4
-- title: `Cơ bản về điều kiện if`
-- summary: `Học cách đưa một khối in vào bên trong khối điều kiện.`
-- description: `Học sinh làm quen với cấu trúc rẽ nhánh đơn giản: khi điều kiện đúng, chương trình in một thông điệp.`
-- estimatedMinutes: 14
-- learningGoals: `["Nhận ra khối điều kiện quyết định chạy hay không", "Lồng hành động vào bên trong khối điều kiện", "Viết nội dung cho hành động trong điều kiện", "Quan sát kết quả khi điều kiện đúng"]`
-- stepCount: 5
-
-### Steps (5)
-
-1. `v2-lesson-4-step-1` / `40000000-0000-0000-0000-000000000401`
-   - title: `Thêm khối điều kiện`
-   - instructions: `Hãy nói: **Thêm khối điều kiện** để thêm một khối if.`
-   - hints: `["Khối điều kiện giúp chương trình ra quyết định.", "Chỉ cần thêm khối, chưa cần đặt gì bên trong.", "Thử: Thêm khối điều kiện."]`
-   - action: `{ kind: "add_block", blockType: "if" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l4-start", type: "start" }] }`
-
-2. `v2-lesson-4-step-2` / `40000000-0000-0000-0000-000000000402`
-   - title: `Đặt khối in vào trong điều kiện`
-   - instructions: `Hãy nói: **Đặt vào trong khối điều kiện** rồi thêm khối in, hoặc kéo khối in vào trong.`
-   - hints: `["Khối in phải nằm trong phần thân của khối điều kiện.", "Khi điều kiện đúng, khối in sẽ chạy.", "Thử: Đặt vào trong khối điều kiện."]`
-   - action: `{ kind: "insert_into", parentBlockType: "if", childBlockType: "print" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l4-start", type: "start" }, { id: "v2-l4-if", type: "if", fields: { condition: true }, children: [] }]}`
-
-3. `v2-lesson-4-step-3` / `40000000-0000-0000-0000-000000000403`
-   - title: `Đặt nội dung cho khối in bên trong`
-   - instructions: `Chọn khối in trong điều kiện và hãy nói: **Đặt chữ Sẵn sàng**.`
-   - hints: `["Nội dung cần là: Sẵn sàng.", "Đây là thông điệp chỉ in khi điều kiện đúng.", "Thử: Đặt chữ Sẵn sàng."]`
-   - action: `{ kind: "set_text", blockId: "v2-l4-inner-print", field: "text", expectedText: "Sẵn sàng" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l4-start", type: "start" }, { id: "v2-l4-if", type: "if", fields: { condition: true }, children: [{ id: "v2-l4-inner-print", type: "print", fields: { text: "" } }]}]}`
-
-4. `v2-lesson-4-step-4` / `40000000-0000-0000-0000-000000000404`
-   - title: `Chạy chương trình có điều kiện`
-   - instructions: `Hãy nói: **Chạy chương trình** để xem 'Sẵn sàng' được in ra.`
-   - hints: `["Vì điều kiện đang đúng, khối in sẽ chạy.", "Nếu không thấy gì, kiểm tra khối in đã nằm trong điều kiện chưa.", "Thử: Chạy chương trình."]`
-   - action: `{ kind: "run_program", expectedOutput: ["Sẵn sàng"] }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l4-start", type: "start" }, { id: "v2-l4-if", type: "if", fields: { condition: true }, children: [{ id: "v2-l4-inner-print", type: "print", fields: { text: "Sẵn sàng" } }]}]}`
-
-5. `v2-lesson-4-step-5` / `40000000-0000-0000-0000-000000000405`
-   - title: `Mở gợi ý để ôn lại`
-   - instructions: `Trước khi kết thúc, hãy nói: **Xin gợi ý** để xem tóm tắt về khối điều kiện.`
-   - hints: `["Gợi ý giúp bạn ôn lại ý chính.", "Có thể nói 'gợi ý' hoặc 'giúp'.", "Thử: Xin gợi ý."]`
-   - action: `{ kind: "ask_hint" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l4-start", type: "start" }, { id: "v2-l4-if", type: "if", fields: { condition: true }, children: [{ id: "v2-l4-inner-print", type: "print", fields: { text: "Sẵn sàng" } }]}]}`
-
-## Lesson 5 — variables-basics-v2
-
-- id: `v2-lesson-5`, slug: `variables-basics-v2`
-- databaseLessonId: `40000000-0000-0000-0000-000000000005`
-- orderIndex: 5
-- title: `Cơ bản về biến`
-- summary: `Tạo một biến, đặt tên và gán giá trị số.`
-- description: `Học sinh làm quen với khái niệm biến: một nơi lưu trữ có tên và giá trị. Bài này tập trung vào tạo, đặt tên và gán số.`
-- estimatedMinutes: 16
-- learningGoals: `["Biết biến là nơi lưu giá trị", "Đặt tên biến bằng giọng nói", "Gán giá trị số cho biến", "Kết hợp biến với khối in trong cùng một chương trình"]`
-- stepCount: 6
-
-### Steps (6)
-
-1. `v2-lesson-5-step-1` / `40000000-0000-0000-0000-000000000501`
-   - title: `Thêm khối biến`
-   - instructions: `Hãy nói: **Thêm khối biến** để tạo một biến mới.`
-   - hints: `["Khối biến giúp chương trình nhớ một giá trị.", "Chỉ cần thêm khối, chưa cần đặt tên.", "Thử: Thêm khối biến."]`
-   - action: `{ kind: "add_block", blockType: "variable" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }] }`
-
-2. `v2-lesson-5-step-2` / `40000000-0000-0000-0000-000000000502`
-   - title: `Đặt tên biến`
-   - instructions: `Chọn khối biến và hãy nói: **Đặt chữ diem** để đặt tên biến là 'diem'.`
-   - hints: `["Tên biến nên ngắn và dễ hiểu.", "Trong bài này, tên cần đúng là: diem.", "Thử: Đặt chữ diem."]`
-   - action: `{ kind: "set_text", blockId: "v2-l5-variable", field: "name", expectedText: "diem" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "", value: 0 } }]}`
-
-3. `v2-lesson-5-step-3` / `40000000-0000-0000-0000-000000000503`
-   - title: `Gán giá trị cho biến`
-   - instructions: `Với khối biến đang chọn, hãy nói: **Đặt số 10** để gán giá trị 10.`
-   - hints: `["Giá trị cần là số 10.", "Câu lệnh bắt đầu bằng 'Đặt số'.", "Thử: Đặt số 10."]`
-   - action: `{ kind: "set_number", blockId: "v2-l5-variable", field: "value", expectedNumber: 10 }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 0 } }]}`
-
-4. `v2-lesson-5-step-4` / `40000000-0000-0000-0000-000000000504`
-   - title: `Thêm khối in`
-   - instructions: `Hãy nói: **Thêm khối in** để chuẩn bị hiển thị thông tin.`
-   - hints: `["Khối in sẽ nằm sau khối biến.", "Không cần xoá khối biến.", "Thử: Thêm khối in."]`
-   - action: `{ kind: "add_block", blockType: "print" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } }]}`
-
-5. `v2-lesson-5-step-5` / `40000000-0000-0000-0000-000000000505`
-   - title: `Đặt nhãn cho khối in`
-   - instructions: `Chọn khối in và hãy nói: **Đặt chữ diem** để ghi nhớ biến bạn đang theo dõi.`
-   - hints: `["Đây là nhãn nhắc bạn về biến 'diem'.", "Nội dung cần đúng là: diem.", "Thử: Đặt chữ diem."]`
-   - action: `{ kind: "set_text", blockId: "v2-l5-print", field: "text", expectedText: "diem" }`
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } }, { id: "v2-l5-print", type: "print", fields: { text: "" } }]}`
-
-6. `v2-lesson-5-step-6` / `40000000-0000-0000-0000-000000000506`
-   - title: `Chạy chương trình`
-   - instructions: `Hãy nói: **Chạy chương trình** để kiểm tra mọi thứ hoạt động.`
-   - hints: `["Chương trình tạo biến rồi in nhãn.", "Nếu có lỗi, kiểm tra lại khối biến.", "Thử: Chạy chương trình."]`
-   - action: `{ kind: "run_program" }` (no `expectedOutput`)
-   - starter: `{ version: 1, blocks: [{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } }, { id: "v2-l5-print", type: "print", fields: { text: "diem" } }]}`
-
-# Allowed files
-- packages/lesson-engine/src/seed-v2.ts        (NEW)
-- packages/lesson-engine/src/seed-v2.test.ts   (NEW)
-- packages/lesson-engine/src/index.ts          (MODIFY — add ONE line: `export * from "./seed-v2";` at EOF)
-
-# Forbidden files
-- All other files under packages/lesson-engine/src/
-- packages/shared-types/*, packages/voice-parser/*, packages/block-engine/*,
-  packages/ui/*, apps/web/*, supabase/*, all package.json, all tsconfig.json,
-  root configs
-
-# Constraints
-- TypeScript strict. No `any`. No unsafe casts. Use `satisfies` where
-  helpful to pin literal types.
-- All strings are Vietnamese as specified — character-perfect copy (do NOT
-  substitute synonyms, do NOT modify diacritics).
-- Every `LessonStepV2` object must have `id`, `databaseStepId`, `orderIndex`,
-  `title`, `instructions`, `hints`, `starterWorkspace`, `action` — exact
-  field names per the LessonStepV2 interface from action-model.ts.
-- Each lesson's `stepCount` must equal the actual `steps.length`.
-- Import types from `./action-model` (relative). Import `BlockKind`,
-  `WorkspaceBlock`, `ProgramWorkspace` from `@shecancode/shared-types` only
-  if needed. Do NOT import anything else.
-- Do NOT export the raw `lessonsV2` array from `index.ts` via the re-export
-  line — the `export * from "./seed-v2"` already exposes everything.
-- Do NOT touch `lessons`, `evaluateCompletionLogic`, `getSeedCourseOverview`,
-  `listSeedLessons`, `getSeedLessonById`, `evaluateLessonStep`, or any
-  other function/const in `index.ts`. The ONLY edit to `index.ts` is the
-  single re-export line at the END of the file.
-- `seed-v2.ts` may exceed normal 200 line budget due to data volume — cap
-  at 550 lines (there's a lot of lesson content).
-- `seed-v2.test.ts` under 160 lines.
+- Vietnamese strings character-perfect (do not paraphrase).
+- The "v2-l5-print-var" id must be unique within the lesson 5 step 6
+  starter — no collision with other ids.
 - Do NOT add new dependencies.
-
-# Required test coverage (seed-v2.test.ts)
-
-Use `node:assert/strict`. Print `"seed-v2 tests passed"` on success.
-
-Tests:
-1. `listSeedV2Lessons()` returns exactly 5 previews, in order 1..5, with
-   unique slugs ending in `-v2`.
-2. For each of 5 lessons: `getSeedV2LessonBySlug(slug)` and
-   `getSeedV2LessonById(id)` both return the same lesson reference (or at
-   least deep-equal), and the lesson's `stepCount === steps.length`.
-3. Every step has a non-empty `instructions` string containing `"Hãy nói"`.
-4. Every `set_text` and `set_number` action's `blockId` must be present in
-   that step's `starterWorkspace` (recursive search). This is the
-   critical correctness check — if a step references a non-existent
-   block, the evaluator will silently fail.
-5. Every step's `action.kind` is one of the 6 valid LessonStepAction kinds.
-6. Lesson 1 step 1 uses `add_block` start with empty starterWorkspace;
-   assert `lesson1.steps[0].action.kind === "add_block"` and the
-   starterWorkspace has zero blocks.
-7. Lesson 4 step 5 is the `ask_hint` step; assert its action kind.
-8. `getSeedV2LessonBySlug("nonexistent")` returns `null`.
-9. `getSeedV2LessonById("nonexistent")` returns `null`.
+- Do NOT touch any other lesson or any other step.
 
 # Verification
-1. `npx tsc --noEmit -p packages/lesson-engine` exits 0.
-2. `npx tsx packages/lesson-engine/src/seed-v2.test.ts` exits 0 printing
-   `"seed-v2 tests passed"`. (Sandbox fallback node --import tsx acceptable.)
-3. All pre-existing tests still green:
-   - `action-model.test.ts`, `completion-logic-helpers.test.ts`,
-     `evaluate-block-structure.test.ts`, `evaluate-runtime.test.ts`,
-     `evaluate-step.test.ts`
-4. `git status --short packages/lesson-engine/src/` shows:
-   - NEW: seed-v2.ts, seed-v2.test.ts
-   - MODIFIED: index.ts (1 line appended)
-5. `git diff packages/lesson-engine/src/index.ts` shows ONLY the single
-   `+export * from "./seed-v2";` line.
+
+1. nix-shell -p nodejs_22 --run "cd packages/lesson-engine && npx tsc --noEmit" exits 0.
+2. nix-shell -p nodejs_22 --run "cd packages/lesson-engine && for f in src/*.test.ts; do npx tsx \"\$f\"; done" — all 6 test files still green. seed-v2.test.ts is the critical one — it asserts that every set_text/set_number action's blockId exists in the step's starterWorkspace via recursive search. The test must still pass, which means recursive search must find blocks inside `inputs` as well as `children`.
+3. If seed-v2.test.ts fails because the recursive search doesn't descend into `inputs`, the test file in packages/lesson-engine/src/seed-v2.test.ts may need a 1-line fix to also walk `inputs`. THAT IS ALLOWED — extend the forbidden-files rule to permit ONLY the existing seed-v2.test.ts file IF AND ONLY IF the failure is the one described. Do not modify any other file.
+4. nix-shell -p nodejs_22 --run "cd apps/web && npx tsc --noEmit 2>&1 | tail -10" exits 0.
+5. git status --short shows ONLY:
+   - M packages/lesson-engine/src/seed-v2.ts
+   - (optionally) M packages/lesson-engine/src/seed-v2.test.ts
 
 # Final summary
-- Changed files (new + modified)
-- Confirmation tsc + all 6 test files (5 existing + 1 new) green
-- Confirmation index.ts diff is exactly 1 line
-- Any assumption made about the 5-vs-6 step count in Lesson 3 (spec shows 5
-  steps; follow the 5-step version)
-- Any deviation from the verbatim Vietnamese text (should be none)
-
-
-# Goal
-Create a new pure Vietnamese voice intent parser in
-`packages/voice-parser` that maps user transcripts to the 6 action variants
-of `LessonStepAction` (from S1) + an `unknown` fallback. This runs ALONGSIDE
-the existing legacy `parseVoiceCommand` — leave that untouched.
-
-Add one re-export line to the existing `index.ts` so consumers can
-`import { parseVoiceIntent, VoiceIntent } from "@shecancode/voice-parser"`.
-Everything else is new files.
-
-# Required type: VoiceIntent
-
-```ts
-import type { BlockKind } from "@shecancode/shared-types";
-
-export type VoiceIntent =
-  | { kind: "add_block"; blockType: BlockKind }
-  | { kind: "insert_into"; parentHint?: BlockKind; childHint?: BlockKind }
-  | { kind: "set_text"; text: string }
-  | { kind: "set_number"; value: number }
-  | { kind: "run_program" }
-  | { kind: "ask_hint" }
-  | {
-      kind: "unknown";
-      reason: "empty" | "no_match" | "ambiguous" | "partial_add_block";
-    };
-```
-
-# Required function
-
-```ts
-export function parseVoiceIntent(transcript: string): VoiceIntent;
-```
-
-Pure, deterministic, no I/O, no randomness.
-
-# Normalization pipeline (apply to transcript BEFORE matching)
-
-1. If empty/whitespace only → return `{ kind: "unknown", reason: "empty" }`.
-2. Build `normalized` string:
-   - trim
-   - lowercase
-   - reuse `stripVietnameseDiacritics` from `./index` (import it — DO NOT
-     redefine; if it is not exported, add a NEW export keyword to it in
-     `index.ts` as your ONE allowed edit, OR duplicate the 4-line function
-     in the new file — Codex chooses; duplicate is cleaner, prefer that)
-   - strip surrounding punctuation `[.,!?;:"'()]`
-   - replace non-`[a-z0-9\s]` with space
-   - collapse multi-space to single space
-   - drop leading politeness: `(hay|lam on|giup minh|cho minh)\s+`
-   - drop trailing politeness particles `\s+(di|nhe|nha|a|voi|oi)$`
-   - final trim
-3. Also keep the ORIGINAL transcript (post step 1 trim only) for `set_text`
-   capture preservation — required so diacritics + case survive.
-
-# Matching priority (FIRST match wins, don't try lower tiers)
-
-1. **set_text** — regex on normalized:
-   `/^(?:dat chu|go chu|noi dung la|cho chu|viet chu|chu la)\s+(.+)$/`
-   If match: compute the captured text from the ORIGINAL transcript using
-   whitespace-token alignment. Split both the original and normalized
-   transcripts on whitespace. Count how many tokens the keyword phrase
-   occupies in the normalized form (e.g. `"dat chu"` = 2 tokens,
-   `"noi dung la"` = 3 tokens). Take the corresponding SUFFIX of the
-   original transcript's tokens and join with single spaces. Return
-   `{ kind: "set_text", text: <preserved> }`.
-
-2. **set_number** — regex on normalized:
-   `/^(?:dat so|gia tri(?: la)?|cho so|dat bang|so la|gan bang)\s+(.+)$/`
-   Capture the numeric payload. Resolve in this order:
-   - If payload matches `^\d+$` → `Number(payload)`
-   - Else try the Vietnamese word-number table (see next block)
-   - Else → `{ kind: "unknown", reason: "no_match" }`
-
-   **Vietnamese number words** (exhaustive for 0..99; higher out of scope):
-   - `khong=0, mot=1, hai=2, ba=3, bon=4, nam=5, sau=6, bay=7, tam=8, chin=9, muoi=10`
-   - `muoi <unit>` = 10 + unit (special: `lam`=5 in this position, so
-     `muoi lam` = 15, but `muoi mot` = 11, `muoi nam` = 15 also)
-   - `<tens> muoi` for 20–90 where tens ∈ 2..9 (`hai muoi` = 20, `ba muoi` = 30, ...)
-   - `<tens> muoi <unit>` for compound (`hai muoi mot` = 21; special
-     `mot→1`, `lam→5`, `tu→4`, `nam→5` in unit position)
-   - Implementation hint: write a small `parseVietnameseNumber(s: string): number | null` helper inside the file.
-
-3. **insert_into** — normalized transcript starts with (or equals) any of:
-   `dat vao trong`, `bo vo`, `cho vao ben trong`, `keo vo`, `dat vao`,
-   `bo vao trong`, `long vao`, `nhet vao`
-   After the keyword, if remaining tokens contain a block keyword
-   (`lap`, `dieu kien`, `in`, `bat dau`, `bien`), set `parentHint` to the
-   corresponding `BlockKind`: `lap→repeat`, `dieu kien→if`, `in→print`,
-   `bat dau→start`, `bien→variable`. Otherwise `parentHint` undefined.
-   `childHint` stays undefined in V1 (not parsed yet).
-
-4. **add_block** — for each of the 5 BlockKinds, try its phrase list:
-
-   - `start` (BlockKind `"start"`): `them khoi bat dau`, `them start`,
-     `cho khoi bat dau`, `keo khoi bat dau ra`, `them lenh bat dau`,
-     `khoi bat dau`
-   - `print` (BlockKind `"print"`): `them khoi in`, `cho khoi in`,
-     `them lenh in`, `them in`, `khoi in`, `in ra`
-   - `repeat` (BlockKind `"repeat"`): `them khoi lap`, `cho khoi lap`,
-     `them vong lap`, `them lap`, `khoi lap`, `lap lai`
-   - `if` (BlockKind `"if"`): `them khoi dieu kien`, `them if`,
-     `them dieu kien`, `khoi dieu kien`, `them khoi neu`, `neu thi`
-   - `variable` (BlockKind `"variable"`): `them bien`, `tao bien`,
-     `bien moi`, `them khoi bien`, `khoi bien`, `them mot bien`
-
-   Matching: exact equality OR startsWith (strip trailing tokens then
-   retry) — whichever is simpler; longest matched phrase wins.
-   Return `{ kind: "add_block", blockType: <kind> }`.
-
-   If the transcript contains a hint word (`them`, `cho`, `keo`) but
-   NO block keyword matches → return
-   `{ kind: "unknown", reason: "partial_add_block" }`.
-
-5. **run_program** — exact/startsWith match on any of: `chay chuong trinh`,
-   `chay di`, `thuc thi`, `run program`, `chay thu`, `chay code`,
-   `bat dau chay`, `chay`
-
-6. **ask_hint** — exact/startsWith match on any of: `goi y`, `chi toi`,
-   `mach nho`, `giup voi`, `meo`, `huong dan`, `toi can goi y`,
-   `cho xin goi y`, `xin goi y`
-
-7. **unknown** fallback — `{ kind: "unknown", reason: "no_match" }`.
-
-Note: because `set_text` and `set_number` are regex-anchored, they catch
-those exact phrasings first. `add_block` matches are string-level (no regex
-payload). Simple string comparison is fine.
-
-# Allowed files
-- packages/voice-parser/src/parse-intent.ts       (NEW)
-- packages/voice-parser/src/parse-intent.test.ts  (NEW)
-- packages/voice-parser/src/index.ts              (MODIFY — add ONE re-export line at the bottom)
-
-# Forbidden files
-- All other files under packages/voice-parser/ and packages/voice-parser/src/
-- packages/shared-types/*, packages/lesson-engine/*, packages/block-engine/*,
-  packages/ui/*, apps/web/*, supabase/*, package.json, tsconfig.json,
-  root configs
-
-# Constraints
-
-- TypeScript strict. No `any`. No unsafe `as` casts.
-- Pure function: no I/O, no Date, no globals, no mutation of inputs.
-- Import `BlockKind` from `@shecancode/shared-types`.
-- Do NOT touch or change `parseVoiceCommand`, `VoiceParseResult`,
-  `SUPPORTED_COMMAND_PATTERNS`, `stripVietnameseDiacritics`,
-  `normalizeForMatching`, `normalizeTranscript` in `index.ts`.
-- The ONLY allowed edit to `index.ts` is adding this single line at the
-  end: `export * from "./parse-intent";`
-- Exhaustive `switch` in the fallthrough path or clearly structured
-  if-chain — keep the control flow readable.
-- `parse-intent.ts` under ~240 lines.
-- `parse-intent.test.ts` under ~260 lines.
-- Do NOT add any new dependency.
-
-# Required test coverage (parse-intent.test.ts)
-
-Use `node:assert/strict`. Print `"parse-intent tests passed"` and exit 0.
-
-At minimum, cover:
-
-- **add_block** — 2 phrases per BlockKind (10 tests). At least 3 without
-  diacritics (`"them khoi bat dau"`, `"them in"`, `"them bien"`).
-- **insert_into** — positive with parentHint (`"bo vo khoi lap"` →
-  `parentHint: "repeat"`), positive without hint (`"dat vao trong"` →
-  undefined), negative: unrelated phrase.
-- **set_text** — `"Đặt chữ Xin chào"` → `text === "Xin chào"` (diacritics
-  preserved, case preserved); `"go chu hello world"` → `"hello world"`;
-  empty capture → `unknown.no_match` (if anything, but this should never
-  happen because regex requires `\s+(.+)`).
-- **set_number** — `"đặt số 5"` → 5 (digit); `"đặt số năm"` → 5 (word);
-  `"gia tri hai muoi"` → 20; `"cho so muoi lam"` → 15; `"dat so abcxyz"`
-  → `unknown.no_match`.
-- **run_program** — `"chạy chương trình"` → ok; `"chay di"` → ok;
-  `"chạy"` → ok (single word).
-- **ask_hint** — `"gợi ý"` → ok; `"giup voi"` → ok.
-- **unknown** — `""` → `reason: "empty"`; `"abcxyz qwerty"` → `"no_match"`;
-  `"thêm"` alone → `"partial_add_block"`; `"cho tôi"` alone →
-  `"partial_add_block"`.
-- **politeness trimming** — `"thêm khối in đi"` → add_block print;
-  `"hãy chạy chương trình"` → run_program.
-
-Each test asserts the FULL returned object (kind + slots) using
-`assert.deepEqual`.
-
-# Verification
-
-1. `npx tsc --noEmit -p packages/voice-parser` exits 0 (runs inside
-   nix-shell via `scripts/run-codex-task.sh`).
-2. `npx tsx packages/voice-parser/src/parse-intent.test.ts` exits 0 and
-   prints `"parse-intent tests passed"`. (Sandbox fallback:
-   `node --import tsx ...`.)
-3. Existing legacy parser still works — run nothing new, but `tsc` on
-   voice-parser must succeed without modifying `parseVoiceCommand`.
-4. `git status --short -- packages/voice-parser/src/` must show:
-   - 2 new untracked files: `parse-intent.ts`, `parse-intent.test.ts`
-   - 1 modified file: `index.ts` (only the added re-export line)
-5. `git diff packages/voice-parser/src/index.ts` must show ONLY a single
-   `export * from "./parse-intent";` addition and nothing else.
-
-# Final summary (what to report back)
-
-- Changed files (path-absolute, grouped new vs modified)
-- Confirmation that only ONE line was added to index.ts
-- tsc result
-- parse-intent.test.ts exit status and line count
-- Assumptions Codex made (especially around the word-number table)
-- Any deviation from the spec (ideally none)
-
-
-# Goal
-Build the foundation for the voice-first lesson V2 redesign: a new pure
-TypeScript module `action-model.ts` in `packages/lesson-engine` that exports
-`LessonStepAction` (6 variants), `LessonStepV2`, and a pure evaluator
-`evaluateStepAction(action, workspace, executionResult): LessonStepEvaluationResult`.
-
-This runs ALONGSIDE the existing legacy `LessonCompletionLogic` /
-`evaluateCompletionLogic` path — do NOT modify any existing file in
-`lesson-engine`, `shared-types`, or anywhere else. Legacy stays at
-`/lessons/*`; V2 will live at `/lessons-v2/*` (built in later slices).
-
-# Required type: LessonStepAction (discriminated union of 6 variants)
-
-Use `kind` as discriminator (NOT `type`, to avoid confusion with legacy
-`completionLogic.type`). All 6 variants must be exported as a single union:
-
-```ts
-export type LessonStepAction =
-  | { kind: "add_block"; blockType: BlockKind; label?: string }
-  | {
-      kind: "insert_into";
-      parentBlockType: BlockKind;
-      childBlockType: BlockKind;
-      slot?: string;  // reserved for future; ignored by evaluator in V1
-    }
-  | { kind: "set_text"; blockId: string; field: string; expectedText: string }
-  | { kind: "set_number"; blockId: string; field: string; expectedNumber: number }
-  | { kind: "run_program"; expectedOutput?: string[] }
-  | { kind: "ask_hint" };
-```
-
-`BlockKind` must be imported from `@shecancode/shared-types`. Do NOT
-redeclare it.
-
-# Required type: LessonStepV2
-
-```ts
-export interface LessonStepV2 {
-  id: string;
-  databaseStepId: string;
-  orderIndex: number;
-  title: string;
-  instructions: string;          // Vietnamese prompt shown to learner
-  hints: string[];
-  starterWorkspace: ProgramWorkspace;
-  action: LessonStepAction;
-}
-```
-
-`ProgramWorkspace` imported from `@shecancode/shared-types`.
-
-# Required function: evaluateStepAction (pure)
-
-```ts
-export function evaluateStepAction(
-  action: LessonStepAction,
-  workspace: ProgramWorkspace,
-  executionResult: ProgramExecutionResult,
-): LessonStepEvaluationResult;
-```
-
-All three parameter types and the return type come from
-`@shecancode/shared-types`. Do NOT redeclare any of them. The function is
-pure — no I/O, no Date, no globals, no mutation.
-
-Use a `switch (action.kind)` that is exhaustive via
-`const _exhaustive: never = action;` in the default branch.
-
-## Per-variant pass rules (match the design spec exactly)
-
-Helper: import `flattenBlocks` from `./helpers` for recursive block search.
-Do NOT redefine it.
-
-### add_block
-`flattenBlocks(workspace.blocks).some((b) => b.type === action.blockType)`
-→ pass. Loose per charter — disconnected block groups DO count.
-
-### insert_into
-`flattenBlocks(workspace.blocks)` has some block `p` with
-`p.type === action.parentBlockType` AND `p.children` is a non-empty array
-AND `p.children.some((c) => c.type === action.childBlockType)`.
-Ignore `action.slot` in V1 (reserved for future). If NO parent of that type
-exists, fail.
-
-### set_text
-Find a block in `flattenBlocks(workspace.blocks)` whose `id === action.blockId`.
-If not found → fail. Read `block.fields?.[action.field]`. If undefined or not
-a string → fail. Pass if
-`String(fieldValue).trim() === action.expectedText.trim()` (exact,
-case-sensitive, NO diacritic stripping).
-
-### set_number
-Find a block in `flattenBlocks(workspace.blocks)` whose `id === action.blockId`.
-If not found → fail. Read `block.fields?.[action.field]`. Coerce via
-`Number(fieldValue)`. Pass if `Number.isFinite(n) && n === action.expectedNumber`.
-
-### run_program
-If `executionResult.success !== true` → fail. If `action.expectedOutput` is
-undefined → pass. Otherwise:
-`executionResult.output.length === action.expectedOutput.length` AND
-every index `i` passes
-`normalizeText(executionResult.output[i] ?? "") === normalizeText(action.expectedOutput[i])`.
-Use `normalizeText` from `./helpers`.
-
-### ask_hint
-Always `{ completed: true, feedback: ASK_HINT_PASS_FEEDBACK }`. No failing
-state — this action exists only as an onboarding step to teach learners
-that hints are available.
-
-## Feedback strings (Vietnamese, verbatim)
-
-Use these exact strings (declare as `const` at top of file for reuse). Do
-NOT change any punctuation or wording:
-
-```ts
-const FEEDBACK = {
-  add_block_pass: "Bạn đã thêm đúng khối cần thiết.",
-  add_block_fail: "Bạn vẫn chưa thêm khối được yêu cầu.",
-  insert_into_pass: "Khối con đã nằm đúng bên trong khối cha.",
-  insert_into_fail: "Hãy kéo khối con vào bên trong khối cha.",
-  set_text_pass: "Nội dung văn bản đã đúng.",
-  set_text_fail: "Nội dung văn bản chưa khớp với yêu cầu.",
-  set_number_pass: "Giá trị số đã đúng.",
-  set_number_fail: "Giá trị số chưa đúng với yêu cầu.",
-  run_program_pass: "Chương trình đã chạy thành công.",
-  run_program_fail: "Chương trình chưa chạy đúng như mong đợi.",
-  ask_hint_pass: "Bạn đã mở gợi ý — tiếp tục nhé!",
-} as const;
-```
-
-Return shape per call: `{ completed: boolean, feedback: string }`.
-
-# Allowed files
-- packages/lesson-engine/src/action-model.ts       (NEW)
-- packages/lesson-engine/src/action-model.test.ts  (NEW)
-
-# Forbidden files
-- ANY existing file under packages/lesson-engine/src/ (index.ts, helpers.ts,
-  completion-logic-helpers.ts, evaluate-block-structure.ts,
-  evaluate-runtime.ts, evaluate-step.ts, and their .test.ts pairs)
-- packages/shared-types/*
-- packages/voice-parser/*
-- packages/block-engine/*
-- packages/ui/*
-- apps/web/*
-- supabase/*
-- Any package.json, tsconfig.json, or root config files
-
-# Constraints
-- TypeScript strict. No `any`. No unsafe `as` casts except one narrow
-  `fields.value as string | number | boolean` if Codex judges it necessary
-  for `set_number`'s `Number(...)` input — but prefer computing via
-  `Number(block.fields?.[action.field])` directly without a cast.
-- Pure function: no I/O, no globals, no `Date`, no mutation of inputs.
-- Import all types from `@shecancode/shared-types`:
-  `BlockKind`, `WorkspaceBlock`, `ProgramWorkspace`, `ProgramExecutionResult`,
-  `LessonStepEvaluationResult`. Do NOT redeclare.
-- Import `flattenBlocks` and `normalizeText` from `./helpers`. Do NOT
-  duplicate them locally.
-- Exhaustive `switch (action.kind)` with `const _exhaustive: never = action;`
-  in the default branch.
-- Do NOT add any new dependency to any package.json.
-- `action-model.ts` under ~130 lines.
-- `action-model.test.ts` under ~180 lines.
-
-# Required test coverage (action-model.test.ts)
-
-The test file must use `node:assert/strict` and log a final success line
-`"action-model tests passed"`. It must cover, at minimum:
-
-- **add_block**: pass with target block at top level; pass with target block
-  nested inside a parent's children (loose rule); fail when workspace empty;
-  fail when only a different block type present.
-- **insert_into**: pass with `repeat` parent and `print` child; fail when
-  `repeat` parent exists but `children` is empty; fail when matching parent
-  type is absent; fail when parent has children but none of the required
-  child type.
-- **set_text**: pass exact match on a seeded `print` block's `text` field;
-  fail on mismatch; fail on missing blockId; fail when field is undefined;
-  case-sensitive fail (e.g. "Xin chào" vs "xin chào").
-- **set_number**: pass on numeric equal (5 and 5); pass when field is string
-  `"5"` coerced to 5; fail on non-numeric string `"abc"`; fail on wrong
-  number; fail on missing blockId.
-- **run_program**: pass when `success=true` and no `expectedOutput` set;
-  pass when `expectedOutput` present and matches exactly (with normalizeText
-  diacritic folding); fail when `success=false`; fail when output length
-  differs; fail when one index mismatches.
-- **ask_hint**: always returns `{ completed: true, feedback: ASK_HINT_PASS }`.
-- **exhaustive**: a trivial compile-time check — the test file imports the
-  type and has a type-level never check on an exhaustive switch (can be a
-  commented-out section or a dead const).
-
-Each case must assert BOTH `completed` and `feedback` (exact string match).
-
-# Verification
-1. From repo root inside nix-shell (auto via run-codex-task.sh):
-   `npx tsc --noEmit -p packages/lesson-engine` exits 0.
-2. From `packages/lesson-engine`:
-   `npx tsx src/action-model.test.ts` exits 0 and prints
-   `action-model tests passed`.
-   (Sandbox fallback: `node --import tsx src/action-model.test.ts`.)
-3. Run existing test files — all must stay green:
-   - `npx tsx src/completion-logic-helpers.test.ts`
-   - `npx tsx src/evaluate-block-structure.test.ts`
-   - `npx tsx src/evaluate-runtime.test.ts`
-   - `npx tsx src/evaluate-step.test.ts`
-4. `git status --short` shows exactly 2 new untracked files under
-   `packages/lesson-engine/src/`:
-   - `action-model.ts`
-   - `action-model.test.ts`
-   NO other file touched (not even index.ts).
-
-# Final summary (what to report back)
-- Changed files (both new, path-absolute)
-- Confirmation that NO existing file was modified
-- `npx tsc --noEmit` result
-- Test exit status for action-model.test.ts
-- Test exit status for the 4 pre-existing test files (all must still be green)
-- Any assumption Codex made that's not explicitly in this task
-
+- Changed file(s)
+- tsc + test results
+- Whether the seed-v2 recursive blockId search needed a fix to descend into inputs (and which 1-line change you made if so)
+- Confirmation that lessons 1-4 + lesson 5 steps 1-5 are byte-identical

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import Link from "next/link";
 import * as Blockly from "blockly";
 import { executeProgram } from "@shecancode/block-engine";
-import type { LessonV2WithSteps } from "@shecancode/lesson-engine";
+import { listSeedV2Lessons, type LessonV2WithSteps } from "@shecancode/lesson-engine";
 import { parseVoiceIntent, type VoiceIntent } from "@shecancode/voice-parser";
 import type {
   BlockKind,
@@ -251,9 +252,15 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const [voiceLog, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
+  const [lessonComplete, setLessonComplete] = useState(false);
   const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
   const currentStep = lesson.steps[currentStepIndex];
+  const nextLesson = useMemo(() => {
+    const all = listSeedV2Lessons();
+    const idx = all.findIndex((entry) => entry.slug === lesson.slug);
+    return idx >= 0 && idx < all.length - 1 ? all[idx + 1] : null;
+  }, [lesson.slug]);
 
   useEffect(() => {
     stepIndexRef.current = currentStepIndex;
@@ -279,6 +286,13 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     return () => window.clearTimeout(id);
   }, [currentStepIndex]);
 
+  // Reset lessonComplete if the user navigates away from the last step
+  // (e.g. via the sidebar or "Bước trước"). The completion card should only
+  // appear when the learner is genuinely on the final completed step.
+  useEffect(() => {
+    if (currentStepIndex < lesson.steps.length - 1) setLessonComplete(false);
+  }, [currentStepIndex, lesson.steps.length]);
+
   useEffect(() => {
     if (failCount >= 3) setShowSkip(true);
   }, [failCount]);
@@ -301,6 +315,14 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       advancingRef.current = true;
       setLastFeedback(null);
       setCurrentStepIndex((index) => Math.min(lesson.steps.length - 1, index + 1));
+    }
+  }
+
+  function markStepPassed() {
+    // For the final step, mark the whole lesson complete so the celebration
+    // overlay takes over. Intermediate steps just advance via resetAfterSuccess.
+    if (currentStepIndex >= lesson.steps.length - 1) {
+      setLessonComplete(true);
     }
   }
 
@@ -374,6 +396,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     setLastFeedback(evaluation.feedback);
     if (evaluation.completed) {
+      markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
       return;
     }
@@ -389,6 +412,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     setLastFeedback(evaluation.feedback);
     if (evaluation.completed) {
+      markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
     } else {
       setFailCount((count) => count + 1);
@@ -611,7 +635,63 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const activeHint = currentStep.hints[hintIndex % Math.max(currentStep.hints.length, 1)];
 
   return (
-    <section className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
+    <section className="relative grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
+      {lessonComplete && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[1.4rem] bg-black/30 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[1.4rem] border-4 border-black bg-[#fff6fb] p-6 shadow-[10px_10px_0_#121212]">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-black">Hoàn thành 🎉</p>
+            <h2 className="font-heading mt-2 text-3xl text-black">Xong bài "{lesson.title}"!</h2>
+            <p className="mt-3 text-sm text-zinc-800">
+              Bạn đã làm xong toàn bộ {lesson.steps.length} bước. Tiếp tục để học khái niệm tiếp theo, hoặc làm lại bài này nếu muốn ôn.
+            </p>
+            {runResult?.success && runResult.output.length > 0 && (
+              <div className="mt-3 rounded border-2 border-black bg-white px-3 py-2 font-mono text-xs">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả cuối</p>
+                <ul className="mt-1 list-none">
+                  {runResult.output.map((line, i) => (
+                    <li key={i} className="text-black">{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-5 flex flex-wrap gap-2">
+              {nextLesson ? (
+                <Link
+                  href={`/lessons-v2/${nextLesson.slug}`}
+                  className="inline-flex min-h-10 items-center rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
+                >
+                  Bài tiếp theo: {nextLesson.title} →
+                </Link>
+              ) : (
+                <Link
+                  href="/lessons-v2"
+                  className="inline-flex min-h-10 items-center rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
+                >
+                  Đã xong toàn bộ — Về danh sách
+                </Link>
+              )}
+              <Link
+                href="/lessons-v2"
+                className="inline-flex min-h-10 items-center rounded-[0.75rem] border-4 border-black bg-white px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
+              >
+                Danh sách bài
+              </Link>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setLessonComplete(false);
+                  setCurrentStepIndex(0);
+                  setRunResult(null);
+                  setLastFeedback(null);
+                }}
+              >
+                Làm lại
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex min-h-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
         <div className="border-b-4 border-black px-4 py-2">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">

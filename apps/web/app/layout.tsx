@@ -24,8 +24,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="vi">
-      <body className={`${headingFont.variable} ${bodyFont.variable} antialiased`}>
+    <html lang="vi" suppressHydrationWarning>
+      {/*
+        suppressHydrationWarning on <body> silences the React hydration
+        mismatch that browser extensions trigger when they inject nodes
+        (e.g. "TeX All the Things" / MathJax) before hydration runs. The
+        warning is cosmetic in that case — our own markup is stable.
+      */}
+      <body
+        suppressHydrationWarning
+        className={`${headingFont.variable} ${bodyFont.variable} antialiased`}
+      >
         {children}
       </body>
     </html>

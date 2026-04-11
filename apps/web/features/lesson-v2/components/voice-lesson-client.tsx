@@ -19,9 +19,20 @@ import {
   evaluateStepAction,
   type LessonStepAction,
 } from "../../../../../packages/lesson-engine/src/action-model";
+import {
+  describeIntent,
+  deriveSampleUtterance,
+  extractSampleFromInstructions,
+  splitBoldSegments,
+} from "../utils/intent-display";
+import { markLessonV2StepCompletedAction } from "../server/actions";
 
 interface VoiceLessonClientProps {
   lesson: LessonV2WithSteps;
+  /** Step the learner should resume at (computed from persisted progress). */
+  initialStepIndex?: number;
+  /** True when the learner has already completed every step of this lesson. */
+  initialAllCompleted?: boolean;
 }
 
 let registered = false;
@@ -212,13 +223,20 @@ function starterStateFromWorkspace(workspace: ProgramWorkspace) {
   if (!workspace.blocks.length) {
     return { blocks: { languageVersion: 0, blocks: [] } };
   }
-  const blocklyBlocks: Record<string, unknown>[] = [];
-  let yPos = 40;
-  for (const block of workspace.blocks) {
-    blocklyBlocks.push(domainBlockToBlockly(block, 48, yPos));
-    yPos += 110;
+  // Chain consecutive sibling blocks via `next` instead of emitting each as a
+  // disconnected top-level block. Fixes a latent bug where backward nav into
+  // steps like L3/L4 step 2 (starter = [start, repeat]) would load start and
+  // repeat as two top-level blocks, forcing the learner to drag-connect them
+  // by hand before the step could pass.
+  const [first, ...rest] = workspace.blocks;
+  const root = domainBlockToBlockly(first, 48, 40);
+  let tail = root;
+  for (const block of rest) {
+    const entry = domainBlockToBlockly(block);
+    (tail as { next?: { block: Record<string, unknown> } }).next = { block: entry };
+    tail = entry;
   }
-  return { blocks: { languageVersion: 0, blocks: blocklyBlocks } };
+  return { blocks: { languageVersion: 0, blocks: [root] } };
 }
 
 function getInsertPosition(workspace: Blockly.WorkspaceSvg) {
@@ -226,6 +244,28 @@ function getInsertPosition(workspace: Blockly.WorkspaceSvg) {
   if (!roots.length) return { x: 48, y: 40 };
   const last = roots[roots.length - 1].getRelativeToSurfaceXY();
   return { x: last.x, y: last.y + 110 };
+}
+
+// Briefly highlight a block so the learner sees which one their command just
+// affected. Uses Blockly's selection API (non-destructive, SELECTED events
+// are filtered out of the step change listener upstream). Release after ~1.3s
+// only if nothing else has stolen the selection in the meantime.
+function flashBlock(block: Blockly.BlockSvg | null | undefined) {
+  if (!block) return;
+  try {
+    block.select();
+    window.setTimeout(() => {
+      try {
+        if (Blockly.common.getSelected() === block) {
+          block.unselect();
+        }
+      } catch {
+        /* block may have been disposed — ignore */
+      }
+    }, 1300);
+  } catch {
+    /* selection may fail mid-render — non-critical */
+  }
 }
 
 function feedbackReason(reason: Extract<VoiceIntent, { kind: "unknown" }>["reason"]) {
@@ -237,14 +277,18 @@ function getActionFieldName(action: LessonStepAction) {
   return fieldMap[action.field as keyof typeof fieldMap] ?? action.field.toUpperCase();
 }
 
-export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Element {
+export function VoiceLessonClient({
+  lesson,
+  initialStepIndex = 0,
+  initialAllCompleted = false,
+}: VoiceLessonClientProps): JSX.Element {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
   const suppressEvaluationRef = useRef(false);
-  const stepIndexRef = useRef(0);
+  const stepIndexRef = useRef(initialStepIndex);
   const advancingRef = useRef(false);
   const lastTranscriptRef = useRef("");
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [hintIndex, setHintIndex] = useState(0);
   const [failCount, setFailCount] = useState(0);
@@ -252,7 +296,8 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const [voiceLog, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
-  const [lessonComplete, setLessonComplete] = useState(false);
+  const [lastIntent, setLastIntent] = useState<VoiceIntent | null>(null);
+  const [lessonComplete, setLessonComplete] = useState(initialAllCompleted);
   const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
   const currentStep = lesson.steps[currentStepIndex];
@@ -267,8 +312,11 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   }, [currentStepIndex]);
 
   useEffect(() => {
-    setCurrentStepIndex(0);
-  }, [lesson.id]);
+    // Client-side lesson changes (rare — App Router does full navigation)
+    // reset to the resume point derived from persisted progress.
+    setCurrentStepIndex(initialStepIndex);
+    setLessonComplete(initialAllCompleted);
+  }, [lesson.id, initialStepIndex, initialAllCompleted]);
 
   useEffect(() => {
     setFailCount(0);
@@ -276,6 +324,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     setShowSkip(false);
     setHintIndex(0);
     setRunResult(null);
+    setLastIntent(null);
     // Hold the advancing guard briefly while Blockly's load events for the
     // new step's starterWorkspace flush; otherwise the change listener can
     // fire on the burst and re-evaluate against the previous step.
@@ -380,6 +429,16 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     setHintIndex((index) => (index + 1) % currentStep.hints.length);
   }
 
+  // Fire-and-forget persistence when a step passes. The server action is
+  // already resilient to auth/RLS/migration gaps, but we also catch here so
+  // any unexpected rejection (network drop, DNS flake) never surfaces to
+  // the learner as an unhandled promise rejection.
+  function persistStepCompleted(stepId: string) {
+    void markLessonV2StepCompletedAction(lesson.slug, stepId).catch(() => {
+      /* swallow — persistence is best-effort */
+    });
+  }
+
   function evaluateAndMaybeAdvance(intent?: VoiceIntent) {
     if (advancingRef.current) return;
     const workspace = workspaceRef.current;
@@ -396,6 +455,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     setLastFeedback(evaluation.feedback);
     if (evaluation.completed) {
+      persistStepCompleted(currentStep.id);
       markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
       return;
@@ -412,6 +472,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     setLastFeedback(evaluation.feedback);
     if (evaluation.completed) {
+      persistStepCompleted(currentStep.id);
       markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
     } else {
@@ -452,6 +513,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
         textLiteral = created;
       }
       textLiteral.setFieldValue(value, "VALUE");
+      flashBlock(target as Blockly.BlockSvg);
       return true;
     }
     const fieldName = resolveFieldName(target, currentStep.action, intent.kind === "set_text" ? ["TEXT", "NAME"] : ["TIMES", "VALUE"]);
@@ -460,6 +522,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       return false;
     }
     target.setFieldValue(value, fieldName);
+    flashBlock(target as Blockly.BlockSvg);
     return true;
   }
 
@@ -473,9 +536,47 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
         const block = workspace.newBlock(blocklyType) as Blockly.BlockSvg;
         block.initSvg();
         block.render();
-        // Auto-connect non-start blocks to the bottom of the start chain so
-        // they actually execute. Beginner-friendly: voice-added blocks
-        // shouldn't float disconnected.
+        // Explicit "vào trong Y" — the learner asked for an inside placement.
+        // Find the matching parent container, walk to the tail of its DO
+        // chain, and attach there. Falls through to after-current if the
+        // parent can't be located (e.g. the repeat/if block doesn't exist
+        // yet — the UI then treats it as a plain add-after).
+        if (
+          intent.blockType !== "start" &&
+          intent.position?.kind === "inside" &&
+          block.previousConnection
+        ) {
+          const parentBlocklyType = typeMap[intent.position.parentHint];
+          if (parentBlocklyType) {
+            const all = workspace.getAllBlocks(false) as Blockly.BlockSvg[];
+            const parent = all.find((b) => b.type === parentBlocklyType);
+            const slot = parent?.getInput("DO");
+            if (parent && slot?.connection) {
+              const firstChild = slot.connection.targetBlock() as Blockly.BlockSvg | null;
+              if (!firstChild) {
+                slot.connection.connect(block.previousConnection);
+                flashBlock(block);
+                return { changed: true, shouldEvaluate: true };
+              }
+              let tail: Blockly.BlockSvg = firstChild;
+              let next = tail.getNextBlock() as Blockly.BlockSvg | null;
+              while (next) {
+                tail = next;
+                next = tail.getNextBlock() as Blockly.BlockSvg | null;
+              }
+              if (tail.nextConnection) {
+                block.previousConnection.connect(tail.nextConnection);
+                flashBlock(block);
+                return { changed: true, shouldEvaluate: true };
+              }
+            }
+          }
+          // Fall through to the default after-current path if we couldn't
+          // attach inside (container missing / slot locked / no connection).
+        }
+        // Default: auto-connect non-start blocks to the bottom of the start
+        // chain so they actually execute. Beginner-friendly: voice-added
+        // blocks shouldn't float disconnected.
         if (intent.blockType !== "start" && block.previousConnection) {
           const tops = workspace.getTopBlocks(true) as Blockly.BlockSvg[];
           const start = tops.find((b) => b.type === "scc_start") as Blockly.BlockSvg | undefined;
@@ -488,12 +589,14 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
             }
             if (last.nextConnection) {
               block.previousConnection.connect(last.nextConnection);
+              flashBlock(block);
               return { changed: true, shouldEvaluate: true };
             }
           }
         }
         const { x, y } = getInsertPosition(workspace);
         block.moveBy(x, y);
+        flashBlock(block);
         return { changed: true, shouldEvaluate: true };
       }
       case "insert_into": {
@@ -517,6 +620,39 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       case "set_text":
       case "set_number":
         return { changed: setFieldFromIntent(intent), shouldEvaluate: true };
+      case "delete_last": {
+        // Prefer the currently-selected block (the learner's explicit target),
+        // but never the hat — scc_start is the program entry point and
+        // removing it would strand the rest of the chain. Fall back to the
+        // tail of the start-chain if nothing relevant is selected.
+        const selected = Blockly.common.getSelected();
+        let victim: Blockly.BlockSvg | null = null;
+        if (selected instanceof Blockly.BlockSvg && selected.type !== "scc_start") {
+          victim = selected;
+        } else {
+          const tops = workspace.getTopBlocks(true) as Blockly.BlockSvg[];
+          const start = tops.find((b) => b.type === "scc_start") as Blockly.BlockSvg | undefined;
+          if (start) {
+            let tail: Blockly.BlockSvg = start;
+            let next = tail.getNextBlock() as Blockly.BlockSvg | null;
+            while (next) {
+              tail = next;
+              next = tail.getNextBlock() as Blockly.BlockSvg | null;
+            }
+            if (tail !== start) victim = tail;
+          }
+        }
+        if (!victim) {
+          setLastFeedback("Không có khối nào để xoá.");
+          return { changed: false, shouldEvaluate: false };
+        }
+        victim.dispose(true);
+        setLastFeedback("Đã xoá khối cuối.");
+        // Don't re-evaluate: deletion usually regresses the step state and
+        // firing a fail just because the learner corrected themselves would
+        // spam the feedback panel. The next intent will trigger eval.
+        return { changed: true, shouldEvaluate: false };
+      }
       case "run_program":
         return { changed: false, shouldEvaluate: true };
       case "ask_hint":
@@ -613,6 +749,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     if (advancingRef.current) return;
     setVoiceLog((items) => [...items, transcript].slice(-5));
     const intent = parseVoiceIntent(transcript);
+    setLastIntent(intent);
     suppressEvaluationRef.current = true;
     const outcome = applyIntentToWorkspace(intent);
     // Hold suppression briefly so any sync Blockly events from newBlock()
@@ -633,6 +770,13 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   }
 
   const activeHint = currentStep.hints[hintIndex % Math.max(currentStep.hints.length, 1)];
+  const isChallenge = currentStep.isChallenge === true;
+  // Challenge steps hide the sample chip — the learner has to recall the
+  // phrase themselves. Hints still available via the sidebar button.
+  const sampleUtterance = isChallenge
+    ? null
+    : extractSampleFromInstructions(currentStep.instructions) ??
+      deriveSampleUtterance(currentStep.action);
 
   return (
     <section className="relative grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
@@ -696,9 +840,34 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
         <div className="border-b-4 border-black px-4 py-2">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">
             Bước {currentStepIndex + 1} / {lesson.steps.length}
+            {isChallenge && (
+              <span className="ml-2 inline-flex items-center rounded border-2 border-black bg-[#ffb84d] px-1.5 py-0 text-[9px] font-black uppercase text-black">
+                Thử thách
+              </span>
+            )}
           </p>
           <p className="mt-0.5 text-base font-bold text-black">{currentStep.title}</p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-700">{currentStep.instructions}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-700">
+            {splitBoldSegments(currentStep.instructions).map((seg, i) =>
+              seg.bold ? (
+                <strong key={i} className="font-black text-black">
+                  {seg.text}
+                </strong>
+              ) : (
+                <span key={i}>{seg.text}</span>
+              ),
+            )}
+          </p>
+          {sampleUtterance && (
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-600">
+                Câu mẫu
+              </span>
+              <span className="rounded border-2 border-black bg-[#fff6fb] px-2 py-0.5 font-mono text-[11px] font-semibold text-black">
+                “{sampleUtterance}”
+              </span>
+            </div>
+          )}
         </div>
         <div ref={containerRef} className="min-h-[320px] w-full flex-1 border-b-4 border-black" />
         <div className="flex flex-wrap items-center gap-2 border-b-4 border-black px-3 py-2">
@@ -747,6 +916,14 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
             <p className="text-red-600">Trình duyệt chưa hỗ trợ nhận giọng nói — dùng chuột để kéo khối.</p>
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
+          {lastIntent && (
+            <p className="text-zinc-600">
+              <span className="font-black uppercase tracking-[0.14em] text-[9px] text-zinc-500">
+                Mình hiểu là
+              </span>{" "}
+              <span className="font-semibold text-black">{describeIntent(lastIntent)}</span>
+            </p>
+          )}
           {lastFeedback && <p className="font-semibold text-black">{lastFeedback}</p>}
           {runResult && (
             <div className="rounded border-2 border-black bg-[#fffdf3] px-2 py-1 font-mono">

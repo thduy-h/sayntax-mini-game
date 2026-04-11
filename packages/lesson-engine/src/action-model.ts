@@ -38,6 +38,13 @@ export interface LessonStepV2 {
   hints: string[];
   starterWorkspace: ProgramWorkspace;
   action: LessonStepAction;
+  /**
+   * Mark the final step of a lesson as a mini-challenge. The UI hides the
+   * "câu mẫu" chip so the learner has to recall the phrase themselves, and
+   * surfaces a small badge to signal the shift in tone. Optional — defaults
+   * to false for regular learning steps.
+   */
+  isChallenge?: boolean;
 }
 
 export function evaluateStepAction(

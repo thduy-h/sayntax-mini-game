@@ -1,10 +1,19 @@
 import type { BlockKind } from "@shecancode/shared-types";
 
+// Optional position hint carried on `add_block` intents.
+// Default (no position) means: append after the current/active block — see
+// rule in CLAUDE.md product docs. `inside` means: the user said "vào trong"
+// and explicitly asked for the new block to be placed inside a container.
+export type AddBlockPosition =
+  | { kind: "after_current" }
+  | { kind: "inside"; parentHint: BlockKind };
+
 export type VoiceIntent =
-  | { kind: "add_block"; blockType: BlockKind }
+  | { kind: "add_block"; blockType: BlockKind; position?: AddBlockPosition }
   | { kind: "insert_into"; parentHint?: BlockKind; childHint?: BlockKind }
   | { kind: "set_text"; text: string }
   | { kind: "set_number"; value: number }
+  | { kind: "delete_last" }
   | { kind: "run_program" }
   | { kind: "ask_hint" }
   | {
@@ -25,6 +34,16 @@ const INSERT_PREFIXES = [
   "nhet vao",
 ] as const;
 
+// Connectors that indicate an inside-container placement when they follow
+// an add_block phrase. Ordered longest-first so prefix matching prefers the
+// most specific phrase.
+const INSIDE_CONNECTORS = [
+  "vao ben trong",
+  "vao trong",
+  "ben trong",
+  "trong",
+] as const;
+
 const ADD_BLOCK_PHRASES: ReadonlyArray<readonly [BlockKind, readonly string[]]> = [
   ["start", ["them khoi bat dau", "them lenh bat dau", "cho khoi bat dau", "keo khoi bat dau ra", "them start", "khoi bat dau"]],
   ["print", ["them khoi in", "cho khoi in", "them lenh in", "them in", "khoi in", "in ra"]],
@@ -38,6 +57,7 @@ const BLOCK_HINTS: ReadonlyArray<readonly [string, BlockKind]> = [
   ["bat dau", "start"],
   ["lap", "repeat"],
   ["bien", "variable"],
+  ["neu", "if"],
   ["in", "print"],
 ] as const;
 
@@ -50,6 +70,18 @@ const RUN_PROGRAM_PHRASES = [
   "chay thu",
   "chay di",
   "chay",
+] as const;
+
+const DELETE_LAST_PHRASES = [
+  "xoa khoi vua them",
+  "xoa khoi cuoi cung",
+  "xoa khoi cuoi",
+  "xoa lenh cuoi",
+  "bo khoi cuoi",
+  "bo khoi vua them",
+  "xoa khoi nay",
+  "huy khoi cuoi",
+  "go khoi cuoi",
 ] as const;
 
 const ASK_HINT_PHRASES = [
@@ -154,7 +186,9 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
   const originalTokens = original.split(/\s+/);
   const normalizedTokens = normalized.split(/\s+/);
 
-  const textMatch = normalized.match(/^(?:dat chu|go chu|noi dung la|cho chu|viet chu|chu la)\s+(.+)$/);
+  const textMatch = normalized.match(
+    /^(?:sua noi dung thanh|doi noi dung thanh|sua chu thanh|doi chu thanh|dat chu|go chu|noi dung la|cho chu|viet chu|chu la)\s+(.+)$/,
+  );
   if (textMatch) {
     const payloadTokens = textMatch[1].split(/\s+/).filter(Boolean).length;
     const prefixLength = normalizedTokens.length - payloadTokens;
@@ -165,7 +199,9 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
     return text ? { kind: "set_text", text } : unknown("no_match");
   }
 
-  const numberMatch = normalized.match(/^(?:dat so|gia tri(?: la)?|cho so|dat bang|so la|gan bang)\s+(.+)$/);
+  const numberMatch = normalized.match(
+    /^(?:sua so lan thanh|doi so lan thanh|doi so thanh|sua so thanh|dat so|gia tri(?: la)?|cho so|dat bang|so la|gan bang)\s+(.+)$/,
+  );
   if (numberMatch) {
     const payload = numberMatch[1].trim();
     if (/^\d+$/.test(payload)) return { kind: "set_number", value: Number(payload) };
@@ -190,7 +226,32 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
       matchedBlock = { phrase, blockType };
     }
   }
-  if (matchedBlock) return { kind: "add_block", blockType: matchedBlock.blockType };
+  if (matchedBlock) {
+    // Product rule: "thêm khối X" defaults to appending AFTER the current
+    // block. Only when the learner explicitly says "vào trong Y" do we
+    // attach a position hint pointing inside a container. See product docs.
+    const remaining = normalized.slice(matchedBlock.phrase.length).trim();
+    if (remaining) {
+      const connector = matchPhrasePrefix(remaining, INSIDE_CONNECTORS);
+      if (connector) {
+        const afterConnector = remaining.slice(connector.length).trim();
+        const parentHint = afterConnector ? findParentHint(afterConnector) : undefined;
+        if (parentHint) {
+          return {
+            kind: "add_block",
+            blockType: matchedBlock.blockType,
+            position: { kind: "inside", parentHint },
+          };
+        }
+      }
+    }
+    return { kind: "add_block", blockType: matchedBlock.blockType };
+  }
+
+  // delete_last comes before the partial_add_block guard because some delete
+  // phrases (e.g. "bo khoi vua them") include the word "them" and would
+  // otherwise get captured as an incomplete add_block.
+  if (matchPhrasePrefix(normalized, DELETE_LAST_PHRASES)) return { kind: "delete_last" };
 
   if (/\b(them|cho|keo)\b/.test(normalized)) return unknown("partial_add_block");
 

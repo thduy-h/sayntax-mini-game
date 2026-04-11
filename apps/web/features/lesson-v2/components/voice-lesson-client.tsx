@@ -10,7 +10,7 @@ import type {
   ProgramWorkspace,
   WorkspaceBlock,
 } from "@shecancode/shared-types";
-import { Mic, MicOff, Lightbulb } from "lucide-react";
+import { Mic, MicOff, Lightbulb, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
 import {
@@ -177,6 +177,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const [lastFeedback, setLastFeedback] = useState<string | null>(null);
   const [voiceLog, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
+  const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
   const speech = useSpeechRecognition();
   const currentStep = lesson.steps[currentStepIndex];
 
@@ -193,6 +194,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     setLastFeedback(null);
     setShowSkip(false);
     setHintIndex(0);
+    setRunResult(null);
     // Hold the advancing guard briefly while Blockly's load events for the
     // new step's starterWorkspace flush; otherwise the change listener can
     // fire on the burst and re-evaluate against the previous step.
@@ -259,6 +261,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     }
     const program = toProgram(workspace);
     const exec = intent?.kind === "run_program" ? executeProgram(program) : SUCCESS_EXECUTION;
+    if (intent?.kind === "run_program") setRunResult(exec);
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     setLastFeedback(evaluation.feedback);
     if (evaluation.completed) {
@@ -266,6 +269,21 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       return;
     }
     setFailCount((count) => count + 1);
+  }
+
+  function runProgramFromButton() {
+    const workspace = workspaceRef.current;
+    if (!workspace || !currentStep) return;
+    const program = toProgram(workspace);
+    const exec = executeProgram(program);
+    setRunResult(exec);
+    const evaluation = evaluateStepAction(currentStep.action, program, exec);
+    setLastFeedback(evaluation.feedback);
+    if (evaluation.completed) {
+      resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
+    } else {
+      setFailCount((count) => count + 1);
+    }
   }
 
   function setFieldFromIntent(intent: Extract<VoiceIntent, { kind: "set_text" | "set_number" }>) {
@@ -444,6 +462,10 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
             {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
             {speech.isListening ? "Dừng" : "Nói"}
           </Button>
+          <Button size="sm" variant="outline" onClick={runProgramFromButton}>
+            <Play className="mr-2 h-4 w-4" />
+            Chạy
+          </Button>
           <Button size="sm" variant="outline" onClick={prevStep} disabled={currentStepIndex === 0}>
             ← Trước
           </Button>
@@ -472,13 +494,39 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
             <span className="ml-auto truncate font-mono text-xs text-zinc-700">"{speech.transcript}"</span>
           )}
         </div>
-        <div className="min-h-[36px] px-3 py-1.5 text-xs">
+        <div className="flex min-h-[60px] flex-col gap-1 px-3 py-1.5 text-xs">
           {!speech.isSupported && (
             <p className="text-red-600">Trình duyệt chưa hỗ trợ nhận giọng nói — dùng chuột để kéo khối.</p>
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
           {lastFeedback && <p className="font-semibold text-black">{lastFeedback}</p>}
-          {!lastFeedback && !speech.errorMessage && voiceLog.length > 0 && (
+          {runResult && (
+            <div className="rounded border-2 border-black bg-[#fffdf3] px-2 py-1 font-mono">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả</p>
+              {runResult.success ? (
+                runResult.output.length === 0 ? (
+                  <p className="text-zinc-500">(không có đầu ra)</p>
+                ) : (
+                  <ul className="list-none">
+                    {runResult.output.map((line, i) => (
+                      <li key={i} className="text-black">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : (
+                <ul className="list-none text-red-600">
+                  {runResult.errors.length > 0 ? (
+                    runResult.errors.map((err, i) => <li key={i}>{err}</li>)
+                  ) : (
+                    <li>Chương trình lỗi không xác định.</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
+          {!lastFeedback && !runResult && !speech.errorMessage && voiceLog.length > 0 && (
             <p className="text-zinc-500">Đã nói: {voiceLog.slice(-3).join(" · ")}</p>
           )}
         </div>

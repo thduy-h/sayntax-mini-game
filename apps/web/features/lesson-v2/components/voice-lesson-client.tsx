@@ -368,12 +368,39 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       setLastFeedback(intent.kind === "set_text" ? "Hãy chọn khối trước khi đặt chữ." : "Hãy chọn khối trước khi đặt số.");
       return false;
     }
+    const value = intent.kind === "set_text" ? intent.text : String(intent.value);
+    // Special-case scc_print: TEXT is a value_input slot, not a field. We
+    // write the new value into the connected text_literal reporter (creating
+    // one if the slot is empty).
+    if (target.type === "scc_print" && intent.kind === "set_text") {
+      let textLiteral = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
+      if (!textLiteral || textLiteral.type !== "scc_text_literal") {
+        const created = workspace.newBlock("scc_text_literal") as Blockly.BlockSvg;
+        created.initSvg();
+        created.render();
+        const slot = (target as Blockly.BlockSvg).getInput("TEXT");
+        if (slot?.connection && created.outputConnection) {
+          // Disconnect any existing reporter (e.g. variable_get) before
+          // attaching the fresh literal so the user's voice command is
+          // respected even if the seed had something else there.
+          const existing = slot.connection.targetBlock();
+          if (existing) {
+            slot.connection.disconnect();
+            existing.dispose(true);
+          }
+          slot.connection.connect(created.outputConnection);
+        }
+        textLiteral = created;
+      }
+      textLiteral.setFieldValue(value, "VALUE");
+      return true;
+    }
     const fieldName = resolveFieldName(target, currentStep.action, intent.kind === "set_text" ? ["TEXT", "NAME"] : ["TIMES", "VALUE"]);
     if (!fieldName) {
       setLastFeedback("Không tìm thấy ô dữ liệu phù hợp trong khối đang chọn.");
       return false;
     }
-    target.setFieldValue(intent.kind === "set_text" ? intent.text : String(intent.value), fieldName);
+    target.setFieldValue(value, fieldName);
     return true;
   }
 

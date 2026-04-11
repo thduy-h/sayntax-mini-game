@@ -76,23 +76,49 @@ assert.deepEqual(
   { completed: false, feedback: FEEDBACK.insert_into_fail },
 );
 
+// set_text loose semantics: any non-empty text passes; only empty/missing fails.
+const printBlockEmpty: WorkspaceBlock = { id: "print-empty", type: "print", fields: { text: "" } };
+const printBlockReporter: WorkspaceBlock = {
+  id: "print-rep",
+  type: "print",
+  inputs: { text: { id: "lit-1", type: "text_literal", fields: { value: "Bất kỳ" } } },
+};
 assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "Xin chào" }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_text_pass });
-assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "Tạm biệt" }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_text_fail });
+// Different (any) text still passes — loose by design.
+assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "Tạm biệt" }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_text_pass });
+// Lowercase variant still passes — loose.
+assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "xin chào" }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_text_pass });
+// Empty literal field still fails.
+assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-empty", field: "text", expectedText: "anything" }, workspace([printBlockEmpty]), result()), { completed: false, feedback: FEEDBACK.set_text_fail });
+// Missing block fails.
 assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "missing", field: "text", expectedText: "Xin chào" }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_text_fail });
+// Wrong field still fails.
 assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "missing", expectedText: "Xin chào" }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_text_fail });
-assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "xin chào" }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_text_fail });
+// Reporter sub-block (text_literal) is read for the value.
+assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-rep", field: "text", expectedText: "ignored" }, workspace([printBlockReporter]), result()), { completed: true, feedback: FEEDBACK.set_text_pass });
 
+// set_number loose semantics: any finite number passes; only NaN/missing fails.
 assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "print-1", field: "count", expectedNumber: 5 }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_number_pass });
 assert.deepEqual(
   evaluateStepAction({ kind: "set_number", blockId: "print-2", field: "count", expectedNumber: 5 }, workspace([{ id: "print-2", type: "print", fields: { count: "5" } }]), result()),
   { completed: true, feedback: FEEDBACK.set_number_pass },
 );
+// Different number still passes — loose.
+assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "print-1", field: "count", expectedNumber: 6 }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_number_pass });
+// Non-numeric string fails (NaN).
 assert.deepEqual(
   evaluateStepAction({ kind: "set_number", blockId: "print-3", field: "count", expectedNumber: 5 }, workspace([{ id: "print-3", type: "print", fields: { count: "abc" } }]), result()),
   { completed: false, feedback: FEEDBACK.set_number_fail },
 );
-assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "print-1", field: "count", expectedNumber: 6 }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_number_fail });
+// Missing block fails.
 assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "missing", field: "count", expectedNumber: 5 }, workspace([printBlock]), result()), { completed: false, feedback: FEEDBACK.set_number_fail });
+// Reporter sub-block (number_literal) is read for the value.
+const repeatRep: WorkspaceBlock = {
+  id: "repeat-rep",
+  type: "repeat",
+  inputs: { times: { id: "n-1", type: "number_literal", fields: { value: 7 } } },
+};
+assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "repeat-rep", field: "times", expectedNumber: 999 }, workspace([repeatRep]), result()), { completed: true, feedback: FEEDBACK.set_number_pass });
 
 assert.deepEqual(evaluateStepAction({ kind: "run_program" }, workspace([]), result()), { completed: true, feedback: FEEDBACK.run_program_pass });
 assert.deepEqual(

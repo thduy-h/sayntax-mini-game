@@ -63,15 +63,34 @@ export function evaluateStepAction(
         ? { completed: true, feedback: FEEDBACK.insert_into_pass }
         : { completed: false, feedback: FEEDBACK.insert_into_fail };
     case "set_text": {
-      const fieldValue = blocks.find((block) => block.id === action.blockId)?.fields?.[action.field];
-      return typeof fieldValue === "string" && fieldValue.trim() === action.expectedText.trim()
+      const target = blocks.find((block) => block.id === action.blockId);
+      // Loose semantics: any non-empty text passes. Look in both the
+      // literal `fields[<field>]` AND a Scratch-style reporter sub-block
+      // at `inputs[<field>]` (text_literal -> fields.value). This lets
+      // beginners write whatever they want instead of matching an exact
+      // expectedText string.
+      const literal = target?.fields?.[action.field];
+      const reporter = target?.inputs?.[action.field];
+      const reporterValue =
+        reporter?.type === "text_literal" || reporter?.type === "variable_get"
+          ? reporter.fields?.value ?? reporter.fields?.name
+          : undefined;
+      const candidate = reporterValue ?? literal;
+      const text = typeof candidate === "string" ? candidate : candidate !== undefined ? String(candidate) : "";
+      return text.trim().length > 0
         ? { completed: true, feedback: FEEDBACK.set_text_pass }
         : { completed: false, feedback: FEEDBACK.set_text_fail };
     }
     case "set_number": {
-      const fieldValue = blocks.find((block) => block.id === action.blockId)?.fields?.[action.field];
-      const n = Number(fieldValue);
-      return Number.isFinite(n) && n === action.expectedNumber
+      const target = blocks.find((block) => block.id === action.blockId);
+      const literal = target?.fields?.[action.field];
+      const reporter = target?.inputs?.[action.field];
+      const reporterValue = reporter?.type === "number_literal" ? reporter.fields?.value : undefined;
+      const candidate = reporterValue ?? literal;
+      const n = Number(candidate);
+      // Loose semantics: any finite number passes. Lets beginners experiment
+      // with their own values instead of matching an exact expectedNumber.
+      return Number.isFinite(n)
         ? { completed: true, feedback: FEEDBACK.set_number_pass }
         : { completed: false, feedback: FEEDBACK.set_number_fail };
     }

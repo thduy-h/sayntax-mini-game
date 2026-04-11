@@ -12,7 +12,6 @@ import type {
 } from "@shecancode/shared-types";
 import { Mic, MicOff, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
 import {
   evaluateStepAction,
@@ -168,6 +167,9 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
   const suppressEvaluationRef = useRef(false);
+  const stepIndexRef = useRef(0);
+  const advancingRef = useRef(false);
+  const lastTranscriptRef = useRef("");
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [hintIndex, setHintIndex] = useState(0);
@@ -179,6 +181,10 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const currentStep = lesson.steps[currentStepIndex];
 
   useEffect(() => {
+    stepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex]);
+
+  useEffect(() => {
     setCurrentStepIndex(0);
   }, [lesson.id]);
 
@@ -187,6 +193,14 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     setLastFeedback(null);
     setShowSkip(false);
     setHintIndex(0);
+    // Hold the advancing guard briefly while Blockly's load events for the
+    // new step's starterWorkspace flush; otherwise the change listener can
+    // fire on the burst and re-evaluate against the previous step.
+    advancingRef.current = true;
+    const id = window.setTimeout(() => {
+      advancingRef.current = false;
+    }, 250);
+    return () => window.clearTimeout(id);
   }, [currentStepIndex]);
 
   useEffect(() => {
@@ -205,6 +219,10 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     setFailCount(0);
     setShowSkip(false);
     if (shouldAdvance) {
+      // Set the guard immediately so any synchronous Blockly events queued
+      // by applyIntentToWorkspace cannot trigger a second cascading advance
+      // before React commits the state update.
+      advancingRef.current = true;
       setLastFeedback(null);
       setCurrentStepIndex((index) => Math.min(lesson.steps.length - 1, index + 1));
     }
@@ -230,8 +248,15 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   }
 
   function evaluateAndMaybeAdvance(intent?: VoiceIntent) {
+    if (advancingRef.current) return;
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return;
+    // Only run_program is allowed to evaluate without an explicit user intent.
+    // Bare workspace events (CREATE/MOVE bursts during load) must NOT trigger
+    // an unrelated step's evaluator — they previously caused 1->4 cascades.
+    if (!intent && currentStep.action.kind !== "set_text" && currentStep.action.kind !== "set_number" && currentStep.action.kind !== "insert_into" && currentStep.action.kind !== "add_block") {
+      return;
+    }
     const program = toProgram(workspace);
     const exec = intent?.kind === "run_program" ? executeProgram(program) : SUCCESS_EXECUTION;
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
@@ -306,6 +331,9 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     }
   }
 
+  // Inject Blockly ONCE on mount. Don't dispose on step change — only clear
+  // and reload the starter via the next effect. Disposing per step caused
+  // bursts of CREATE/MOVE events to fire on a stale closure listener.
   useEffect(() => {
     ensureBlocks();
     if (!containerRef.current || workspaceRef.current) return;
@@ -318,36 +346,47 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
       zoom: { controls: true, maxScale: 1.4, minScale: 0.7, startScale: 0.92, wheel: true },
     });
     workspaceRef.current = workspace;
-    if (currentStep) {
-      suppressEvaluationRef.current = true;
-      Blockly.serialization.workspaces.load(starterStateFromWorkspace(currentStep.starterWorkspace), workspace);
-      suppressEvaluationRef.current = false;
-    }
     setWorkspaceReady(true);
     return () => {
       workspace.dispose();
       workspaceRef.current = null;
     };
-  }, [currentStep]);
+  }, []);
 
+  // Load the current step's starter on every step change. Suppress eval
+  // during the load so the burst of Blockly events doesn't trigger advance.
   useEffect(() => {
     const workspace = workspaceRef.current;
     if (!workspaceReady || !workspace || !currentStep) return;
     suppressEvaluationRef.current = true;
     workspace.clear();
     Blockly.serialization.workspaces.load(starterStateFromWorkspace(currentStep.starterWorkspace), workspace);
-    suppressEvaluationRef.current = false;
+    // Hold suppression for the next macrotask — Blockly may fire events
+    // asynchronously after load() returns.
+    const id = window.setTimeout(() => {
+      suppressEvaluationRef.current = false;
+    }, 50);
+    return () => window.clearTimeout(id);
   }, [currentStep, workspaceReady]);
 
   useEffect(() => {
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return;
+    const attachedIndex = currentStepIndex;
     const onChange = (event: Blockly.Events.Abstract) => {
       if (suppressEvaluationRef.current) return;
+      if (advancingRef.current) return;
+      // Bail if the listener's captured step is no longer current.
+      if (stepIndexRef.current !== attachedIndex) return;
       if (
         event.type === Blockly.Events.CLICK ||
         event.type === Blockly.Events.SELECTED ||
-        event.type === Blockly.Events.VIEWPORT_CHANGE
+        event.type === Blockly.Events.VIEWPORT_CHANGE ||
+        event.type === Blockly.Events.UI ||
+        event.type === Blockly.Events.BUBBLE_OPEN ||
+        event.type === Blockly.Events.THEME_CHANGE ||
+        event.type === Blockly.Events.TOOLBOX_ITEM_SELECT ||
+        event.type === Blockly.Events.FINISHED_LOADING
       ) return;
       if (currentStep.action.kind === "run_program" || currentStep.action.kind === "ask_hint") return;
       evaluateAndMaybeAdvance();
@@ -359,11 +398,18 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   useEffect(() => {
     const transcript = speech.transcript.trim();
     if (!transcript) return;
+    if (transcript === lastTranscriptRef.current) return;
+    lastTranscriptRef.current = transcript;
+    if (advancingRef.current) return;
     setVoiceLog((items) => [...items, transcript].slice(-5));
     const intent = parseVoiceIntent(transcript);
     suppressEvaluationRef.current = true;
     const outcome = applyIntentToWorkspace(intent);
-    suppressEvaluationRef.current = false;
+    // Hold suppression briefly so any sync Blockly events from newBlock()
+    // / connect() don't slip past before we run the user-driven evaluation.
+    window.setTimeout(() => {
+      suppressEvaluationRef.current = false;
+    }, 50);
     if (outcome.shouldEvaluate) evaluateAndMaybeAdvance(intent);
   }, [speech.transcript]);
 
@@ -379,69 +425,101 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const activeHint = currentStep.hints[hintIndex % Math.max(currentStep.hints.length, 1)];
 
   return (
-    <section className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
-      <div>
-        <Card>
-          <CardHeader>
-            <p>Bước {currentStepIndex + 1} / {lesson.steps.length}</p>
-            <CardTitle>{currentStep.title}</CardTitle>
-            <CardDescription>{currentStep.instructions}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div ref={containerRef} style={{ height: 520 }} className="w-full border-4 border-black" />
-            <div className="mt-4 flex flex-col gap-2">
-              {!speech.isSupported && (
-                <p className="text-sm text-red-600">Trình duyệt hiện tại chưa hỗ trợ nhận giọng nói. Bạn có thể tiếp tục bằng chuột.</p>
-              )}
-              <div className="flex items-center gap-2">
-                <Button onClick={() => (speech.isListening ? speech.stopListening() : speech.startListening())} disabled={!speech.isSupported}>
-                  {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-                  {speech.isListening ? "Dừng ghi âm" : "Bắt đầu nói"}
-                </Button>
-                {showSkip && (
-                  <Button variant="secondary" onClick={() => { nextStep(); setFailCount(0); setShowSkip(false); }}>
-                    Bỏ qua bước này
-                  </Button>
-                )}
-              </div>
-              {speech.errorMessage && <p className="text-sm text-red-600">{speech.errorMessage}</p>}
-              {speech.transcript && <p className="text-sm font-mono">Bạn nói: "{speech.transcript}"</p>}
-              {voiceLog.length > 0 && <p className="text-xs text-muted-foreground">Lần nói gần đây: {voiceLog.join(" • ")}</p>}
-              {lastFeedback && <p className="text-sm font-semibold">{lastFeedback}</p>}
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button onClick={prevStep} disabled={currentStepIndex === 0}>← Bước trước</Button>
-              <Button onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Bước sau →</Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <aside>
-        <Card>
-          <CardHeader><CardTitle>Các bước</CardTitle></CardHeader>
-          <CardContent>
-            <ol className="flex flex-col gap-2">
-              {lesson.steps.map((step, i) => (
-                <li key={step.id}>
-                  <button onClick={() => setCurrentStepIndex(i)} className={i === currentStepIndex ? "font-black underline" : ""}>
-                    Bước {i + 1}: {step.title}
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
-        <Card className="mt-4 bg-[#fff6fb]">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Lightbulb className="h-4 w-4" />Gợi ý</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <p className="text-sm">{activeHint ?? "Chưa có gợi ý cho bước này."}</p>
-            <Button variant="secondary" onClick={advanceHint} disabled={currentStep.hints.length === 0}>
-              Gợi ý
+    <section className="grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)]">
+      <div className="flex min-h-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
+        <div className="border-b-4 border-black px-4 py-2">
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">
+            Bước {currentStepIndex + 1} / {lesson.steps.length}
+          </p>
+          <p className="mt-0.5 text-base font-bold text-black">{currentStep.title}</p>
+          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-700">{currentStep.instructions}</p>
+        </div>
+        <div ref={containerRef} className="min-h-[320px] w-full flex-1 border-b-4 border-black" />
+        <div className="flex flex-wrap items-center gap-2 border-b-4 border-black px-3 py-2">
+          <Button
+            size="sm"
+            onClick={() => (speech.isListening ? speech.stopListening() : speech.startListening())}
+            disabled={!speech.isSupported}
+          >
+            {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+            {speech.isListening ? "Dừng" : "Nói"}
+          </Button>
+          <Button size="sm" variant="outline" onClick={prevStep} disabled={currentStepIndex === 0}>
+            ← Trước
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={nextStep}
+            disabled={currentStepIndex >= lesson.steps.length - 1}
+          >
+            Sau →
+          </Button>
+          {showSkip && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                nextStep();
+                setFailCount(0);
+                setShowSkip(false);
+              }}
+            >
+              Bỏ qua
             </Button>
-          </CardContent>
-        </Card>
+          )}
+          {speech.transcript && (
+            <span className="ml-auto truncate font-mono text-xs text-zinc-700">"{speech.transcript}"</span>
+          )}
+        </div>
+        <div className="min-h-[36px] px-3 py-1.5 text-xs">
+          {!speech.isSupported && (
+            <p className="text-red-600">Trình duyệt chưa hỗ trợ nhận giọng nói — dùng chuột để kéo khối.</p>
+          )}
+          {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
+          {lastFeedback && <p className="font-semibold text-black">{lastFeedback}</p>}
+          {!lastFeedback && !speech.errorMessage && voiceLog.length > 0 && (
+            <p className="text-zinc-500">Đã nói: {voiceLog.slice(-3).join(" · ")}</p>
+          )}
+        </div>
+      </div>
+      <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col rounded-[1.4rem] border-4 border-black bg-[#fffdf3] shadow-[8px_8px_0_#121212]">
+          <div className="border-b-4 border-black px-4 py-2">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Các bước</p>
+          </div>
+          <ol className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 text-sm">
+            {lesson.steps.map((step, i) => (
+              <li key={step.id}>
+                <button
+                  onClick={() => setCurrentStepIndex(i)}
+                  className={`w-full rounded border-2 border-black px-2 py-1 text-left text-xs transition ${
+                    i === currentStepIndex ? "bg-[#a8e6ff] font-black" : "bg-white hover:bg-[#fff6fb]"
+                  }`}
+                >
+                  {i + 1}. {step.title}
+                </button>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="flex flex-col gap-2 rounded-[1.4rem] border-4 border-black bg-[#fff6fb] px-3 py-2 shadow-[8px_8px_0_#121212]">
+          <div className="flex items-center justify-between">
+            <p className="flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.18em] text-black">
+              <Lightbulb className="h-3.5 w-3.5" />
+              Gợi ý
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={advanceHint}
+              disabled={currentStep.hints.length === 0}
+            >
+              Đổi
+            </Button>
+          </div>
+          <p className="text-xs text-zinc-800">{activeHint ?? "Chưa có gợi ý cho bước này."}</p>
+        </div>
       </aside>
     </section>
   );

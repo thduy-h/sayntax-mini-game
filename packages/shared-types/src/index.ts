@@ -7,10 +7,27 @@ export type FontScale = "default" | "large" | "x-large";
 export type ProgressStatus = "not_started" | "in_progress" | "completed";
 export type ProgramRunStatus = "success" | "error";
 export type VoiceCommandStatus = "success" | "unsupported" | "error";
-export type BlockKind = "start" | "print" | "repeat" | "if" | "variable";
+export type BlockKind =
+  | "start"
+  | "print"
+  | "repeat"
+  | "if"
+  | "variable"
+  | "variable_get"
+  | "text_literal"
+  | "number_literal";
 
 export const USER_ROLES: AppRole[] = ["student", "admin"];
-export const BLOCK_TYPES: BlockKind[] = ["start", "print", "repeat", "if", "variable"];
+export const BLOCK_TYPES: BlockKind[] = [
+  "start",
+  "print",
+  "repeat",
+  "if",
+  "variable",
+  "variable_get",
+  "text_literal",
+  "number_literal",
+];
 
 export const roleLabels: Record<AppRole, string> = {
   admin: "Quản trị viên / Người hướng dẫn",
@@ -101,6 +118,7 @@ export interface WorkspaceBlock {
   id: string;
   type: BlockKind;
   fields?: Record<string, string | number | boolean>;
+  inputs?: Record<string, WorkspaceBlock>;
   children?: WorkspaceBlock[];
 }
 

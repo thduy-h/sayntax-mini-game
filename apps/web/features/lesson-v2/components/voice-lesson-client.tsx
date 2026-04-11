@@ -25,7 +25,7 @@ interface VoiceLessonClientProps {
 let registered = false;
 
 const SUCCESS_EXECUTION: ProgramExecutionResult = { success: true, output: [], errors: [], variables: {} };
-const typeMap = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" } as const;
+const typeMap: Partial<Record<import("@shecancode/shared-types").BlockKind, string>> = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" };
 const fieldMap = { text: "TEXT", name: "NAME", value: "VALUE", times: "TIMES", condition: "CONDITION" } as const;
 
 const theme = Blockly.Theme.defineTheme("shecancode-voice", {
@@ -315,7 +315,9 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     if (!workspace || !currentStep) return { changed: false, shouldEvaluate: false };
     switch (intent.kind) {
       case "add_block": {
-        const block = workspace.newBlock(typeMap[intent.blockType]) as Blockly.BlockSvg;
+        const blocklyType = typeMap[intent.blockType];
+        if (!blocklyType) return { changed: false, shouldEvaluate: false };
+        const block = workspace.newBlock(blocklyType) as Blockly.BlockSvg;
         block.initSvg();
         block.render();
         // Auto-connect non-start blocks to the bottom of the start chain so

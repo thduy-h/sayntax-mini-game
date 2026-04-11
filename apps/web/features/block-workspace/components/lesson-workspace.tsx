@@ -6,6 +6,7 @@ import { executeProgram } from "@shecancode/block-engine";
 import { evaluateLessonStep } from "@shecancode/lesson-engine";
 import { SUPPORTED_COMMAND_PATTERNS, parseVoiceCommand } from "@shecancode/voice-parser";
 import type {
+  BlockKind,
   LessonWithSteps,
   ProgramExecutionResult,
   ProgramWorkspace,
@@ -109,7 +110,7 @@ function buildBlocklyChain(blocks: WorkspaceBlock[]): Record<string, unknown> | 
 }
 
 function domainBlockToBlockly(block: WorkspaceBlock, x?: number, y?: number): Record<string, unknown> {
-  const typeMap = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" } as const;
+  const typeMap: Partial<Record<BlockKind, string>> = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" };
   const result: Record<string, unknown> = { id: block.id, type: typeMap[block.type] ?? block.type };
   if (x !== undefined) result.x = x;
   if (y !== undefined) result.y = y;
@@ -158,8 +159,10 @@ function getInsertPosition(workspace: Blockly.WorkspaceSvg) {
 }
 
 function addBlockFromVoice(workspace: Blockly.WorkspaceSvg, action: Extract<VoiceCommandAction, { type: "add_block" }>) {
-  const typeMap = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" } as const;
-  const block = workspace.newBlock(typeMap[action.blockType]) as Blockly.BlockSvg;
+  const typeMap: Partial<Record<BlockKind, string>> = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" };
+  const blocklyType = typeMap[action.blockType];
+  if (!blocklyType) return;
+  const block = workspace.newBlock(blocklyType) as Blockly.BlockSvg;
   if (action.blockType === "repeat" && action.repeatCount) block.setFieldValue(String(action.repeatCount), "TIMES");
   block.initSvg();
   block.render();
@@ -203,7 +206,8 @@ function defaultStepIndex(lesson: LessonWithSteps, progressMap: Record<string, P
 }
 
 function blockLabel(type: Extract<VoiceCommandAction, { type: "add_block" }>["blockType"]) {
-  return { start: "bắt đầu", print: "in", repeat: "lặp", if: "điều kiện", variable: "biến" }[type];
+  const labels: Partial<Record<BlockKind, string>> = { start: "bắt đầu", print: "in", repeat: "lặp", if: "điều kiện", variable: "biến" };
+  return labels[type] ?? type;
 }
 
 export function LessonWorkspace({ initialProgress = {}, lesson }: { initialProgress?: Record<string, ProgressStatus>; lesson: LessonWithSteps }) {

@@ -6,6 +6,7 @@ import { executeProgram } from "@shecancode/block-engine";
 import type { LessonV2WithSteps } from "@shecancode/lesson-engine";
 import { parseVoiceIntent, type VoiceIntent } from "@shecancode/voice-parser";
 import type {
+  BlockKind,
   ProgramExecutionResult,
   ProgramWorkspace,
   WorkspaceBlock,
@@ -25,7 +26,16 @@ interface VoiceLessonClientProps {
 let registered = false;
 
 const SUCCESS_EXECUTION: ProgramExecutionResult = { success: true, output: [], errors: [], variables: {} };
-const typeMap: Partial<Record<import("@shecancode/shared-types").BlockKind, string>> = { start: "scc_start", print: "scc_print", repeat: "scc_repeat", if: "scc_if", variable: "scc_variable" };
+const typeMap: Partial<Record<BlockKind, string>> = {
+  start: "scc_start",
+  print: "scc_print",
+  repeat: "scc_repeat",
+  if: "scc_if",
+  variable: "scc_variable",
+  variable_get: "scc_variable_get",
+  text_literal: "scc_text_literal",
+  number_literal: "scc_number_literal",
+};
 const fieldMap = { text: "TEXT", name: "NAME", value: "VALUE", times: "TIMES", condition: "CONDITION" } as const;
 
 const theme = Blockly.Theme.defineTheme("shecancode-voice", {
@@ -61,6 +71,16 @@ const toolbox: Blockly.utils.toolbox.ToolboxDefinition = {
     { kind: "category", name: "Đầu ra", categorystyle: "output_category", contents: [{ kind: "block", type: "scc_print" }] },
     { kind: "category", name: "Lặp", categorystyle: "logic_category", contents: [{ kind: "block", type: "scc_repeat" }] },
     { kind: "category", name: "Điều kiện", categorystyle: "logic_category", contents: [{ kind: "block", type: "scc_if" }] },
+    {
+      kind: "category",
+      name: "Giá trị",
+      categorystyle: "output_category",
+      contents: [
+        { kind: "block", type: "scc_text_literal" },
+        { kind: "block", type: "scc_number_literal" },
+        { kind: "block", type: "scc_variable_get" },
+      ],
+    },
     { kind: "category", name: "Biến", categorystyle: "variable_category", contents: [{ kind: "block", type: "scc_variable" }] },
   ],
 };
@@ -69,17 +89,35 @@ function ensureBlocks() {
   if (registered) return;
   Blockly.defineBlocksWithJsonArray([
     { type: "scc_start", message0: "bắt đầu", nextStatement: null, style: "logic_blocks" },
-    { type: "scc_print", message0: "in %1", args0: [{ type: "field_input", name: "TEXT", text: "Xin chào" }], previousStatement: null, nextStatement: null, style: "text_blocks" },
+    { type: "scc_print", message0: "in %1", args0: [{ type: "input_value", name: "TEXT", check: ["String", "Number"] }], previousStatement: null, nextStatement: null, style: "text_blocks" },
     { type: "scc_repeat", message0: "lặp %1 lần", args0: [{ type: "field_number", name: "TIMES", value: 3, min: 0, precision: 1 }], message1: "thực hiện %1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null, style: "loop_blocks" },
     { type: "scc_if", message0: "nếu điều kiện là %1", args0: [{ type: "field_checkbox", name: "CONDITION", checked: true }], message1: "thì %1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null, style: "logic_blocks" },
     { type: "scc_variable", message0: "đặt biến %1 thành %2", args0: [{ type: "field_input", name: "NAME", text: "score" }, { type: "field_input", name: "VALUE", text: "5" }], previousStatement: null, nextStatement: null, style: "variable_blocks" },
+    { type: "scc_text_literal", message0: "%1", args0: [{ type: "field_input", name: "VALUE", text: "Xin chào" }], output: "String", style: "text_blocks" },
+    { type: "scc_number_literal", message0: "%1", args0: [{ type: "field_number", name: "VALUE", value: 0 }], output: "Number", style: "loop_blocks" },
+    { type: "scc_variable_get", message0: "biến %1", args0: [{ type: "field_input", name: "NAME", text: "score" }], output: "String", style: "variable_blocks" },
   ]);
   registered = true;
 }
 
 function parseBlock(block: Blockly.Block): WorkspaceBlock {
+  if (block.type === "scc_text_literal") {
+    return { id: block.id, type: "text_literal", fields: { value: block.getFieldValue("VALUE") ?? "" } };
+  }
+  if (block.type === "scc_number_literal") {
+    return { id: block.id, type: "number_literal", fields: { value: Number(block.getFieldValue("VALUE") ?? 0) } };
+  }
+  if (block.type === "scc_variable_get") {
+    return { id: block.id, type: "variable_get", fields: { name: block.getFieldValue("NAME") ?? "" } };
+  }
   if (block.type === "scc_start") return { id: block.id, type: "start" };
-  if (block.type === "scc_print") return { id: block.id, type: "print", fields: { text: block.getFieldValue("TEXT") || "" } };
+  if (block.type === "scc_print") {
+    const valueBlock = block.getInputTargetBlock("TEXT");
+    if (valueBlock) {
+      return { id: block.id, type: "print", inputs: { text: parseBlock(valueBlock) } };
+    }
+    return { id: block.id, type: "print", fields: { text: "" } };
+  }
   if (block.type === "scc_repeat") return { id: block.id, type: "repeat", fields: { times: Number(block.getFieldValue("TIMES") || 0) }, children: readChain(block.getInputTargetBlock("DO")) };
   if (block.type === "scc_if") return { id: block.id, type: "if", fields: { condition: block.getFieldValue("CONDITION") === "TRUE" }, children: readChain(block.getInputTargetBlock("DO")) };
   if (block.type === "scc_variable") return { id: block.id, type: "variable", fields: { name: block.getFieldValue("NAME") || "score", value: block.getFieldValue("VALUE") || "" } };
@@ -119,11 +157,39 @@ function buildBlocklyChain(blocks: WorkspaceBlock[]): Record<string, unknown> | 
 }
 
 function domainBlockToBlockly(block: WorkspaceBlock, x?: number, y?: number): Record<string, unknown> {
+  if (block.type === "text_literal") {
+    return { id: block.id, type: "scc_text_literal", fields: { VALUE: String(block.fields?.value ?? "") } };
+  }
+  if (block.type === "number_literal") {
+    return { id: block.id, type: "scc_number_literal", fields: { VALUE: Number(block.fields?.value ?? 0) } };
+  }
+  if (block.type === "variable_get") {
+    return { id: block.id, type: "scc_variable_get", fields: { NAME: String(block.fields?.name ?? "") } };
+  }
+  if (block.type === "print") {
+    const result: Record<string, unknown> = { id: block.id, type: "scc_print" };
+    if (x !== undefined) result.x = x;
+    if (y !== undefined) result.y = y;
+    if (block.inputs?.text) {
+      result.inputs = {
+        TEXT: { block: domainBlockToBlockly(block.inputs.text) },
+      };
+    } else if (typeof block.fields?.text === "string") {
+      result.inputs = {
+        TEXT: {
+          block: {
+            type: "scc_text_literal",
+            fields: { VALUE: String(block.fields.text) },
+          },
+        },
+      };
+    }
+    return result;
+  }
   const result: Record<string, unknown> = { id: block.id, type: typeMap[block.type] ?? block.type };
   if (x !== undefined) result.x = x;
   if (y !== undefined) result.y = y;
   const fields: Record<string, unknown> = {};
-  if (block.type === "print" && block.fields?.text !== undefined) fields.TEXT = String(block.fields.text);
   if (block.type === "repeat" && block.fields?.times !== undefined) fields.TIMES = Number(block.fields.times);
   if (block.type === "if" && block.fields?.condition !== undefined) fields.CONDITION = block.fields.condition ? "TRUE" : "FALSE";
   if (block.type === "variable") {

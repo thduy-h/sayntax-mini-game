@@ -102,19 +102,24 @@ export function evaluateStepAction(
         ? { completed: true, feedback: FEEDBACK.set_number_pass }
         : { completed: false, feedback: FEEDBACK.set_number_fail };
     }
-    case "run_program":
+    case "run_program": {
       if (executionResult.success !== true) {
         return { completed: false, feedback: FEEDBACK.run_program_fail };
       }
       if (action.expectedOutput === undefined) {
         return { completed: true, feedback: FEEDBACK.run_program_pass };
       }
+      // Loose comparison: normalize (lowercase + diacritic strip) AND strip
+      // surrounding/trailing punctuation. Web Speech API often appends "."
+      // or "!" to dictated text, which previously caused exact-match fails.
+      const stripPunct = (s: string) => normalizeText(s).replace(/[.,!?;:"'()]+/g, "").trim();
       return executionResult.output.length === action.expectedOutput.length &&
         action.expectedOutput.every(
-          (expected, index) => normalizeText(executionResult.output[index] ?? "") === normalizeText(expected),
+          (expected, index) => stripPunct(executionResult.output[index] ?? "") === stripPunct(expected),
         )
         ? { completed: true, feedback: FEEDBACK.run_program_pass }
         : { completed: false, feedback: FEEDBACK.run_program_fail };
+    }
     case "ask_hint":
       return { completed: true, feedback: FEEDBACK.ask_hint_pass };
     default: {

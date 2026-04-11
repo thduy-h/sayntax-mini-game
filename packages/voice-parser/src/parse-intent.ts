@@ -158,7 +158,10 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
   if (textMatch) {
     const payloadTokens = textMatch[1].split(/\s+/).filter(Boolean).length;
     const prefixLength = normalizedTokens.length - payloadTokens;
-    const text = originalTokens.slice(prefixLength).join(" ").trim();
+    // Strip surrounding sentence-ending punctuation from the captured text.
+    // Web Speech API often appends "." or "!" to dictated phrases, which
+    // would otherwise mismatch later expectedOutput comparisons.
+    const text = originalTokens.slice(prefixLength).join(" ").trim().replace(/^[.,!?;:"'()]+|[.,!?;:"'()]+$/g, "").trim();
     return text ? { kind: "set_text", text } : unknown("no_match");
   }
 

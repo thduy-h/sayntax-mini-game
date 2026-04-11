@@ -97,7 +97,14 @@ function readChain(block: Blockly.Block | null): WorkspaceBlock[] {
 }
 
 function toProgram(workspace: Blockly.WorkspaceSvg): ProgramWorkspace {
-  return { version: 1, blocks: workspace.getTopBlocks(true).flatMap((block) => readChain(block)) };
+  // Only execute blocks that are part of the chain starting from `start`.
+  // Disconnected / floating blocks are treated as drafts and ignored, both
+  // for execution and for evaluation. Beginner-friendly: matches the
+  // Scratch-style "snap to start to actually run" mental model.
+  const tops = workspace.getTopBlocks(true);
+  const startBlock = tops.find((b) => b.type === "scc_start");
+  if (!startBlock) return { version: 1, blocks: [] };
+  return { version: 1, blocks: readChain(startBlock) };
 }
 
 function buildBlocklyChain(blocks: WorkspaceBlock[]): Record<string, unknown> | undefined {
@@ -311,6 +318,25 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
         const block = workspace.newBlock(typeMap[intent.blockType]) as Blockly.BlockSvg;
         block.initSvg();
         block.render();
+        // Auto-connect non-start blocks to the bottom of the start chain so
+        // they actually execute. Beginner-friendly: voice-added blocks
+        // shouldn't float disconnected.
+        if (intent.blockType !== "start" && block.previousConnection) {
+          const tops = workspace.getTopBlocks(true) as Blockly.BlockSvg[];
+          const start = tops.find((b) => b.type === "scc_start") as Blockly.BlockSvg | undefined;
+          if (start) {
+            let last: Blockly.BlockSvg = start;
+            let nextBlock = last.getNextBlock() as Blockly.BlockSvg | null;
+            while (nextBlock) {
+              last = nextBlock;
+              nextBlock = last.getNextBlock() as Blockly.BlockSvg | null;
+            }
+            if (last.nextConnection) {
+              block.previousConnection.connect(last.nextConnection);
+              return { changed: true, shouldEvaluate: true };
+            }
+          }
+        }
         const { x, y } = getInsertPosition(workspace);
         block.moveBy(x, y);
         return { changed: true, shouldEvaluate: true };

@@ -396,14 +396,28 @@ export const lessonsV2 = [
         id: "v2-lesson-5-step-6",
         databaseStepId: "40000000-0000-0000-0000-000000000506",
         orderIndex: 6,
-        title: "Chạy chương trình",
-        instructions: "Hãy nói: **Chạy chương trình** để kiểm tra mọi thứ hoạt động.",
-        hints: ["Chương trình tạo biến rồi in nhãn.", "Nếu có lỗi, kiểm tra lại khối biến.", "Thử: Chạy chương trình."],
-        action: { kind: "run_program" },
+        title: "In ra giá trị của biến",
+        instructions: "Hãy nói: **Chạy chương trình** để in ra giá trị của biến diem (sẽ là 10).",
+        hints: [
+          "Khối in giờ chứa biến diem chứ không phải chữ.",
+          "Giá trị của biến diem là 10 (đặt từ bước 3).",
+          "Thử: Chạy chương trình.",
+        ],
+        action: { kind: "run_program", expectedOutput: ["10"] },
         starterWorkspace: workspace([
             { id: "v2-l5-start", type: "start" },
             { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } },
-            { id: "v2-l5-print", type: "print", fields: { text: "diem" } },
+            {
+              id: "v2-l5-print",
+              type: "print",
+              inputs: {
+                text: {
+                  id: "v2-l5-print-var",
+                  type: "variable_get",
+                  fields: { name: "diem" },
+                },
+              },
+            },
           ]),
       },
     ],

@@ -1,12 +1,21 @@
 import Link from "next/link";
 import { countWorkspaceBlocks, createEmptyProgram } from "@shecancode/block-engine";
-import { getSeedCourseOverview, listSeedLessons } from "@shecancode/lesson-engine";
+import { listSeedV2Lessons } from "@shecancode/lesson-engine";
 import { roleLabels } from "@shecancode/shared-types";
 import { Badge, Surface } from "@shecancode/ui";
-import { SUPPORTED_COMMAND_PATTERNS } from "@shecancode/voice-parser";
 
-const course = getSeedCourseOverview();
-const lessons = listSeedLessons();
+const COURSE_TITLE = "Nền tảng tư duy tính toán";
+const SUPPORTED_COMMANDS_PREVIEW = [
+  "thêm khối bắt đầu",
+  "thêm khối in",
+  "đặt chữ Xin chào",
+  "thêm khối lặp",
+  "đặt số 5",
+  "chạy chương trình",
+] as const;
+
+const lessons = listSeedV2Lessons();
+const totalVoiceCommands = 10;
 const roles = Object.values(roleLabels);
 const workspaceBlockCount = countWorkspaceBlocks(createEmptyProgram());
 
@@ -57,16 +66,16 @@ export default function Home() {
           <div className="mt-6 grid gap-4">
             <div className="rounded-[1rem] border-4 border-white bg-[#ff5f87] p-4 text-black">
               <p className="text-xs font-black uppercase">Khóa học</p>
-              <p className="mt-2 text-3xl font-black leading-none">{course.title}</p>
+              <p className="mt-2 text-3xl font-black leading-none">{COURSE_TITLE}</p>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="rounded-[1rem] border-4 border-white bg-[#fff6fb] p-4 text-black">
                 <p className="text-xs font-black uppercase">Bài học</p>
-                <p className="mt-2 text-4xl font-black leading-none">{course.lessonCount}</p>
+                <p className="mt-2 text-4xl font-black leading-none">{lessons.length}</p>
               </div>
               <div className="rounded-[1rem] border-4 border-white bg-[#7df2c3] p-4 text-black">
                 <p className="text-xs font-black uppercase">Lệnh giọng nói</p>
-                <p className="mt-2 text-4xl font-black leading-none">{SUPPORTED_COMMAND_PATTERNS.length}</p>
+                <p className="mt-2 text-4xl font-black leading-none">{totalVoiceCommands}</p>
               </div>
               <div className="rounded-[1rem] border-4 border-white bg-[#ffb84d] p-4 text-black">
                 <p className="text-xs font-black uppercase">Vai trò</p>
@@ -148,7 +157,7 @@ export default function Home() {
           <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Lệnh tiếng Việt đang hỗ trợ</p>
           <h2 className="font-heading mt-4 text-4xl leading-none text-black">Web Speech API + parser rule-based cho các câu lệnh ngắn, rõ, dễ học.</h2>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {SUPPORTED_COMMAND_PATTERNS.slice(0, 6).map((command, index) => (
+            {SUPPORTED_COMMANDS_PREVIEW.map((command, index) => (
               <div
                 key={command}
                 className={`rounded-[1rem] border-4 border-black px-4 py-3 text-sm font-black uppercase text-black shadow-[6px_6px_0_#121212] ${

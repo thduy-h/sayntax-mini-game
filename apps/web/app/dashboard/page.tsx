@@ -1,14 +1,15 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSeedCourseOverview, listSeedLessons } from "@shecancode/lesson-engine";
+import { listSeedV2Lessons } from "@shecancode/lesson-engine";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOutAction } from "@/features/auth/server/actions";
 import { getCurrentAppUser } from "@/features/auth/server/data";
-import { getLessonProgressSummaries } from "@/features/progress/server/data";
 
 export const dynamic = "force-dynamic";
+
+const COURSE_TITLE = "Nền tảng tư duy tính toán";
 
 export default async function DashboardPage() {
   const appUser = await getCurrentAppUser();
@@ -17,9 +18,7 @@ export default async function DashboardPage() {
   if (!appUser.onboarding_completed) redirect("/onboarding");
   if (appUser.role === "admin") redirect("/admin");
 
-  const course = getSeedCourseOverview();
-  const lessons = listSeedLessons();
-  const progressSummaries = await getLessonProgressSummaries(lessons.map((lesson) => lesson.databaseLessonId));
+  const lessons = listSeedV2Lessons();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
@@ -29,15 +28,12 @@ export default async function DashboardPage() {
             <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Bảng học tập</p>
             <CardTitle className="max-w-3xl text-4xl sm:text-5xl">Chào mừng quay lại, {appUser.email}</CardTitle>
             <CardDescription>
-              Chọn bài học, thực hành với block và tiếp tục tiến độ đã lưu mà không cần đi qua quá nhiều thao tác phụ.
+              Mỗi bài học dạy đúng một thao tác — thêm khối, đặt chữ, đặt số, chạy chương trình — bằng giọng nói tiếng Việt.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-4">
-            <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#ff5f87] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/lessons">
-              Vào bài học
-            </Link>
             <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#a8e6ff] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/lessons-v2">
-              Bài học V2 (voice)
+              Vào bài học
             </Link>
             <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#7df2c3] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href="/role-models">
               Góc truyền cảm hứng
@@ -55,7 +51,7 @@ export default async function DashboardPage() {
               <strong>Vai trò:</strong> Học sinh
             </p>
             <p>
-              <strong>Khóa học:</strong> {course.title}
+              <strong>Khóa học:</strong> {COURSE_TITLE}
             </p>
             <form action={signOutAction}>
               <Button className="w-full" type="submit" variant="outline">
@@ -75,8 +71,8 @@ export default async function DashboardPage() {
               <CardDescription>{lesson.summary}</CardDescription>
             </CardHeader>
             <CardContent className="flex items-center justify-between text-sm font-semibold text-zinc-700">
-              <span>{progressSummaries[lesson.databaseLessonId]?.completed ?? 0}/{lesson.stepCount} bước hoàn thành</span>
-              <Link className="font-black uppercase text-black underline decoration-4 underline-offset-4" href={`/lessons/${lesson.id}` as Route}>Mở</Link>
+              <span>{lesson.stepCount} bước</span>
+              <Link className="font-black uppercase text-black underline decoration-4 underline-offset-4" href={`/lessons-v2/${lesson.slug}` as Route}>Mở</Link>
             </CardContent>
           </Card>
         ))}

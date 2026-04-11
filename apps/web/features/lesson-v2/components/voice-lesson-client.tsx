@@ -251,6 +251,7 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
   const [voiceLog, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
+  const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
   const currentStep = lesson.steps[currentStepIndex];
 
@@ -465,21 +466,32 @@ export function VoiceLessonClient({ lesson }: VoiceLessonClientProps): JSX.Eleme
     };
   }, []);
 
-  // Load the current step's starter on every step change. Suppress eval
-  // during the load so the burst of Blockly events doesn't trigger advance.
+  // Load the current step's starter ONLY when:
+  //  - It's the first time we're rendering a step (mount)
+  //  - The user navigated BACKWARD or jumped non-adjacently via the sidebar
+  // For natural forward advance (auto-advance after success, or "Bước sau"
+  // button), KEEP the existing workspace as-is — the learner's blocks
+  // persist across steps the way Scratch's single workspace does.
   useEffect(() => {
     const workspace = workspaceRef.current;
     if (!workspaceReady || !workspace || !currentStep) return;
+    const prevIndex = prevStepIndexRef.current;
+    const isInitialLoad = workspace.getAllBlocks(false).length === 0;
+    const isAdjacentForward = currentStepIndex === prevIndex + 1;
+    prevStepIndexRef.current = currentStepIndex;
+    // Adjacent forward advance: don't touch the workspace.
+    if (!isInitialLoad && isAdjacentForward) {
+      return;
+    }
+    // Backward, jump, or first load: reset to this step's starter.
     suppressEvaluationRef.current = true;
     workspace.clear();
     Blockly.serialization.workspaces.load(starterStateFromWorkspace(currentStep.starterWorkspace), workspace);
-    // Hold suppression for the next macrotask — Blockly may fire events
-    // asynchronously after load() returns.
     const id = window.setTimeout(() => {
       suppressEvaluationRef.current = false;
     }, 50);
     return () => window.clearTimeout(id);
-  }, [currentStep, workspaceReady]);
+  }, [currentStep, currentStepIndex, workspaceReady]);
 
   useEffect(() => {
     const workspace = workspaceRef.current;

@@ -1,9 +1,21 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getEnv } from "@/lib/env";
+import { getEnvSafe } from "@/lib/env";
+
+function isPublicRoute(pathname: string) {
+  return pathname === "/" || pathname === "/demo" || pathname.startsWith("/demo/");
+}
 
 export async function proxy(request: NextRequest) {
-  const env = getEnv();
+  if (isPublicRoute(request.nextUrl.pathname)) {
+    return NextResponse.next({ request });
+  }
+
+  const env = getEnvSafe();
+  if (!env) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({
     request,
   });

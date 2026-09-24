@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { getSiteUrl, isAdminEmailAllowed } from "@/lib/env";
+import { getSiteUrl, isAdminEmailAllowed, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser, getRedirectPathForUser } from "@/features/auth/server/data";
 import { signInSchema, signUpSchema } from "@/features/auth/schemas";
@@ -14,7 +14,17 @@ function redirectWithMessage(path: string, key: "error" | "message", value: stri
   redirect(`${path}?${key}=${encodeURIComponent(value)}`);
 }
 
+function safeCallbackPath(value: string) {
+  if (!value.startsWith("/") || value.startsWith("//")) return null;
+  if (value.startsWith("/sign-in") || value.startsWith("/sign-up")) return null;
+  return value;
+}
+
 export async function signInAction(formData: FormData) {
+  if (!isSupabaseConfigured()) {
+    redirectWithMessage("/sign-in", "error", "Supabase chưa được cấu hình. Hãy dùng chế độ demo hoặc thiết lập biến môi trường trước khi đăng nhập.");
+  }
+
   const parsed = signInSchema.safeParse({
     email: getString(formData, "email"),
     password: getString(formData, "password"),
@@ -25,6 +35,7 @@ export async function signInAction(formData: FormData) {
   }
 
   const credentials = parsed.data;
+  const callbackUrl = safeCallbackPath(getString(formData, "callbackUrl"));
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signInWithPassword(credentials);
 
@@ -37,10 +48,22 @@ export async function signInAction(formData: FormData) {
     redirectWithMessage("/sign-in", "error", "Hồ sơ tài khoản của bạn chưa sẵn sàng. Vui lòng thử lại sau ít phút.");
   }
 
+  if (!user.onboarding_completed) {
+    redirect("/onboarding");
+  }
+
+  if (callbackUrl && !(callbackUrl.startsWith("/admin") && user.role !== "admin")) {
+    redirect(callbackUrl);
+  }
+
   redirect(getRedirectPathForUser(user));
 }
 
 export async function signUpAction(formData: FormData) {
+  if (!isSupabaseConfigured()) {
+    redirectWithMessage("/sign-up", "error", "Supabase chưa được cấu hình. Hãy dùng chế độ demo hoặc thiết lập biến môi trường trước khi đăng ký.");
+  }
+
   const parsed = signUpSchema.safeParse({
     email: getString(formData, "email"),
     password: getString(formData, "password"),
@@ -97,6 +120,9 @@ export async function signUpAction(formData: FormData) {
 }
 
 export async function signOutAction() {
+  if (!isSupabaseConfigured()) {
+    redirect("/sign-in");
+  }
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signOut();
   redirect("/sign-in");

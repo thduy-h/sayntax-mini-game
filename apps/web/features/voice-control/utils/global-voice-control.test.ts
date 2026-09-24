@@ -1,0 +1,31 @@
+import assert from "node:assert/strict";
+
+import { parseGlobalVoiceCommand } from "./global-voice-control";
+
+assert.deepEqual(parseGlobalVoiceCommand("mở demo"), { kind: "navigate", href: "/demo", label: "demo" });
+assert.deepEqual(parseGlobalVoiceCommand("trải nghiệm ngay"), { kind: "navigate", href: "/demo", label: "demo" });
+assert.deepEqual(parseGlobalVoiceCommand("bấm Trải nghiệm ngay"), { kind: "navigate", href: "/demo", label: "demo" });
+assert.deepEqual(parseGlobalVoiceCommand("mở bài 1"), { kind: "navigate", href: "/demo/start-and-sequence-v2", label: "bài 1" });
+assert.deepEqual(parseGlobalVoiceCommand("mở bài số 2"), { kind: "navigate", href: "/demo/print-output-v2", label: "bài 2" });
+assert.deepEqual(parseGlobalVoiceCommand("bài ba"), { kind: "navigate", href: "/demo/repeat-loops-v2", label: "bài 3" });
+assert.deepEqual(parseGlobalVoiceCommand("bấm bài 5"), { kind: "navigate", href: "/demo/variables-basics-v2", label: "bài 5" });
+assert.deepEqual(parseGlobalVoiceCommand("đi đến bài học"), { kind: "navigate", href: "/lessons-v2", label: "bài học" });
+assert.deepEqual(parseGlobalVoiceCommand("trang chủ"), { kind: "navigate", href: "/", label: "trang chủ" });
+assert.deepEqual(parseGlobalVoiceCommand("chạy chương trình"), { kind: "click", label: "chay" });
+assert.deepEqual(parseGlobalVoiceCommand("kiểm tra bài"), { kind: "click", label: "chay" });
+assert.deepEqual(parseGlobalVoiceCommand("bước sau"), { kind: "click", label: "sau" });
+assert.deepEqual(parseGlobalVoiceCommand("bước trước"), { kind: "click", label: "truoc" });
+assert.deepEqual(parseGlobalVoiceCommand("hoàn tác"), { kind: "click", label: "hoan tac" });
+assert.deepEqual(parseGlobalVoiceCommand("dùng câu mẫu"), { kind: "click", label: "dung cau mau" });
+assert.deepEqual(parseGlobalVoiceCommand("thực hiện"), { kind: "click", label: "thuc hien" });
+assert.deepEqual(parseGlobalVoiceCommand("gợi ý"), { kind: "click", label: "doi" });
+assert.deepEqual(parseGlobalVoiceCommand("chọn ô email"), { kind: "focus", label: "email" });
+assert.deepEqual(parseGlobalVoiceCommand("nhập xin chào"), { kind: "fill_focused", value: "xin chao" });
+assert.deepEqual(parseGlobalVoiceCommand("cuộn xuống"), { kind: "scroll", direction: "down" });
+assert.deepEqual(parseGlobalVoiceCommand("lên đầu trang"), { kind: "scroll", direction: "top" });
+assert.deepEqual(parseGlobalVoiceCommand("quay lại"), { kind: "history", direction: "back" });
+assert.deepEqual(parseGlobalVoiceCommand("trợ giúp"), { kind: "help" });
+assert.deepEqual(parseGlobalVoiceCommand("dừng nghe"), { kind: "stop" });
+assert.deepEqual(parseGlobalVoiceCommand("xyz abc"), { kind: "unknown", transcript: "xyz abc" });
+
+console.log("global-voice-control tests passed");

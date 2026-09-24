@@ -15,7 +15,8 @@ export type BlockKind =
   | "variable"
   | "variable_get"
   | "text_literal"
-  | "number_literal";
+  | "number_literal"
+  | "boolean_literal";
 
 export const USER_ROLES: AppRole[] = ["student", "admin"];
 export const BLOCK_TYPES: BlockKind[] = [
@@ -27,6 +28,7 @@ export const BLOCK_TYPES: BlockKind[] = [
   "variable_get",
   "text_literal",
   "number_literal",
+  "boolean_literal",
 ];
 
 export const roleLabels: Record<AppRole, string> = {

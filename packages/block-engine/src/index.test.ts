@@ -98,6 +98,26 @@ const repeatReporterResult = executeProgram(
 assert.equal(repeatReporterResult.success, true);
 assert.deepEqual(repeatReporterResult.output, ["x", "x", "x"]);
 
+const booleanReporterResult = executeProgram(
+  createWorkspace([
+    { id: "start-boolean", type: "start" },
+    {
+      id: "if-boolean",
+      type: "if",
+      inputs: {
+        condition: {
+          id: "bool-1",
+          type: "boolean_literal",
+          fields: { value: true },
+        },
+      },
+      children: [{ id: "print-boolean", type: "print", fields: { text: "đúng" } }],
+    },
+  ]),
+);
+assert.equal(booleanReporterResult.success, true);
+assert.deepEqual(booleanReporterResult.output, ["đúng"]);
+
 const precedenceResult = executeProgram(
   createWorkspace([
     { id: "start-6", type: "start" },

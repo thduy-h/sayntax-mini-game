@@ -6,6 +6,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
+    "test": "node --import tsx src/action-model.test.ts && node --import tsx src/seed-v2.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

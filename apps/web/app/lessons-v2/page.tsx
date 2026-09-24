@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSeedV2LessonBySlug, listSeedV2Lessons, type LessonV2Preview } from "@shecancode/lesson-engine";
+import { AppNav } from "@/components/app-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentAppUser } from "@/features/auth/server/data";
 import { getLessonV2CompletionCounts } from "@/features/lesson-v2/server/progress-data";
@@ -13,7 +14,7 @@ type LessonCard = LessonV2Preview & { estimatedMinutes: number; completedCount: 
 export default async function LessonsV2Page() {
   const appUser = await getCurrentAppUser();
 
-  if (!appUser) redirect("/sign-in");
+  if (!appUser) redirect(`/sign-in?callbackUrl=${encodeURIComponent("/lessons-v2")}`);
   if (!appUser.onboarding_completed) redirect("/onboarding");
 
   const counts = await getLessonV2CompletionCounts();
@@ -25,10 +26,11 @@ export default async function LessonsV2Page() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
+      <AppNav />
       <Card className="grid-sheen bg-[#a8e6ff]">
         <CardHeader>
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Bài học V2</p>
-          <CardTitle className="max-w-4xl text-4xl sm:text-5xl">Bài học V2 — học bằng giọng nói</CardTitle>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Bài học</p>
+          <CardTitle className="max-w-4xl text-4xl sm:text-5xl">Bài học — học bằng giọng nói</CardTitle>
           <CardDescription>
             Mỗi bước chỉ dạy một hành động. Nói câu lệnh, xem khối xuất hiện, và tiếp tục.
           </CardDescription>

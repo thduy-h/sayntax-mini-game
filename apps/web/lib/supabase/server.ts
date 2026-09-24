@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { getEnv } from "@/lib/env";
+import { getEnv, getEnvSafe } from "@/lib/env";
 
 export async function createServerSupabaseClient() {
-  const env = getEnv();
+  const env = getEnvSafe();
+  if (!env) {
+    throw new Error("Supabase chưa được cấu hình. Hãy thiết lập NEXT_PUBLIC_SUPABASE_URL và NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+  }
   const cookieStore = await cookies();
 
   return createServerClient(env.NEXT_PUBLIC_SUPABASE_URL, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, {
@@ -39,4 +42,3 @@ export function createServiceRoleSupabaseClient() {
     },
   });
 }
-

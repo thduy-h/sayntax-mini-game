@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppNav } from "@/components/app-nav";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SwitchField } from "@/components/ui/switch-field";
@@ -20,7 +21,7 @@ export const dynamic = "force-dynamic";
 export default async function OnboardingPage({ searchParams }: OnboardingPageProps) {
   const appUser = await getCurrentAppUser();
   if (!appUser) {
-    redirect("/sign-in");
+    redirect(`/sign-in?callbackUrl=${encodeURIComponent("/onboarding")}`);
   }
 
   if (appUser.onboarding_completed) {
@@ -31,6 +32,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 py-8 sm:px-10">
+      <AppNav />
       <Card className="bg-slate-900 text-white">
         <CardHeader>
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-teal-200">Thiết lập ban đầu</p>
@@ -70,10 +72,12 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                     name="ageRange"
                   >
                     <option value="">Chọn độ tuổi</option>
-                    <option value="8-10">8-10</option>
-                    <option value="11-13">11-13</option>
-                    <option value="14-16">14-16</option>
-                    <option value="17-19">17-19</option>
+                    <option value="15-17">15–17</option>
+                    <option value="18-19">18–19</option>
+                    <option value="20-24">20–24</option>
+                    <option value="25-29">25–29</option>
+                    <option value="30-35">30–35</option>
+                    <option value="prefer-not-to-say">Không muốn cung cấp</option>
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -107,7 +111,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
               <div>
                 <h2 className="font-heading text-2xl text-slate-900">Thiết lập trợ năng</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Các thiết lập này sẽ được lưu và áp dụng khi hoàn thiện workspace và giao diện bài học.
+                  Các thiết lập này sẽ được lưu và áp dụng trong giao diện bài học khi tính năng tương ứng đã sẵn sàng.
                 </p>
               </div>
               <div className="space-y-2">
@@ -148,16 +152,16 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                 />
                 <SwitchField
                   defaultChecked
-                  description="Hiển thị gợi ý điều hướng bằng bàn phím ở các màn hình tương tác."
-                  label="Gợi ý bàn phím"
+                  description="Giữ nhãn và focus rõ ràng để hỗ trợ điều hướng bằng bàn phím của trình duyệt."
+                  label="Nhãn và focus rõ ràng"
                   name="keyboardNavigationHints"
                 />
               </div>
             </section>
 
-            <Button size="lg" type="submit">
+            <FormSubmitButton pendingLabel="Đang lưu thiết lập..." size="lg">
               Hoàn tất thiết lập
-            </Button>
+            </FormSubmitButton>
           </form>
         </CardContent>
       </Card>

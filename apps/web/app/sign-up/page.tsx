@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FormSubmitButton } from "@/components/form-submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthMessage } from "@/features/auth/components/auth-message";
 import { AuthShell } from "@/features/auth/components/auth-shell";
 import { signUpAction } from "@/features/auth/server/actions";
 import { getCurrentAppUser, getRedirectPathForUser } from "@/features/auth/server/data";
+import { isSupabaseConfigured } from "@/lib/env";
 
 interface SignUpPageProps {
   searchParams: Promise<{
@@ -24,6 +25,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   }
 
   const params = await searchParams;
+  const authConfigured = isSupabaseConfigured();
 
   return (
     <AuthShell
@@ -39,6 +41,12 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
       </CardHeader>
       <CardContent className="space-y-5">
         <AuthMessage message={params.error} tone="error" />
+        {!authConfigured && (
+          <AuthMessage
+            message="Đăng ký chưa sẵn sàng vì Supabase chưa được cấu hình. Bạn vẫn có thể vào chế độ demo công khai."
+            tone="error"
+          />
+        )}
         <form action={signUpAction} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -75,10 +83,13 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
               </span>
             </label>
           </fieldset>
-          <Button className="w-full" size="lg" type="submit">
+          <FormSubmitButton className="w-full" disabled={!authConfigured} pendingLabel="Đang tạo tài khoản..." size="lg">
             Tạo tài khoản
-          </Button>
+          </FormSubmitButton>
         </form>
+        <Link className="inline-flex font-semibold text-accent underline-offset-4 hover:underline" href="/demo">
+          Trải nghiệm demo không cần đăng nhập
+        </Link>
         <p className="text-sm text-slate-600">
           Đã có tài khoản?{" "}
           <Link className="font-semibold text-accent underline-offset-4 hover:underline" href="/sign-in">

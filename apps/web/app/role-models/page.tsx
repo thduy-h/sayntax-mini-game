@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AppNav } from "@/components/app-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentAppUser } from "@/features/auth/server/data";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -19,7 +20,7 @@ export default async function RoleModelsPage() {
   const appUser = await getCurrentAppUser();
 
   if (!appUser) {
-    redirect("/sign-in");
+    redirect(`/sign-in?callbackUrl=${encodeURIComponent("/role-models")}`);
   }
 
   if (!appUser.onboarding_completed) {
@@ -38,6 +39,7 @@ export default async function RoleModelsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
+      <AppNav />
       <Card className="border-0 bg-[linear-gradient(155deg,#5e335a,#30536a)] text-white">
         <CardHeader>
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-100">Truyền cảm hứng</p>

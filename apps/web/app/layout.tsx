@@ -1,16 +1,9 @@
 import type { Metadata } from "next";
-import { Manrope, Space_Grotesk } from "next/font/google";
+import Script from "next/script";
+import { GlobalCommandBar } from "@/features/voice-control/components/global-command-bar";
+import { GlobalCommandProvider } from "@/features/voice-control/components/global-command-context";
+import { GlobalVoiceControl } from "@/features/voice-control/components/global-voice-control";
 import "./globals.css";
-
-const headingFont = Space_Grotesk({
-  variable: "--font-heading",
-  subsets: ["latin"],
-});
-
-const bodyFont = Manrope({
-  variable: "--font-body",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "SheCanCode Voice",
@@ -25,17 +18,37 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" suppressHydrationWarning>
+      <head suppressHydrationWarning>
+        <Script
+          id="scc-remove-extension-hydration-noise"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function removeExtensionHydrationNoise() {
+                function clean() {
+                  document.getElementById("MathJax_Message")?.remove();
+                }
+                clean();
+                if (document.readyState === "loading") {
+                  document.addEventListener("DOMContentLoaded", clean, { once: true });
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       {/*
-        suppressHydrationWarning on <body> silences the React hydration
-        mismatch that browser extensions trigger when they inject nodes
-        (e.g. "TeX All the Things" / MathJax) before hydration runs. The
-        warning is cosmetic in that case — our own markup is stable.
+        Some browser extensions inject nodes such as #MathJax_Message before
+        hydration. The cleanup script above removes the known injected node;
+        suppressHydrationWarning keeps extension-only DOM noise from masking
+        real app behavior during demos.
       */}
-      <body
-        suppressHydrationWarning
-        className={`${headingFont.variable} ${bodyFont.variable} antialiased`}
-      >
-        {children}
+      <body suppressHydrationWarning className="antialiased">
+        <GlobalCommandProvider>
+          {children}
+          <GlobalVoiceControl />
+          <GlobalCommandBar />
+        </GlobalCommandProvider>
       </body>
     </html>
   );

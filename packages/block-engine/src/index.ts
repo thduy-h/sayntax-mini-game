@@ -13,6 +13,8 @@ export function evaluateReporter(
       const value = Number(block.fields?.value ?? 0);
       return Number.isFinite(value) ? value : 0;
     }
+    case "boolean_literal":
+      return Boolean(block.fields?.value ?? false);
     case "variable_get": {
       const variableName = String(block.fields?.name ?? "");
       return variables[variableName] ?? "";
@@ -80,6 +82,7 @@ function runBlock(
     }
     case "text_literal":
     case "number_literal":
+    case "boolean_literal":
     case "variable_get":
       // Reporter blocks only run via evaluateReporter, not as top-level statements.
       return;

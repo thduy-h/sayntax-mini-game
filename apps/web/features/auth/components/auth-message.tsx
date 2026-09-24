@@ -10,6 +10,7 @@ export function AuthMessage({ message, tone = "info" }: AuthMessageProps) {
 
   return (
     <div
+      aria-live={tone === "error" ? "assertive" : "polite"}
       className={`rounded-2xl px-4 py-3 text-sm font-medium ${
         tone === "error" ? "bg-rose-100 text-rose-900" : "bg-teal-100 text-teal-950"
       }`}
@@ -18,4 +19,3 @@ export function AuthMessage({ message, tone = "info" }: AuthMessageProps) {
     </div>
   );
 }
-

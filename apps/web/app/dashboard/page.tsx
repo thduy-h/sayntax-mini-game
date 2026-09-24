@@ -2,10 +2,12 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { listSeedV2Lessons } from "@shecancode/lesson-engine";
+import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { signOutAction } from "@/features/auth/server/actions";
 import { getCurrentAppUser } from "@/features/auth/server/data";
+import { getLessonV2CompletionCounts } from "@/features/lesson-v2/server/progress-data";
 
 export const dynamic = "force-dynamic";
 
@@ -14,14 +16,20 @@ const COURSE_TITLE = "Nền tảng tư duy tính toán";
 export default async function DashboardPage() {
   const appUser = await getCurrentAppUser();
 
-  if (!appUser) redirect("/sign-in");
+  if (!appUser) redirect(`/sign-in?callbackUrl=${encodeURIComponent("/dashboard")}`);
   if (!appUser.onboarding_completed) redirect("/onboarding");
   if (appUser.role === "admin") redirect("/admin");
 
   const lessons = listSeedV2Lessons();
+  const counts = await getLessonV2CompletionCounts();
+  const completedLessons = lessons.filter((lesson) => (counts[lesson.slug] ?? 0) >= lesson.stepCount).length;
+  const completedSteps = lessons.reduce((total, lesson) => total + Math.min(counts[lesson.slug] ?? 0, lesson.stepCount), 0);
+  const totalSteps = lessons.reduce((total, lesson) => total + lesson.stepCount, 0);
+  const nextLesson = lessons.find((lesson) => (counts[lesson.slug] ?? 0) < lesson.stepCount) ?? lessons[0];
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
+      <AppNav />
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <Card className="grid-sheen bg-[#ffefb8]">
           <CardHeader>
@@ -53,6 +61,9 @@ export default async function DashboardPage() {
             <p>
               <strong>Khóa học:</strong> {COURSE_TITLE}
             </p>
+            <p>
+              <strong>Tiến độ:</strong> {completedLessons}/{lessons.length} bài hoàn thành
+            </p>
             <form action={signOutAction}>
               <Button className="w-full" type="submit" variant="outline">
                 Đăng xuất
@@ -61,6 +72,25 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </section>
+
+      <Card className="bg-[#fffdf3]" id="progress">
+        <CardHeader>
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Tiến độ</p>
+          <CardTitle>{completedSteps}/{totalSteps} bước đã hoàn thành</CardTitle>
+          <CardDescription>
+            {nextLesson
+              ? `Bài gợi ý tiếp theo: ${nextLesson.title}.`
+              : "Bạn đã hoàn thành toàn bộ bài học hiện có."}
+          </CardDescription>
+        </CardHeader>
+        {nextLesson ? (
+          <CardContent>
+            <Link className="inline-flex min-h-12 items-center rounded-[1rem] border-4 border-black bg-[#ffb84d] px-5 py-3 font-black uppercase text-black shadow-[6px_6px_0_#121212]" href={`/lessons-v2/${nextLesson.slug}` as Route}>
+              {completedSteps > 0 ? "Tiếp tục học" : "Bắt đầu bài đầu tiên"}
+            </Link>
+          </CardContent>
+        ) : null}
+      </Card>
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {lessons.map((lesson, index) => (

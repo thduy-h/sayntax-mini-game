@@ -12,6 +12,8 @@
   --accent-warm: #ffb84d;
   --border: #121212;
   --shadow-brutal: 8px 8px 0 #121212;
+  --font-body: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-heading: var(--font-body);
 }
 
 @theme inline {
@@ -27,6 +29,17 @@
   --font-heading: var(--font-heading);
 }
 
+:root {
+  --z-blockly-workspace: 0;
+  --z-blockly-toolbox: 20;
+  --z-blockly-flyout: 30;
+  --z-app-controls: 80;
+  --z-global-command: 850;
+  --z-global-voice: 900;
+  --z-completion-modal: 1000;
+  --global-command-bar-height: 8rem;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -37,13 +50,14 @@ html {
 
 body {
   min-height: 100vh;
+  padding-bottom: var(--global-command-bar-height);
   background:
     linear-gradient(90deg, rgba(18, 18, 18, 0.08) 1px, transparent 1px),
     linear-gradient(rgba(18, 18, 18, 0.08) 1px, transparent 1px),
     linear-gradient(135deg, #fff8da 0%, #ffe0eb 46%, #e7fff3 100%);
   background-size: 34px 34px, 34px 34px, 100% 100%;
   color: var(--foreground);
-  font-family: var(--font-body), sans-serif;
+  font-family: var(--font-body);
 }
 
 a,
@@ -68,8 +82,8 @@ textarea:focus-visible {
 }
 
 .font-heading {
-  font-family: var(--font-heading), sans-serif;
-  letter-spacing: -0.04em;
+  font-family: var(--font-heading);
+  letter-spacing: 0;
 }
 
 .grid-sheen {
@@ -102,22 +116,75 @@ textarea:focus-visible {
 .blocklyFlyout,
 .blocklyWidgetDiv .blocklyMenu {
   scrollbar-color: #121212 #fffdf3;
-  scrollbar-width: auto;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 
-.blocklyFlyoutScrollbar,
-.blocklyFlyout .blocklyScrollbarHorizontal,
-.blocklyFlyout .blocklyScrollbarVertical {
+.blocklyToolboxDiv {
+  box-sizing: border-box;
+  max-width: min(36vw, 260px);
+  overflow-y: auto;
+  padding-right: 10px;
+  z-index: var(--z-blockly-toolbox) !important;
+}
+
+.blocklyFlyout {
+  overflow: auto;
+  scrollbar-gutter: stable;
+  z-index: var(--z-blockly-flyout) !important;
+}
+
+.blocklyScrollbarHorizontal,
+.blocklyScrollbarVertical {
+  z-index: var(--z-blockly-toolbox) !important;
+}
+
+.blocklyTreeSelected {
+  background-color: #121212 !important;
+}
+
+.blocklyTreeSelected .blocklyTreeLabel {
+  color: #ffffff !important;
+}
+
+.scc-toolbox-collapsed .blocklyToolboxDiv,
+.scc-toolbox-collapsed .blocklyFlyout {
   display: none !important;
-  opacity: 0 !important;
   pointer-events: none !important;
+}
+
+.scc-voice-debug-panel,
+.scc-voice-debug-panel * {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.scc-voice-debug-panel .font-mono {
+  word-break: break-all;
 }
 
 .blocklyToolboxDiv::-webkit-scrollbar,
 .blocklyFlyout::-webkit-scrollbar,
 .blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.blocklyToolboxDiv::-webkit-scrollbar-thumb,
+.blocklyFlyout::-webkit-scrollbar-thumb,
+.blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar-thumb {
+  background: #121212;
+  border: 2px solid #fffdf3;
+  border-radius: 999px;
+}
+
+.blocklyToolboxDiv::-webkit-scrollbar-track,
+.blocklyFlyout::-webkit-scrollbar-track,
+.blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar-track {
+  background: #fffdf3;
 }
 
 .blocklyScrollbarBackground {

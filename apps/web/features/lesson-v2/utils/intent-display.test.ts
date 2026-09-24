@@ -30,9 +30,15 @@ assert.equal(describeIntent({ kind: "insert_into", parentHint: "repeat" }), "đ�
 assert.equal(describeIntent({ kind: "insert_into" }), "đặt vào trong khối cha");
 assert.equal(describeIntent({ kind: "set_text", text: "Xin chào" }), 'đặt chữ "Xin chào"');
 assert.equal(describeIntent({ kind: "set_number", value: 5 }), "đặt số 5");
+assert.equal(describeIntent({ kind: "set_variable_output", name: "diem" }), "in giá trị biến diem");
+assert.equal(describeIntent({ kind: "select_block", target: "display_id", displayId: "2.1" }), "chọn khối 2.1");
+assert.equal(describeIntent({ kind: "set_insert_cursor", position: "inside" }), "chèn vào trong khối đang chọn");
+assert.equal(describeIntent({ kind: "delete_block", target: "display_id", displayId: "2" }), "xoá khối 2");
 assert.equal(describeIntent({ kind: "delete_last" }), "xoá khối cuối");
+assert.equal(describeIntent({ kind: "move_block", target: "selected", direction: "outside" }), "di chuyển khối đang chọn ra ngoài");
 assert.equal(describeIntent({ kind: "run_program" }), "chạy chương trình");
 assert.equal(describeIntent({ kind: "ask_hint" }), "mở gợi ý");
+assert.equal(describeIntent({ kind: "undo_last" }), "hoàn tác thao tác gần nhất");
 assert.equal(describeIntent({ kind: "unknown", reason: "no_match" }), "chưa hiểu câu lệnh");
 
 // --- extractSampleFromInstructions ---
@@ -81,6 +87,14 @@ assert.equal(
     expectedNumber: 3,
   }),
   "Đặt số 3",
+);
+assert.equal(
+  deriveSampleUtterance({
+    kind: "set_variable_output",
+    blockId: "foo",
+    variableName: "diem",
+  }),
+  "In biến diem",
 );
 assert.equal(
   deriveSampleUtterance({ kind: "run_program", expectedOutput: ["Xin chào"] }),

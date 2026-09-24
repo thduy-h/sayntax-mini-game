@@ -1,6 +1,15 @@
 # SheCanCode Voice
 
-SheCanCode Voice is an accessibility-first, Scratch-inspired learning platform for female students with motor disabilities. The MVP combines guided block programming lessons, browser-based voice commands, student progress tracking, and lightweight admin tooling on a Next.js + Supabase stack.
+SheCanCode Voice is an accessibility-first Blockly learning platform for girls and women with motor disabilities. The current MVP supports guided lessons, rule-based Vietnamese voice commands, text command fallback, basic progress tracking, protected student/admin routes, and a public guest demo.
+
+## Current Status
+
+- 5 beginner lessons
+- 25 guided lesson steps
+- Public guest demo at `/demo`
+- Authenticated student flow with dashboard, lessons, progress, program runs, and voice command logs
+- Lightweight admin pilot dashboard for progress, program runs, and unsupported voice commands
+- Rule-based Vietnamese parser only; no LLM dependency
 
 ## Stack
 
@@ -10,82 +19,177 @@ SheCanCode Voice is an accessibility-first, Scratch-inspired learning platform f
 - npm workspaces monorepo
 - Supabase for auth, Postgres, and storage
 - Blockly for the learning workspace
-- Web Speech API for browser voice input
+- Hybrid ASR for voice input: local `faster-whisper` when available, browser Web Speech API fallback
 
-## Repository Layout
+## Run Locally
 
-```text
-apps/
-  web/
-packages/
-  ui/
-  shared-types/
-  voice-parser/
-  block-engine/
-  lesson-engine/
-supabase/
-  migrations/
-  seed.sql
-docs/
+```bash
+npm install
+npm run dev
 ```
 
-## Setup
+Open `http://localhost:3000`.
 
-1. Install dependencies:
+The landing page and `/demo/**` render without Supabase environment variables. Authenticated routes still require Supabase configuration.
 
-   ```bash
-   npm install
-   ```
+## Hybrid ASR Demo
 
-2. Create local environment files:
+Frontend ASR config uses public Next.js environment variables:
 
-   ```bash
-   cp apps/web/.env.example apps/web/.env.local
-   ```
+```bash
+NEXT_PUBLIC_ASR_MODE=auto
+NEXT_PUBLIC_LOCAL_ASR_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_ASR_HEALTH_TIMEOUT_MS=1200
+```
 
-3. Fill in the Supabase variables in `apps/web/.env.local`.
+Modes:
 
-4. Start the app:
+- `auto`: prefer local ASR, fallback to browser Web Speech API.
+- `local`: only use local ASR. If the server is unavailable, the UI reports that voice recognition is unavailable.
+- `browser`: only use browser Web Speech API.
 
-   ```bash
-   npm run dev
-   ```
+Run the local ASR server:
+
+```bash
+cd asr-server
+python -m venv .venv
+```
+
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+Install and run:
+
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Check health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+First run downloads the Whisper model. Defaults: `ASR_MODEL=base`, `ASR_LANGUAGE=vi`, CUDA with `float16` if available, otherwise CPU with `int8`.
+
+If the local server is not running, the frontend falls back to Edge/Chrome Web Speech API. If the browser does not support stable speech recognition, the global “Nhập lệnh” bar still uses the same rule-based parser.
+
+For HTTPS deployments, an HTTP local ASR URL may be blocked by mixed-content rules. The localhost demo is intended for the presenter machine; use an HTTPS/WSS backend URL for remote deployments.
+
+## Guest Demo
+
+Use this flow for a live pitch when no account is available:
+
+1. Open `/`.
+2. Click “Trải nghiệm ngay — không cần đăng nhập”.
+3. Open “Bắt đầu và tuần tự”.
+4. Use the text fallback if microphone permissions are unreliable:
+   - `thêm khối bắt đầu`
+   - `thêm khối in`
+   - `đặt chữ Xin chào`
+   - `chạy chương trình`
+5. Safe commands such as adding blocks, selecting blocks, setting text/numbers, navigation, hints, and running the program execute immediately. Destructive commands such as deleting or moving blocks ask for `đúng rồi` or `hủy`.
+6. Demo progress is saved in `localStorage` on the current device only.
+7. Use “Đặt lại bản demo” to clear guest progress.
+
+Recommended browser for voice demo: Chrome or Edge on desktop. If Web Speech API is unavailable, use the global “Nhập lệnh” bar; in lessons it uses the same rule-based parser as microphone transcripts.
+
+## Supported Demo Commands
+
+Blockly/programming:
+
+- `thêm khối bắt đầu`
+- `thêm khối in`
+- `thêm khối in chữ Xin chào`
+- `đặt chữ Xin chào`
+- `thêm khối lặp 3 lần`
+- `chèn sau khối 1`
+- `chèn vào trong khối 3`
+- `in biến điểm`
+- `chạy chương trình`
+- `gợi ý`, `kiểm tra bài`, `mình đang ở đâu`
+
+Workspace navigation:
+
+- `cuộn lên`, `cuộn xuống`, `cuộn sang trái`, `cuộn sang phải`
+- `về giữa`, `đưa khối 2 về giữa`
+- `vừa màn hình`, `phóng to`, `thu nhỏ`, `đặt lại zoom`
+
+Toolbox:
+
+- `mở danh sách khối`, `thu gọn danh sách khối`
+- `mở nhóm luồng`, `mở nhóm đầu ra`, `mở nhóm lặp`, `mở nhóm điều kiện`, `mở nhóm giá trị`, `mở nhóm biến`
+
+Confirmation is only needed for risky actions:
+
+- `xóa khối 2` → app asks for `đúng rồi` or `hủy`
+- `di chuyển khối 4 lên trên` → app asks for `đúng rồi` or `hủy`
+
+## Main Routes
+
+- `/` — product landing page
+- `/demo` — public guest demo lesson list
+- `/demo/[slug]` — public guest demo workspace
+- `/sign-in` — authenticated login
+- `/sign-up` — account creation
+- `/onboarding` — profile and accessibility settings
+- `/dashboard` — student dashboard
+- `/lessons-v2` — authenticated lesson list
+- `/lessons-v2/[slug]` — authenticated lesson workspace
+- `/admin` — protected admin pilot dashboard
 
 ## Environment Variables
 
 `apps/web/.env.local`
 
 ```bash
+NEXT_PUBLIC_ASR_MODE=auto
+NEXT_PUBLIC_LOCAL_ASR_URL=http://127.0.0.1:8000
+NEXT_PUBLIC_ASR_HEALTH_TIMEOUT_MS=1200
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_ALLOWLIST_EMAILS=
+ADMIN_EMAILS=
+NEXT_PUBLIC_ADMIN_EMAILS=
 ```
 
-## Local Development
+Notes:
 
-- `npm run dev` starts the Next.js app at `http://localhost:3000`
-- `npm run lint` runs the web lint target
-- `npm run typecheck` runs TypeScript checks across workspaces
-- `npm run test` is reserved for package-level tests as features land
-- `ADMIN_ALLOWLIST_EMAILS` is a comma-separated list used to safely enable admin sign-up for specific emails
+- Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the client.
+- `ADMIN_ALLOWLIST_EMAILS`, `ADMIN_EMAILS`, or `NEXT_PUBLIC_ADMIN_EMAILS` can enable admin sign-up for specific emails.
+- Without Supabase env values, public demo still works; sign-in/sign-up show a friendly configuration message.
 
-## Deployment Notes
+## Checks
 
-- Deploy `apps/web` to Vercel
-- Provision Supabase Auth, Postgres, and Storage
-- Apply SQL in `supabase/migrations`
-- Load reference data from `supabase/seed.sql`
-- Add production environment variables in Vercel and Supabase
+```bash
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
 
-## Current Status
+In some restricted sandboxes, `next build` with Turbopack may need permission to bind an internal local port. The codebase itself builds normally when that restriction is not present.
 
-Milestone 1 is scaffolded:
+## Repository Layout
 
-- Monorepo workspace layout
-- Product-specific Next.js shell
-- Shared package stubs
-- Initial product and architecture docs
-
-The next milestone is shared domain models plus the first Supabase schema pass.
+```text
+apps/web                  Next.js app
+packages/voice-parser     Rule-based Vietnamese parser
+packages/lesson-engine    Seed lessons and validation
+packages/block-engine     Program execution
+packages/shared-types     Shared domain types
+supabase                  Migrations and seed SQL
+docs                      Product and architecture notes
+```

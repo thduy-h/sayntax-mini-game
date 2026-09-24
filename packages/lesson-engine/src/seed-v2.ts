@@ -394,10 +394,14 @@ export const lessonsV2 = [
         id: "v2-lesson-5-step-5",
         databaseStepId: "40000000-0000-0000-0000-000000000505",
         orderIndex: 5,
-        title: "Đặt nhãn cho khối in",
-        instructions: "Chọn khối in và hãy nói: **Đặt chữ diem** để ghi nhớ biến bạn đang theo dõi.",
-        hints: ["Đây là nhãn nhắc bạn về biến 'diem'.", "Nội dung cần đúng là: diem.", "Thử: Đặt chữ diem."],
-        action: { kind: "set_text", blockId: "v2-l5-print", field: "text", expectedText: "diem" },
+        title: "In giá trị biến",
+        instructions: "Chọn khối in và hãy nói: **In biến điểm** để in ra giá trị đang lưu trong biến.",
+        hints: [
+          "Bài này cần in giá trị của biến, không phải in chữ 'diem'.",
+          "Khối in cần nối với khối lấy biến diem.",
+          "Thử: In biến điểm.",
+        ],
+        action: { kind: "set_variable_output", blockId: "v2-l5-print", variableName: "diem" },
         starterWorkspace: workspace([
             { id: "v2-l5-start", type: "start" },
             { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } },

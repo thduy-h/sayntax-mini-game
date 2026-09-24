@@ -4,9 +4,15 @@ coverage/
 dist/
 .turbo/
 .vercel/
+.direnv/
+.envrc
 .DS_Store
 Thumbs.db
+*.zip
 *.log
+__pycache__/
+*.pyc
+tsconfig.tsbuildinfo
 .env
 .env.local
 .env.development.local

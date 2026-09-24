@@ -4,7 +4,7 @@ import type { WorkspaceBlock } from "@shecancode/shared-types";
 
 import { getSeedV2LessonById, getSeedV2LessonBySlug, lessonsV2, listSeedV2Lessons } from "./seed-v2";
 
-const validActionKinds = new Set(["add_block", "insert_into", "set_text", "set_number", "run_program", "ask_hint"]);
+const validActionKinds = new Set(["add_block", "insert_into", "set_text", "set_number", "set_variable_output", "run_program", "ask_hint"]);
 
 function hasBlockId(blocks: WorkspaceBlock[], blockId: string): boolean {
   return blocks.some((block) => block.id === blockId || hasBlockId(block.children ?? [], blockId));
@@ -29,7 +29,7 @@ for (const lesson of lessonsV2) {
     assert.ok(step.instructions.toLowerCase().includes("hãy nói"));
     assert.ok(validActionKinds.has(step.action.kind));
 
-    if (step.action.kind === "set_text" || step.action.kind === "set_number") {
+    if (step.action.kind === "set_text" || step.action.kind === "set_number" || step.action.kind === "set_variable_output") {
       assert.ok(hasBlockId(step.starterWorkspace.blocks, step.action.blockId));
     }
   }

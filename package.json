@@ -11,7 +11,11 @@
     "build": "npm run build --workspace @shecancode/web",
     "lint": "npm run lint --workspace @shecancode/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present && node --import tsx apps/web/lib/operations/operations.test.ts && node --import tsx scripts/lesson-seed-mapping.test.ts",
+    "check:staging-env": "node scripts/staging-config-check.mjs",
+    "smoke": "node scripts/release-smoke.mjs",
+    "smoke:asr": "node scripts/asr-smoke.mjs",
+    "load:smoke": "node scripts/load-smoke.mjs"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -21,4 +25,3 @@
     "tsx": "^4.19.2"
   }
 }
-

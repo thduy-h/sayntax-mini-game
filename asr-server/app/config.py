@@ -1,9 +1,11 @@
 from functools import lru_cache
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 
 
 class Settings(BaseModel):
+    api_token: str | None = None
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0, le=100 * 1024 * 1024)
     model: str = "base"
     device: str = "auto"
     compute_type: str = "auto"
@@ -26,6 +28,8 @@ class Settings(BaseModel):
 def get_settings() -> Settings:
     origins = os.getenv("ASR_CORS_ORIGINS", "")
     return Settings(
+        api_token=os.getenv("LOCAL_ASR_TOKEN") or None,
+        max_upload_bytes=int(os.getenv("MAX_UPLOAD_BYTES", "10485760")),
         model=os.getenv("ASR_MODEL", "base"),
         device=os.getenv("ASR_DEVICE", "auto"),
         compute_type=os.getenv("ASR_COMPUTE_TYPE", "auto"),

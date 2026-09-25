@@ -180,8 +180,8 @@ insert into public.lesson_steps (
     3,
     'Make the output exactly match the lesson target.',
     array['Read the expected output carefully.', 'Spacing and order should match.'],
-    '{"output":["SheCanCode Voice"]}'::jsonb,
-    '{"type":"print_text","text":"SheCanCode Voice"}'::jsonb,
+    '{"output":["SAYNTAX"]}'::jsonb,
+    '{"type":"print_text","text":"SAYNTAX"}'::jsonb,
     '{"version":1,"blocks":[{"id":"seed-start","type":"start"},{"id":"seed-print","type":"print","fields":{"text":""}}]}'::jsonb
   ),
   (
@@ -292,6 +292,61 @@ set lesson_id = excluded.lesson_id,
     expected_result = excluded.expected_result,
     completion_logic = excluded.completion_logic,
     starter_workspace = excluded.starter_workspace;
+
+-- Hidden relational references for the five code-seeded V2 lessons. The app
+-- renders lesson content from packages/lesson-engine; these rows only satisfy
+-- program, run and voice-log foreign keys using the same stable UUID mapping.
+insert into public.lessons (
+  id, course_id, slug, title, summary, description, order_index, estimated_minutes, is_published
+) values
+  ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'start-and-sequence-v2', 'Bắt đầu và tuần tự', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 101, 12, false),
+  ('40000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-000000000001', 'print-output-v2', 'In và đầu ra', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 102, 14, false),
+  ('40000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'repeat-loops-v2', 'Vòng lặp cơ bản', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 103, 16, false),
+  ('40000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'if-basics-v2', 'Cơ bản về điều kiện if', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 104, 18, false),
+  ('40000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'variables-basics-v2', 'Cơ bản về biến', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 105, 20, false)
+on conflict (id) do update
+set course_id = excluded.course_id,
+    slug = excluded.slug,
+    title = excluded.title,
+    summary = excluded.summary,
+    description = excluded.description,
+    order_index = excluded.order_index,
+    estimated_minutes = excluded.estimated_minutes,
+    is_published = excluded.is_published;
+
+insert into public.lesson_steps (
+  id, lesson_id, title, order_index, instructions, hints, expected_result, completion_logic, starter_workspace
+) values
+  ('40000000-0000-0000-0000-000000000101', '40000000-0000-0000-0000-000000000001', 'Thêm khối bắt đầu', 1, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000102', '40000000-0000-0000-0000-000000000001', 'Thêm khối in', 2, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000103', '40000000-0000-0000-0000-000000000001', 'Đặt nội dung', 3, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000104', '40000000-0000-0000-0000-000000000001', 'Chạy chương trình', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000201', '40000000-0000-0000-0000-000000000002', 'Thêm khối in đầu tiên', 1, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000202', '40000000-0000-0000-0000-000000000002', 'Đặt nội dung dòng 1', 2, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000203', '40000000-0000-0000-0000-000000000002', 'Thêm khối in thứ hai', 3, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000204', '40000000-0000-0000-0000-000000000002', 'Đặt nội dung dòng 2', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000205', '40000000-0000-0000-0000-000000000002', 'Chạy để xem hai dòng', 5, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000301', '40000000-0000-0000-0000-000000000003', 'Thêm vòng lặp', 1, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000302', '40000000-0000-0000-0000-000000000003', 'Đưa khối in vào vòng lặp', 2, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000303', '40000000-0000-0000-0000-000000000003', 'Đặt số lần lặp', 3, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000304', '40000000-0000-0000-0000-000000000003', 'Đặt nội dung lặp', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000305', '40000000-0000-0000-0000-000000000003', 'Chạy vòng lặp', 5, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000401', '40000000-0000-0000-0000-000000000004', 'Thêm khối điều kiện', 1, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000402', '40000000-0000-0000-0000-000000000004', 'Đặt khối in vào điều kiện', 2, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000403', '40000000-0000-0000-0000-000000000004', 'Đặt nội dung điều kiện', 3, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000404', '40000000-0000-0000-0000-000000000004', 'Chạy chương trình điều kiện', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000405', '40000000-0000-0000-0000-000000000004', 'Ôn lại khối điều kiện', 5, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000501', '40000000-0000-0000-0000-000000000005', 'Thêm khối biến', 1, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000502', '40000000-0000-0000-0000-000000000005', 'Đặt tên biến', 2, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000503', '40000000-0000-0000-0000-000000000005', 'Gán giá trị cho biến', 3, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000504', '40000000-0000-0000-0000-000000000005', 'Thêm khối in', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000505', '40000000-0000-0000-0000-000000000005', 'In giá trị biến', 5, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
+  ('40000000-0000-0000-0000-000000000506', '40000000-0000-0000-0000-000000000005', 'Chạy chương trình biến', 6, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}')
+on conflict (id) do update
+set lesson_id = excluded.lesson_id,
+    title = excluded.title,
+    order_index = excluded.order_index,
+    instructions = excluded.instructions;
 
 insert into public.role_model_entries (
   id,

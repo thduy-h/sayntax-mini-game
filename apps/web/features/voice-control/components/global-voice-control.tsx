@@ -205,7 +205,7 @@ export function GlobalVoiceControl() {
         >
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black">Voice control toàn web</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black">Điều khiển bằng giọng nói</p>
               <p className="mt-1 text-xs text-zinc-700">Trang hiện tại: {pathname}</p>
             </div>
             <button
@@ -239,13 +239,13 @@ export function GlobalVoiceControl() {
             <Button
               disabled={speech.isListening || speech.isStarting}
               onClick={() => {
-                void speech.retryLocalASR();
+                void speech.retryASR();
               }}
               size="sm"
               type="button"
               variant="outline"
             >
-              Thử lại ASR local
+              Thử lại nhận dạng
             </Button>
             <label className="min-w-[170px] flex-1 text-[10px] font-black uppercase tracking-[0.12em] text-black">
               Micro
@@ -276,10 +276,10 @@ export function GlobalVoiceControl() {
             {speech.interimTranscript && <p className="min-w-0 break-words">Đang nghe: “{speech.interimTranscript}”</p>}
             {speech.transcript && <p className="min-w-0 break-words">Đã nghe: “{speech.transcript}”</p>}
             {lastCommand && <p className="min-w-0 break-words">Mình hiểu là: {lastCommand.kind}</p>}
-            <p className="min-w-0 break-words">ASR trên thiết bị này: <span className="font-semibold">{speech.engineLabel}</span></p>
+            <p className="min-w-0 break-words">Đang dùng: <span className="font-semibold">{speech.engineLabel}</span></p>
             {speech.asrState === "processing" && <p className="min-w-0 break-words text-zinc-600">Đang xử lý giọng nói...</p>}
             <p className="min-w-0 break-words font-semibold text-black">{feedback}</p>
-            {!speech.isSupportKnown && <p className="min-w-0 break-words text-zinc-600">Đang kết nối ASR local...</p>}
+            {!speech.isSupportKnown && <p className="min-w-0 break-words text-zinc-600">Đang kết nối nhận dạng giọng nói...</p>}
             {speech.errorMessage && <p className="min-w-0 break-words text-red-700">{speech.errorMessage}</p>}
           </div>
         </section>

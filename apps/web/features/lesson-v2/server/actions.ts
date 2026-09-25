@@ -1,6 +1,8 @@
 "use server";
 
+import { isSeedV2LessonStep } from "@shecancode/lesson-engine";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { logOperation } from "@/lib/operations/logger";
 
 /**
  * Upsert a completed step into `lesson_v2_progress`. Fire-and-forget from
@@ -15,12 +17,19 @@ export async function markLessonV2StepCompletedAction(
   stepId: string,
 ): Promise<{ ok: boolean }> {
   try {
+    if (!isSeedV2LessonStep(lessonSlug, stepId)) {
+      logOperation("progress_write_failure", { phase: "validation" });
+      return { ok: false };
+    }
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) return { ok: false };
+    if (!user) {
+      logOperation("auth_failure", { phase: "session" });
+      return { ok: false };
+    }
 
     const { error } = await supabase.from("lesson_v2_progress").upsert(
       {
@@ -33,9 +42,13 @@ export async function markLessonV2StepCompletedAction(
       { onConflict: "user_id,lesson_slug,step_id" },
     );
 
-    if (error) return { ok: false };
+    if (error) {
+      logOperation("progress_write_failure", { phase: "persistence" });
+      return { ok: false };
+    }
     return { ok: true };
   } catch {
+    logOperation("progress_write_failure", { phase: "unexpected" });
     return { ok: false };
   }
 }

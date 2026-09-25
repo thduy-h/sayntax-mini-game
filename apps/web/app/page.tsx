@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listSeedV2Lessons } from "@shecancode/lesson-engine";
 import { Badge, Surface } from "@shecancode/ui";
+import { BrandLogo } from "@/components/brand-logo";
 
 const lessons = listSeedV2Lessons();
 const totalSteps = lessons.reduce((sum, lesson) => sum + lesson.stepCount, 0);
@@ -21,12 +22,13 @@ export default function Home() {
           </div>
 
           <div className="mt-8 space-y-5">
-            <p className="font-heading text-sm font-black uppercase tracking-[0.24em] text-black">SheCanCode Voice</p>
+            <BrandLogo className="w-full max-w-[390px]" priority />
+            <p className="font-heading text-base font-black uppercase tracking-[0.2em] text-black">Công nghệ không rào cản</p>
             <h1 className="font-heading max-w-5xl text-5xl leading-none text-black sm:text-6xl lg:text-7xl">
               Học lập trình block bằng giọng nói, từng bước nhỏ và dễ theo.
             </h1>
             <p className="max-w-3xl text-lg font-medium leading-8 text-zinc-800">
-              Nhiều người khuyết tật vận động gặp khó khăn khi học lập trình bằng chuột và bàn phím. SheCanCode Voice giúp học sinh điều khiển Blockly bằng câu lệnh tiếng Việt, có gợi ý và phản hồi rõ ràng.
+              Nhiều người khuyết tật vận động gặp khó khăn khi học lập trình bằng chuột và bàn phím. SAYNTAX giúp học sinh điều khiển Blockly bằng câu lệnh tiếng Việt, có gợi ý và phản hồi rõ ràng.
             </p>
           </div>
 

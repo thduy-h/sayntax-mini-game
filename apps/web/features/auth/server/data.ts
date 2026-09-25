@@ -1,6 +1,7 @@
 import type { AppRole } from "@shecancode/shared-types";
-import { isAdminEmailAllowed, isSupabaseConfigured } from "@/lib/env";
+import { isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { hasAdminRole } from "@/features/auth/roles";
 
 export interface AppUserRecord {
   email: string;
@@ -44,7 +45,6 @@ export function getRedirectPathForUser(user: Pick<AppUserRecord, "onboarding_com
   return user.role === "admin" ? "/admin" : "/dashboard";
 }
 
-export function isAdminUser(user: Pick<AppUserRecord, "email" | "role"> | null) {
-  if (!user) return false;
-  return user.role === "admin" || isAdminEmailAllowed(user.email);
+export function isAdminUser(user: Pick<AppUserRecord, "role"> | null) {
+  return hasAdminRole(user);
 }

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { isSeedV2DatabaseLessonStep } from "@shecancode/lesson-engine";
+import { observeRoute } from "@/lib/operations/logger";
 import { z } from "zod";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAuthenticatedServerSupabase } from "@/lib/supabase/server";
 
 const programPayloadSchema = z.object({
   lessonId: z.string().uuid(),
@@ -13,14 +15,11 @@ const searchParamsSchema = z.object({
 });
 
 export async function GET(request: Request) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const auth = await getAuthenticatedServerSupabase();
+  if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { supabase, user } = auth;
 
   const requestUrl = new URL(request.url);
   const parsed = searchParamsSchema.safeParse({
@@ -53,21 +52,23 @@ export async function GET(request: Request) {
   });
 }
 
-export async function POST(request: Request) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const POST = observeRoute("program_save_failure", post);
 
-  if (!user) {
+async function post(request: Request) {
+  const auth = await getAuthenticatedServerSupabase();
+  if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { supabase, user } = auth;
 
   const json = await request.json().catch(() => null);
   const parsed = programPayloadSchema.safeParse(json);
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Dữ liệu workspace không hợp lệ." }, { status: 400 });
+  }
+  if (!isSeedV2DatabaseLessonStep(parsed.data.lessonId, parsed.data.lessonStepId)) {
+    return NextResponse.json({ error: "Bài học hoặc bước học không tồn tại." }, { status: 400 });
   }
 
   const { data, error } = await supabase

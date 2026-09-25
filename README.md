@@ -1,6 +1,6 @@
-# SheCanCode Voice
+# SAYNTAX
 
-SheCanCode Voice is an accessibility-first Blockly learning platform for girls and women with motor disabilities. The current MVP supports guided lessons, rule-based Vietnamese voice commands, text command fallback, basic progress tracking, protected student/admin routes, and a public guest demo.
+SAYNTAX - **Công nghệ không rào cản** - is an accessibility-first Blockly learning platform for girls and women with motor disabilities. The current MVP supports guided lessons, rule-based Vietnamese voice commands, text command fallback, basic progress tracking, protected student/admin routes, and a public guest demo.
 
 ## Current Status
 
@@ -19,7 +19,7 @@ SheCanCode Voice is an accessibility-first Blockly learning platform for girls a
 - npm workspaces monorepo
 - Supabase for auth, Postgres, and storage
 - Blockly for the learning workspace
-- Hybrid ASR for voice input: local `faster-whisper` when available, browser Web Speech API fallback
+- Server-routed ASR: Groq Whisper in production or local `faster-whisper` for workshops, with Web Speech API fallback
 
 ## Run Locally
 
@@ -32,21 +32,25 @@ Open `http://localhost:3000`.
 
 The landing page and `/demo/**` render without Supabase environment variables. Authenticated routes still require Supabase configuration.
 
-## Hybrid ASR Demo
+## ASR modes
 
-Frontend ASR config uses public Next.js environment variables:
+The browser always uploads audio to the same-origin `/api/asr/transcribe` route. API keys, local URLs and tokens remain server-only.
+
+Production:
 
 ```bash
-NEXT_PUBLIC_ASR_MODE=auto
-NEXT_PUBLIC_LOCAL_ASR_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_ASR_HEALTH_TIMEOUT_MS=1200
+ASR_MODE=cloud
+GROQ_API_KEY=...
+GROQ_ASR_MODEL=whisper-large-v3-turbo
 ```
 
-Modes:
+Workshop:
 
-- `auto`: prefer local ASR, fallback to browser Web Speech API.
-- `local`: only use local ASR. If the server is unavailable, the UI reports that voice recognition is unavailable.
-- `browser`: only use browser Web Speech API.
+```bash
+ASR_MODE=local
+LOCAL_ASR_URL=http://127.0.0.1:8000
+LOCAL_ASR_TOKEN=choose-a-workshop-token
+```
 
 Run the local ASR server:
 
@@ -70,8 +74,8 @@ source .venv/bin/activate
 Install and run:
 
 ```bash
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv pip install -r requirements.txt
+LOCAL_ASR_TOKEN=choose-a-workshop-token uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 Check health:
@@ -82,9 +86,11 @@ curl http://127.0.0.1:8000/health
 
 First run downloads the Whisper model. Defaults: `ASR_MODEL=base`, `ASR_LANGUAGE=vi`, CUDA with `float16` if available, otherwise CPU with `int8`.
 
-If the local server is not running, the frontend falls back to Edge/Chrome Web Speech API. If the browser does not support stable speech recognition, the global “Nhập lệnh” bar still uses the same rule-based parser.
+Start FastAPI first, then start Next.js with the workshop variables. A tunnel may expose Next.js for workshop participants; browsers still call only Next.js, and Next.js forwards audio to port 8000. If Groq/local ASR times out, returns 429/5xx, or has a network failure, the client switches to Edge/Chrome Web Speech API. If that is unavailable, the global “Nhập lệnh” bar remains usable.
 
-For HTTPS deployments, an HTTP local ASR URL may be blocked by mixed-content rules. The localhost demo is intended for the presenter machine; use an HTTPS/WSS backend URL for remote deployments.
+SAYNTAX does not retain raw audio in this flow. Cloud mode sends audio to Groq for recognition; local mode processes it on the operator machine; browser fallback may use the browser vendor's speech service. Do not expose the FastAPI port publicly without HTTPS, authentication and rate limiting.
+
+`ASR_RATE_LIMIT_PER_MINUTE` is a lightweight per-Next.js-instance guard. It is useful for the MVP but is not a distributed quota across multiple Vercel instances.
 
 ## Guest Demo
 
@@ -153,9 +159,14 @@ Confirmation is only needed for risky actions:
 `apps/web/.env.local`
 
 ```bash
-NEXT_PUBLIC_ASR_MODE=auto
-NEXT_PUBLIC_LOCAL_ASR_URL=http://127.0.0.1:8000
-NEXT_PUBLIC_ASR_HEALTH_TIMEOUT_MS=1200
+ASR_MODE=cloud
+GROQ_API_KEY=
+GROQ_ASR_MODEL=whisper-large-v3-turbo
+LOCAL_ASR_URL=http://127.0.0.1:8000
+LOCAL_ASR_TOKEN=
+ASR_MAX_UPLOAD_BYTES=10485760
+ASR_RATE_LIMIT_PER_MINUTE=30
+ASR_TIMEOUT_MS=20000
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
@@ -168,6 +179,7 @@ NEXT_PUBLIC_ADMIN_EMAILS=
 Notes:
 
 - Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the client.
+- Do not expose `GROQ_API_KEY` or `LOCAL_ASR_TOKEN` with a `NEXT_PUBLIC_` prefix.
 - `ADMIN_ALLOWLIST_EMAILS`, `ADMIN_EMAILS`, or `NEXT_PUBLIC_ADMIN_EMAILS` can enable admin sign-up for specific emails.
 - Without Supabase env values, public demo still works; sign-in/sign-up show a friendly configuration message.
 

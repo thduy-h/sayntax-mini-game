@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
+import { isSeedV2DatabaseLessonStep } from "@shecancode/lesson-engine";
+import { observeRoute } from "@/lib/operations/logger";
 import { z } from "zod";
 import type { VoiceCommandStatus } from "@shecancode/shared-types";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAuthenticatedServerSupabase } from "@/lib/supabase/server";
 
 const parsedActionSchema = z.object({
   type: z.string(),
@@ -17,21 +19,23 @@ const voiceLogPayloadSchema = z.object({
   failureReason: z.string().trim().min(1).nullable().optional(),
 });
 
-export async function POST(request: Request) {
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const POST = observeRoute("voice_log_failure", post);
 
-  if (!user) {
+async function post(request: Request) {
+  const auth = await getAuthenticatedServerSupabase();
+  if (!auth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const { supabase, user } = auth;
 
   const json = await request.json().catch(() => null);
   const parsed = voiceLogPayloadSchema.safeParse(json);
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Dữ liệu nhật ký giọng nói không hợp lệ." }, { status: 400 });
+  }
+  if (!isSeedV2DatabaseLessonStep(parsed.data.lessonId, parsed.data.lessonStepId)) {
+    return NextResponse.json({ error: "Bài học hoặc bước học không tồn tại." }, { status: 400 });
   }
 
   const { error } = await supabase.from("voice_command_logs").insert({

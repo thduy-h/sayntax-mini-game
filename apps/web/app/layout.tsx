@@ -6,9 +6,16 @@ import { GlobalVoiceControl } from "@/features/voice-control/components/global-v
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SheCanCode Voice",
+  title: {
+    default: "SAYNTAX - Công nghệ không rào cản",
+    template: "%s | SAYNTAX",
+  },
   description:
     "Nền tảng học lập trình khối ưu tiên trợ năng, có hỗ trợ giọng nói cho nữ sinh khuyết tật vận động.",
+  icons: {
+    apple: "/brand/sayntax-v2-app-icon-1024.png",
+    icon: "/brand/sayntax-v2-favicon-512.png",
+  },
 };
 
 export default function RootLayout({

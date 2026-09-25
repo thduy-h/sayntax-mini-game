@@ -53,8 +53,24 @@ assert.deepEqual(
   evaluateStepAction({ kind: "add_block", blockType: "print" }, workspace([{ id: "1", type: "repeat", children: [{ id: "2", type: "print" }] }]), result()),
   { completed: true, feedback: FEEDBACK.add_block_pass },
 );
-assert.deepEqual(evaluateStepAction({ kind: "add_block", blockType: "print" }, workspace([]), result()), { completed: false, feedback: "Bạn còn thiếu khối in. Hãy nói: thêm khối in." });
-assert.deepEqual(evaluateStepAction({ kind: "add_block", blockType: "print" }, workspace([{ id: "1", type: "start" }]), result()), { completed: false, feedback: "Bạn còn thiếu khối in. Hãy nói: thêm khối in." });
+assert.deepEqual(evaluateStepAction({ kind: "add_block", blockType: "print" }, workspace([]), result()), { completed: false, feedback: "Bạn còn thiếu khối in. Hãy nói hoặc nhập: thêm khối in." });
+assert.deepEqual(evaluateStepAction({ kind: "add_block", blockType: "print" }, workspace([{ id: "1", type: "start" }]), result()), { completed: false, feedback: "Bạn còn thiếu khối in. Hãy nói hoặc nhập: thêm khối in." });
+assert.deepEqual(
+  evaluateStepAction(
+    { kind: "add_block", blockType: "print", minimumCount: 2 },
+    workspace([{ id: "1", type: "print" }]),
+    result(),
+  ),
+  { completed: false, feedback: "Bạn cần 2 khối in. Hiện có 1. Hãy thêm một khối in nữa." },
+);
+assert.deepEqual(
+  evaluateStepAction(
+    { kind: "add_block", blockType: "print", minimumCount: 2 },
+    workspace([{ id: "1", type: "print" }, { id: "2", type: "print" }]),
+    result(),
+  ),
+  { completed: true, feedback: FEEDBACK.add_block_pass },
+);
 
 assert.deepEqual(
   evaluateStepAction({ kind: "insert_into", parentBlockType: "repeat", childBlockType: "print" }, workspace([{ id: "1", type: "repeat", children: [{ id: "2", type: "print" }] }]), result()),

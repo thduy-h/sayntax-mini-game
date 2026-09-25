@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { getSeedV2LessonBySlug, listSeedV2Lessons } from "@shecancode/lesson-engine";
+import { BrandLogo } from "@/components/brand-logo";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function DemoLessonsPage() {
@@ -12,8 +13,8 @@ export default function DemoLessonsPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
       <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border-4 border-black bg-white px-4 py-3 shadow-[6px_6px_0_#121212]">
-        <Link className="font-heading text-lg font-black text-black" href="/">
-          SheCanCode Voice
+        <Link aria-label="SAYNTAX - về trang giới thiệu" className="flex min-h-12 items-center" href="/">
+          <BrandLogo className="w-[160px] sm:w-[180px]" priority />
         </Link>
         <div className="flex flex-wrap gap-2">
           <Link className="inline-flex min-h-10 items-center rounded-[0.75rem] border-2 border-black bg-[#fffdf3] px-3 py-2 text-xs font-black uppercase text-black" href="/sign-in">

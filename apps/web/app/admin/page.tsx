@@ -38,12 +38,12 @@ interface ProgressRow {
 async function getAdminSnapshot() {
   try {
     const supabase = await createServerSupabaseClient();
-    const [runs, logs, progress] = await Promise.all([
+    const [runs, logs, progress, studentsCount, completedCount, voiceCount, unsupportedCount] = await Promise.all([
       supabase
         .from("program_runs")
         .select("id, user_id, lesson_id, lesson_step_id, status, error_message, created_at")
         .order("created_at", { ascending: false })
-        .limit(20)
+        .limit(5)
         .returns<ProgramRunRow[]>(),
       supabase
         .from("voice_command_logs")
@@ -55,17 +55,27 @@ async function getAdminSnapshot() {
         .from("lesson_v2_progress")
         .select("user_id, lesson_slug, step_id, status, completed_at")
         .order("completed_at", { ascending: false, nullsFirst: false })
-        .limit(50)
+        .limit(5)
         .returns<ProgressRow[]>(),
+      supabase.from("users").select("id", { count: "exact", head: true }).eq("role", "student"),
+      supabase.from("lesson_v2_progress").select("id", { count: "exact", head: true }).eq("status", "completed"),
+      supabase.from("voice_command_logs").select("id", { count: "exact", head: true }),
+      supabase.from("voice_command_logs").select("id", { count: "exact", head: true }).eq("status", "unsupported"),
     ]);
 
     return {
+      metrics: {
+        completedSteps: completedCount.error ? 0 : completedCount.count ?? 0,
+        students: studentsCount.error ? 0 : studentsCount.count ?? 0,
+        unsupportedCommands: unsupportedCount.error ? 0 : unsupportedCount.count ?? 0,
+        voiceCommands: voiceCount.error ? 0 : voiceCount.count ?? 0,
+      },
       progress: progress.error ? [] : progress.data ?? [],
       runs: runs.error ? [] : runs.data ?? [],
       voiceLogs: logs.error ? [] : logs.data ?? [],
     };
   } catch {
-    return { progress: [], runs: [], voiceLogs: [] };
+    return { metrics: { completedSteps: 0, students: 0, unsupportedCommands: 0, voiceCommands: 0 }, progress: [], runs: [], voiceLogs: [] };
   }
 }
 
@@ -103,11 +113,6 @@ export default async function AdminPage() {
   }
 
   const snapshot = await getAdminSnapshot();
-  const uniqueStudents = new Set([
-    ...snapshot.progress.map((item) => item.user_id),
-    ...snapshot.runs.map((item) => item.user_id),
-    ...snapshot.voiceLogs.map((item) => item.user_id),
-  ]).size;
   const unsupportedLogs = snapshot.voiceLogs.filter((log) => log.status === "unsupported");
   const misunderstood = [...unsupportedLogs.reduce((map, log) => {
     const key = log.transcript.trim().toLowerCase();
@@ -156,10 +161,10 @@ export default async function AdminPage() {
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Chỉ số pilot">
         {[
-          ["Học viên có hoạt động", uniqueStudents],
-          ["Bước đã hoàn thành", snapshot.progress.filter((item) => item.status === "completed").length],
-          ["Lệnh thoại gần đây", snapshot.voiceLogs.length],
-          ["Lệnh chưa hiểu", unsupportedLogs.length],
+          ["Học viên", snapshot.metrics.students],
+          ["Bước đã hoàn thành", snapshot.metrics.completedSteps],
+          ["Lệnh thoại", snapshot.metrics.voiceCommands],
+          ["Lệnh chưa hiểu", snapshot.metrics.unsupportedCommands],
         ].map(([label, value]) => (
           <Card className="bg-white" key={label}>
             <CardHeader className="pb-2">

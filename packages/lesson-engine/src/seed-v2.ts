@@ -41,7 +41,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000101",
         orderIndex: 1,
         title: "Thêm khối bắt đầu",
-        instructions: "Chào mừng! Hãy nói: **Thêm khối bắt đầu** để tạo điểm khởi động cho chương trình.",
+        instructions: "Chào mừng! Hãy nói hoặc nhập: **Thêm khối bắt đầu** để tạo điểm khởi động cho chương trình.",
         hints: ["Mỗi chương trình đều cần một điểm bắt đầu.", "Bạn chỉ cần nói câu lệnh hoặc kéo khối bắt đầu từ hộp bên trái.", "Thử chính xác: Thêm khối bắt đầu."],
         action: { kind: "add_block", blockType: "start" },
         starterWorkspace: workspace([]),
@@ -51,7 +51,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000102",
         orderIndex: 2,
         title: "Thêm khối in",
-        instructions: "Tuyệt vời! Giờ hãy nói: **Thêm khối in** để chuẩn bị in ra một lời chào.",
+        instructions: "Tuyệt vời! Giờ hãy nói hoặc nhập: **Thêm khối in** để chuẩn bị in ra một lời chào.",
         hints: ["Khối in sẽ hiển thị chữ ra màn hình.", "Thêm khối mới, không cần xoá khối bắt đầu.", "Thử: Thêm khối in."],
         action: { kind: "add_block", blockType: "print" },
         starterWorkspace: workspace([{ id: "v2-l1-start", type: "start" }]),
@@ -61,7 +61,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000103",
         orderIndex: 3,
         title: "Đặt lời chào",
-        instructions: "Chọn khối in rồi hãy nói: **Đặt chữ Xin chào** để nhập nội dung.",
+        instructions: "Chọn khối in rồi hãy nói hoặc nhập: **Đặt chữ Xin chào** để nhập nội dung.",
         hints: ["Câu lệnh bắt đầu bằng 'Đặt chữ'.", "Nội dung cần đúng là: Xin chào.", "Thử nguyên câu: Đặt chữ Xin chào."],
         action: { kind: "set_text", blockId: "v2-l1-print", field: "text", expectedText: "Xin chào" },
         starterWorkspace: workspace([{ id: "v2-l1-start", type: "start" }, { id: "v2-l1-print", type: "print", fields: { text: "" } }]),
@@ -71,7 +71,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000104",
         orderIndex: 4,
         title: "Thử thách: Chạy chương trình",
-        instructions: "Bạn sẵn sàng rồi! Hãy nói câu lệnh phù hợp để chạy chương trình và xem kết quả.",
+        instructions: "Bạn sẵn sàng rồi! Hãy nói hoặc nhập câu lệnh phù hợp để chạy chương trình và xem kết quả.",
         hints: ["Chương trình sẽ chạy từ khối bắt đầu xuống dưới.", "Nếu chưa thấy kết quả, kiểm tra khối in.", "Gợi ý: câu lệnh bắt đầu bằng 'Chạy'."],
         action: { kind: "run_program", expectedOutput: ["Xin chào"] },
         isChallenge: true,
@@ -96,7 +96,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000201",
         orderIndex: 1,
         title: "Thêm khối in đầu tiên",
-        instructions: "Hãy nói: **Thêm khối in** để chuẩn bị dòng đầu tiên.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối in** để chuẩn bị dòng đầu tiên.",
         hints: ["Khối in sẽ nằm sau khối bắt đầu.", "Chỉ cần một khối in mới.", "Thử: Thêm khối in."],
         action: { kind: "add_block", blockType: "print" },
         starterWorkspace: workspace([{ id: "v2-l2-start", type: "start" }]),
@@ -106,7 +106,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000202",
         orderIndex: 2,
         title: "Đặt nội dung dòng 1",
-        instructions: "Chọn khối in đầu tiên và hãy nói: **Đặt chữ Xin chào**.",
+        instructions: "Chọn khối in đầu tiên và hãy nói hoặc nhập: **Đặt chữ Xin chào**.",
         hints: ["Nội dung cần đúng chính tả: Xin chào.", "Dùng câu lệnh bắt đầu bằng 'Đặt chữ'.", "Thử: Đặt chữ Xin chào."],
         action: { kind: "set_text", blockId: "v2-l2-print-1", field: "text", expectedText: "Xin chào" },
         starterWorkspace: workspace([{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "" } }]),
@@ -116,9 +116,9 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000203",
         orderIndex: 3,
         title: "Thêm khối in thứ hai",
-        instructions: "Bây giờ hãy nói: **Thêm khối in** để tạo dòng thứ hai.",
+        instructions: "Bây giờ hãy nói hoặc nhập: **Thêm khối in** để tạo dòng thứ hai.",
         hints: ["Khối mới sẽ nằm dưới khối in cũ.", "Không cần sửa khối in đầu tiên.", "Thử: Thêm khối in."],
-        action: { kind: "add_block", blockType: "print" },
+        action: { kind: "add_block", blockType: "print", minimumCount: 2 },
         starterWorkspace: workspace([{ id: "v2-l2-start", type: "start" }, { id: "v2-l2-print-1", type: "print", fields: { text: "Xin chào" } }]),
       },
       {
@@ -126,7 +126,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000204",
         orderIndex: 4,
         title: "Đặt nội dung dòng 2",
-        instructions: "Chọn khối in thứ hai và hãy nói: **Đặt chữ Bạn làm được**.",
+        instructions: "Chọn khối in thứ hai và hãy nói hoặc nhập: **Đặt chữ Bạn làm được**.",
         hints: ["Đây là nội dung cho dòng thứ hai.", "Viết đúng: Bạn làm được.", "Thử: Đặt chữ Bạn làm được."],
         action: { kind: "set_text", blockId: "v2-l2-print-2", field: "text", expectedText: "Bạn làm được" },
         starterWorkspace: workspace([
@@ -140,7 +140,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000205",
         orderIndex: 5,
         title: "Thử thách: Chạy để xem hai dòng",
-        instructions: "Hãy nói câu lệnh phù hợp để chạy chương trình và xem cả hai dòng xuất hiện.",
+        instructions: "Hãy nói hoặc nhập câu lệnh phù hợp để chạy chương trình và xem cả hai dòng xuất hiện.",
         hints: ["Đầu ra sẽ có hai dòng.", "Dòng đầu là 'Xin chào', dòng sau là 'Bạn làm được'.", "Gợi ý: câu lệnh bắt đầu bằng 'Chạy'."],
         action: { kind: "run_program", expectedOutput: ["Xin chào", "Bạn làm được"] },
         isChallenge: true,
@@ -169,7 +169,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000301",
         orderIndex: 1,
         title: "Thêm khối lặp",
-        instructions: "Hãy nói: **Thêm khối lặp** để tạo một vòng lặp.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối lặp** để tạo một vòng lặp.",
         hints: ["Khối lặp sẽ chạy đi chạy lại các khối bên trong nó.", "Chỉ cần thêm, chưa cần đặt gì vào trong.", "Thử: Thêm khối lặp."],
         action: { kind: "add_block", blockType: "repeat" },
         starterWorkspace: workspace([{ id: "v2-l3-start", type: "start" }]),
@@ -179,7 +179,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000302",
         orderIndex: 2,
         title: "Đặt khối in vào trong vòng lặp",
-        instructions: "Hãy nói: **Thêm khối in vào trong khối lặp** — khối in sẽ được đặt ngay bên trong vòng lặp.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối in vào trong khối lặp** — khối in sẽ được đặt ngay bên trong vòng lặp.",
         hints: [
           "Khối in phải nằm bên trong vùng chứa của khối lặp.",
           "Một câu duy nhất: thêm khối + vị trí.",
@@ -193,7 +193,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000303",
         orderIndex: 3,
         title: "Đặt số lần lặp",
-        instructions: "Chọn khối lặp và hãy nói: **Đặt số 3** để lặp ba lần.",
+        instructions: "Chọn khối lặp và hãy nói hoặc nhập: **Đặt số 3** để lặp ba lần.",
         hints: ["Số lần lặp cần là 3.", "Câu lệnh bắt đầu bằng 'Đặt số'.", "Thử: Đặt số 3."],
         action: { kind: "set_number", blockId: "v2-l3-repeat", field: "times", expectedNumber: 3 },
         starterWorkspace: workspace([
@@ -211,7 +211,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000304",
         orderIndex: 4,
         title: "Đặt nội dung cho khối in bên trong",
-        instructions: "Chọn khối in bên trong vòng lặp và hãy nói: **Đặt chữ Cố lên**.",
+        instructions: "Chọn khối in bên trong vòng lặp và hãy nói hoặc nhập: **Đặt chữ Cố lên**.",
         hints: ["Nội dung cần là: Cố lên.", "Đây là dòng sẽ lặp ba lần.", "Thử: Đặt chữ Cố lên."],
         action: { kind: "set_text", blockId: "v2-l3-inner-print", field: "text", expectedText: "Cố lên" },
         starterWorkspace: workspace([
@@ -229,7 +229,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000305",
         orderIndex: 5,
         title: "Thử thách: Chạy vòng lặp",
-        instructions: "Hãy nói câu lệnh phù hợp để chạy chương trình và thấy 'Cố lên' xuất hiện 3 lần.",
+        instructions: "Hãy nói hoặc nhập câu lệnh phù hợp để chạy chương trình và thấy 'Cố lên' xuất hiện 3 lần.",
         hints: ["Đầu ra có ba dòng giống nhau.", "Nếu chỉ thấy một dòng, kiểm tra số trong khối lặp.", "Gợi ý: câu lệnh bắt đầu bằng 'Chạy'."],
         action: { kind: "run_program", expectedOutput: ["Cố lên", "Cố lên", "Cố lên"] },
         isChallenge: true,
@@ -262,7 +262,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000401",
         orderIndex: 1,
         title: "Thêm khối điều kiện",
-        instructions: "Hãy nói: **Thêm khối điều kiện** để thêm một khối if.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối điều kiện** để thêm một khối if.",
         hints: ["Khối điều kiện giúp chương trình ra quyết định.", "Chỉ cần thêm khối, chưa cần đặt gì bên trong.", "Thử: Thêm khối điều kiện."],
         action: { kind: "add_block", blockType: "if" },
         starterWorkspace: workspace([{ id: "v2-l4-start", type: "start" }]),
@@ -272,7 +272,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000402",
         orderIndex: 2,
         title: "Đặt khối in vào trong điều kiện",
-        instructions: "Hãy nói: **Thêm khối in vào trong khối điều kiện** để khối in chạy khi điều kiện đúng.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối in vào trong khối điều kiện** để khối in chạy khi điều kiện đúng.",
         hints: [
           "Khối in phải nằm trong phần thân của khối điều kiện.",
           "Một câu duy nhất: thêm khối + vị trí.",
@@ -286,7 +286,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000403",
         orderIndex: 3,
         title: "Đặt nội dung cho khối in bên trong",
-        instructions: "Chọn khối in trong điều kiện và hãy nói: **Đặt chữ Sẵn sàng**.",
+        instructions: "Chọn khối in trong điều kiện và hãy nói hoặc nhập: **Đặt chữ Sẵn sàng**.",
         hints: ["Nội dung cần là: Sẵn sàng.", "Đây là thông điệp chỉ in khi điều kiện đúng.", "Thử: Đặt chữ Sẵn sàng."],
         action: { kind: "set_text", blockId: "v2-l4-inner-print", field: "text", expectedText: "Sẵn sàng" },
         starterWorkspace: workspace([
@@ -304,7 +304,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000404",
         orderIndex: 4,
         title: "Chạy chương trình có điều kiện",
-        instructions: "Hãy nói: **Chạy chương trình** để xem 'Sẵn sàng' được in ra.",
+        instructions: "Hãy nói hoặc nhập: **Chạy chương trình** để xem 'Sẵn sàng' được in ra.",
         hints: ["Vì điều kiện đang đúng, khối in sẽ chạy.", "Nếu không thấy gì, kiểm tra khối in đã nằm trong điều kiện chưa.", "Thử: Chạy chương trình."],
         action: { kind: "run_program", expectedOutput: ["Sẵn sàng"] },
         starterWorkspace: workspace([
@@ -321,11 +321,10 @@ export const lessonsV2 = [
         id: "v2-lesson-4-step-5",
         databaseStepId: "40000000-0000-0000-0000-000000000405",
         orderIndex: 5,
-        title: "Thử thách: Mở gợi ý để ôn lại",
-        instructions: "Trước khi kết thúc, hãy nói một câu phù hợp để mở gợi ý và ôn lại khối điều kiện.",
+        title: "Ôn lại khối điều kiện",
+        instructions: "Trước khi kết thúc, hãy nói hoặc nhập: **Gợi ý** để ôn lại ý chính của khối điều kiện.",
         hints: ["Gợi ý giúp bạn ôn lại ý chính.", "Có thể nói 'gợi ý' hoặc 'giúp'.", "Gợi ý: câu lệnh có từ 'gợi ý'."],
         action: { kind: "ask_hint" },
-        isChallenge: true,
         starterWorkspace: workspace([
             { id: "v2-l4-start", type: "start" },
             {
@@ -355,7 +354,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000501",
         orderIndex: 1,
         title: "Thêm khối biến",
-        instructions: "Hãy nói: **Thêm khối biến** để tạo một biến mới.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối biến** để tạo một biến mới.",
         hints: ["Khối biến giúp chương trình nhớ một giá trị.", "Chỉ cần thêm khối, chưa cần đặt tên.", "Thử: Thêm khối biến."],
         action: { kind: "add_block", blockType: "variable" },
         starterWorkspace: workspace([{ id: "v2-l5-start", type: "start" }]),
@@ -365,8 +364,8 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000502",
         orderIndex: 2,
         title: "Đặt tên biến",
-        instructions: "Chọn khối biến và hãy nói: **Đặt chữ diem** để đặt tên biến là 'diem'.",
-        hints: ["Tên biến nên ngắn và dễ hiểu.", "Trong bài này, tên cần đúng là: diem.", "Thử: Đặt chữ diem."],
+        instructions: "Chọn khối biến và hãy nói hoặc nhập: **Đặt chữ diem** để đặt tên biến là 'diem'.",
+        hints: ["Tên biến nên ngắn và dễ hiểu.", "Trong bài này, tên biến là diem, viết không dấu.", "Thử: Đặt chữ diem."],
         action: { kind: "set_text", blockId: "v2-l5-variable", field: "name", expectedText: "diem" },
         starterWorkspace: workspace([{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "", value: 0 } }]),
       },
@@ -375,7 +374,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000503",
         orderIndex: 3,
         title: "Gán giá trị cho biến",
-        instructions: "Với khối biến đang chọn, hãy nói: **Đặt số 10** để gán giá trị 10.",
+        instructions: "Với khối biến đang chọn, hãy nói hoặc nhập: **Đặt số 10** để gán giá trị 10.",
         hints: ["Giá trị cần là số 10.", "Câu lệnh bắt đầu bằng 'Đặt số'.", "Thử: Đặt số 10."],
         action: { kind: "set_number", blockId: "v2-l5-variable", field: "value", expectedNumber: 10 },
         starterWorkspace: workspace([{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 0 } }]),
@@ -385,7 +384,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000504",
         orderIndex: 4,
         title: "Thêm khối in",
-        instructions: "Hãy nói: **Thêm khối in** để chuẩn bị hiển thị thông tin.",
+        instructions: "Hãy nói hoặc nhập: **Thêm khối in** để chuẩn bị hiển thị thông tin.",
         hints: ["Khối in sẽ nằm sau khối biến.", "Không cần xoá khối biến.", "Thử: Thêm khối in."],
         action: { kind: "add_block", blockType: "print" },
         starterWorkspace: workspace([{ id: "v2-l5-start", type: "start" }, { id: "v2-l5-variable", type: "variable", fields: { name: "diem", value: 10 } }]),
@@ -395,7 +394,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000505",
         orderIndex: 5,
         title: "In giá trị biến",
-        instructions: "Chọn khối in và hãy nói: **In biến điểm** để in ra giá trị đang lưu trong biến.",
+        instructions: "Chọn khối in và hãy nói hoặc nhập: **In biến điểm** để in ra giá trị đang lưu trong biến.",
         hints: [
           "Bài này cần in giá trị của biến, không phải in chữ 'diem'.",
           "Khối in cần nối với khối lấy biến diem.",
@@ -413,7 +412,7 @@ export const lessonsV2 = [
         databaseStepId: "40000000-0000-0000-0000-000000000506",
         orderIndex: 6,
         title: "Thử thách: In ra giá trị của biến",
-        instructions: "Hãy nói câu lệnh phù hợp để in ra giá trị của biến diem (sẽ là 10).",
+        instructions: "Hãy nói hoặc nhập câu lệnh phù hợp để chạy chương trình và in ra giá trị của biến diem (sẽ là 10).",
         hints: [
           "Khối in giờ chứa biến diem chứ không phải chữ.",
           "Giá trị của biến diem là 10 (đặt từ bước 3).",
@@ -459,4 +458,14 @@ export function getSeedV2LessonById(id: string): LessonV2WithSteps | null {
 
 export function getSeedV2LessonBySlug(slug: string): LessonV2WithSteps | null {
   return lessonsV2.find((lesson) => lesson.slug === slug) ?? null;
+}
+
+export function isSeedV2LessonStep(lessonSlug: string, stepId: string) {
+  const lesson = getSeedV2LessonBySlug(lessonSlug);
+  return Boolean(lesson?.steps.some((step) => step.id === stepId));
+}
+
+export function isSeedV2DatabaseLessonStep(databaseLessonId: string, databaseStepId: string) {
+  const lesson = lessonsV2.find((candidate) => candidate.databaseLessonId === databaseLessonId);
+  return Boolean(lesson?.steps.some((step) => step.databaseStepId === databaseStepId));
 }

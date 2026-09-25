@@ -2,7 +2,7 @@
 
 ## Vision
 
-SheCanCode Voice helps female students with motor disabilities learn computational thinking through guided block-based lessons, voice input, and encouraging support systems that reduce physical barriers.
+SAYNTAX helps female students with motor disabilities learn computational thinking through guided block-based lessons, voice input, and encouraging support systems that reduce physical barriers. Its promise is **Công nghệ không rào cản**.
 
 ## MVP Scope
 
@@ -31,4 +31,3 @@ SheCanCode Voice helps female students with motor disabilities learn computation
 - Accessibility settings are persistent and easy to use
 - Admins can manage lesson content without editing code
 - Progress, confidence, and voice logs are stored for review
-

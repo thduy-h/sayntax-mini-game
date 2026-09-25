@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import type { WorkspaceBlock } from "@shecancode/shared-types";
 
-import { getSeedV2LessonById, getSeedV2LessonBySlug, lessonsV2, listSeedV2Lessons } from "./seed-v2";
+import { getSeedV2LessonById, getSeedV2LessonBySlug, isSeedV2DatabaseLessonStep, isSeedV2LessonStep, lessonsV2, listSeedV2Lessons } from "./seed-v2";
 
 const validActionKinds = new Set(["add_block", "insert_into", "set_text", "set_number", "set_variable_output", "run_program", "ask_hint"]);
 
@@ -43,8 +43,18 @@ assert.equal(lesson1.steps[0]?.starterWorkspace.blocks.length, 0);
 const lesson4 = getSeedV2LessonBySlug("if-basics-v2");
 assert.ok(lesson4 !== null);
 assert.equal(lesson4.steps[4]?.action.kind, "ask_hint");
+assert.equal(lesson4.steps[4]?.isChallenge, undefined);
+
+const lesson2 = getSeedV2LessonBySlug("print-output-v2");
+assert.ok(lesson2 !== null);
+assert.deepEqual(lesson2.steps[2]?.action, { kind: "add_block", blockType: "print", minimumCount: 2 });
 
 assert.equal(getSeedV2LessonBySlug("nonexistent"), null);
 assert.equal(getSeedV2LessonById("nonexistent"), null);
+assert.equal(isSeedV2LessonStep("start-and-sequence-v2", "v2-lesson-1-step-1"), true);
+assert.equal(isSeedV2LessonStep("start-and-sequence-v2", "v2-lesson-2-step-1"), false);
+assert.equal(isSeedV2LessonStep("fake-lesson", "fake-step"), false);
+assert.equal(isSeedV2DatabaseLessonStep("40000000-0000-0000-0000-000000000001", "40000000-0000-0000-0000-000000000101"), true);
+assert.equal(isSeedV2DatabaseLessonStep("40000000-0000-0000-0000-000000000001", "40000000-0000-0000-0000-000000000201"), false);
 
 console.log("seed-v2 tests passed");

@@ -31,7 +31,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
     <AuthShell
       description="Tạo tài khoản học sinh để bắt đầu bài học có hướng dẫn, hoặc dùng email được cho phép để vào vai trò quản trị."
       eyebrow="Tài khoản mới"
-      title="Tạo tài khoản SheCanCode Voice"
+      title="Tạo tài khoản SAYNTAX"
     >
       <CardHeader>
         <CardTitle>Bắt đầu học với sự hỗ trợ phù hợp</CardTitle>

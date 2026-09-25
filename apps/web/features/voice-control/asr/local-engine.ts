@@ -2,12 +2,12 @@ import type { ASREngine, ASREngineCallbacks } from "./types";
 import { logASR } from "./config";
 import { isLikelyLocalASRHallucination } from "./local-transcript-filter";
 
-interface LocalASREngineOptions {
-  localUrl: string;
+interface ServerASREngineOptions {
   selectedDeviceId: () => string;
 }
 
-interface LocalTranscribeResponse {
+interface ServerTranscribeResponse {
+  provider: "groq" | "local";
   text: string;
 }
 
@@ -22,14 +22,15 @@ const MIN_RECORDING_MS = 450;
 const RESTART_AFTER_SEGMENT_MS = 120;
 const SILENCE_AFTER_SPEECH_MS = 900;
 const SPEECH_RMS_THRESHOLD = 0.012;
+const TRANSCRIBE_TIMEOUT_MS = 25_000;
 
 function chooseMimeType() {
   if (typeof MediaRecorder === "undefined") return "";
   return MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type)) ?? "";
 }
 
-export class LocalASREngine implements ASREngine {
-  readonly type = "local" as const;
+export class ServerASREngine implements ASREngine {
+  readonly type = "server" as const;
   private callbacks: ASREngineCallbacks;
   private chunks: Blob[] = [];
   private controller: AbortController | null = null;
@@ -39,7 +40,7 @@ export class LocalASREngine implements ASREngine {
   private maxTimer: number | null = null;
   private mediaRecorder: MediaRecorder | null = null;
   private mimeType = "";
-  private options: LocalASREngineOptions;
+  private options: ServerASREngineOptions;
   private pendingSegments: QueuedAudioSegment[] = [];
   private recordingStartedAt = 0;
   private restartTimer: number | null = null;
@@ -48,7 +49,7 @@ export class LocalASREngine implements ASREngine {
   private shouldContinue = false;
   private stream: MediaStream | null = null;
 
-  constructor(options: LocalASREngineOptions, callbacks: ASREngineCallbacks) {
+  constructor(options: ServerASREngineOptions, callbacks: ASREngineCallbacks) {
     this.callbacks = callbacks;
     this.options = options;
   }
@@ -70,7 +71,7 @@ export class LocalASREngine implements ASREngine {
       this.shouldContinue = false;
       this.callbacks.onError?.({
         code: "not_supported",
-        message: "Trình duyệt chưa hỗ trợ thu âm để dùng ASR local.",
+        message: "Trình duyệt chưa hỗ trợ thu âm cho nhận dạng giọng nói.",
         recoverable: false,
       });
       return;
@@ -196,20 +197,33 @@ export class LocalASREngine implements ASREngine {
         const form = new FormData();
         form.append("file", segment.blob, `speech.${segment.mimeType.includes("ogg") ? "ogg" : "webm"}`);
         try {
-          logASR("Sending audio to local ASR");
-          const response = await fetch(`${this.options.localUrl.replace(/\/+$/, "")}/transcribe`, {
-            body: form,
-            method: "POST",
-            signal: this.controller.signal,
-          });
-          if (!response.ok) throw new Error(`transcribe ${response.status}`);
-          const data = (await response.json()) as LocalTranscribeResponse;
+          logASR("Sending audio to SAYNTAX ASR");
+          let requestTimedOut = false;
+          const requestTimer = window.setTimeout(() => {
+            requestTimedOut = true;
+            this.controller?.abort();
+          }, TRANSCRIBE_TIMEOUT_MS);
+          let response: Response;
+          try {
+            response = await fetch("/api/asr/transcribe", {
+              body: form,
+              method: "POST",
+              signal: this.controller.signal,
+            });
+          } catch (error) {
+            if (error instanceof DOMException && error.name === "AbortError" && !requestTimedOut) throw error;
+            throw new ASRRequestError(true);
+          } finally {
+            window.clearTimeout(requestTimer);
+          }
+          if (!response.ok) throw new ASRRequestError(response.status === 429 || response.status >= 500);
+          const data = (await response.json()) as ServerTranscribeResponse;
           const text = data.text.trim();
           if (!text || isLikelyLocalASRHallucination(text)) {
             if (!this.shouldContinue && this.mediaRecorder?.state !== "recording") {
               this.callbacks.onError?.({
                 code: "no_speech",
-                message: "ASR local chưa nhận ra câu lệnh. Hãy thử nói lại.",
+                message: "Hệ thống chưa nhận ra câu lệnh. Hãy thử nói lại.",
                 recoverable: true,
               });
             }
@@ -217,19 +231,22 @@ export class LocalASREngine implements ASREngine {
             logASR("Transcript received");
             this.callbacks.onFinalResult?.({
               alternatives: [{ confidence: 1, transcript: text }],
-              engine: "local",
+              engine: data.provider === "groq" ? "cloud" : "local",
               text,
             });
           }
-        } catch {
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") break;
           this.shouldContinue = false;
           this.pendingSegments = [];
-          this.stopCurrentSegment({ final: true });
-          this.callbacks.onError?.({
-            code: "transcribe_failed",
-            message: "ASR local chưa xử lý được đoạn vừa nói. Lần nói tiếp theo sẽ dùng nhận dạng của trình duyệt nếu có.",
+          const asrError = {
+            code: error instanceof ASRRequestError && error.allowFallback ? "upstream_unavailable" : "transcribe_failed",
+            message: error instanceof ASRRequestError && error.allowFallback
+              ? "Dịch vụ nhận dạng tạm thời không phản hồi. Đã chuyển sang nhận dạng của trình duyệt."
+              : "Hệ thống chưa xử lý được đoạn vừa nói. Hãy thử lại.",
             recoverable: true,
-          });
+          } as const;
+          this.stopBeforeReportingError(() => this.callbacks.onError?.(asrError));
           break;
         } finally {
           this.controller = null;
@@ -250,6 +267,30 @@ export class LocalASREngine implements ASREngine {
     this.callbacks.onStateChange?.("starting");
     logASR("Scheduling next recording segment");
     this.scheduleNextSegment();
+  }
+
+  private stopBeforeReportingError(report: () => void) {
+    if (this.maxTimer !== null) window.clearTimeout(this.maxTimer);
+    if (this.restartTimer !== null) window.clearTimeout(this.restartTimer);
+    this.maxTimer = null;
+    this.restartTimer = null;
+    this.stopSilenceDetection();
+    const recorder = this.mediaRecorder;
+    if (recorder?.state === "recording") {
+      recorder.ondataavailable = null;
+      recorder.onstop = () => {
+        this.chunks = [];
+        this.mediaRecorder = null;
+        this.stopTracks();
+        this.callbacks.onStateChange?.("stopped");
+        report();
+      };
+      recorder.stop();
+      return;
+    }
+    this.stopTracks();
+    this.callbacks.onStateChange?.("stopped");
+    report();
   }
 
   private scheduleNextSegment() {
@@ -335,5 +376,11 @@ export class LocalASREngine implements ASREngine {
     }
     this.chunks = [];
     this.stopTracks();
+  }
+}
+
+class ASRRequestError extends Error {
+  constructor(readonly allowFallback: boolean) {
+    super("ASR request failed");
   }
 }

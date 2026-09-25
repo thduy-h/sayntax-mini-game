@@ -1,5 +1,4 @@
-export type ASREngineType = "local" | "browser" | "unavailable";
-export type ASRMode = "auto" | "local" | "browser";
+export type ASREngineType = "server" | "cloud" | "local" | "browser" | "unavailable";
 export type ASRState = "idle" | "checking" | "starting" | "listening" | "processing" | "stopped" | "unavailable";
 
 export interface ASRError {
@@ -12,6 +11,7 @@ export interface ASRError {
     | "no_speech"
     | "aborted"
     | "transcribe_failed"
+    | "upstream_unavailable"
     | "unknown";
   message: string;
   recoverable: boolean;

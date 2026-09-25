@@ -31,7 +31,7 @@ export function useSpeechRecognition() {
   const [alternatives, setAlternatives] = useState<SpeechAlternativeResult[]>([]);
   const [asrState, setAsrState] = useState<ASRState>("checking");
   const [audioInputs, setAudioInputs] = useState<AudioInputOption[]>([]);
-  const [engineLabel, setEngineLabel] = useState("Đang kết nối ASR...");
+  const [engineLabel, setEngineLabel] = useState("Đang kết nối nhận dạng giọng nói...");
   const [engineType, setEngineType] = useState<ASREngineType>("unavailable");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [finalResultId, setFinalResultId] = useState(0);
@@ -118,7 +118,7 @@ export function useSpeechRecognition() {
         onInterimResult: setInterimTranscript,
         onStateChange: (state) => {
           setAsrState(state);
-          if (state === "checking") setEngineLabel("Đang kết nối ASR local...");
+          if (state === "checking") setEngineLabel("Đang kết nối nhận dạng giọng nói...");
           if (state === "listening") setMicrophoneStatus("ready");
         },
       },
@@ -169,11 +169,11 @@ export function useSpeechRecognition() {
     setInterimTranscript("");
   }
 
-  async function retryLocalASR() {
+  async function retryASR() {
     if (asrState === "listening" || asrState === "starting" || asrState === "processing") return;
     setErrorMessage(null);
     setIsSupportKnown(false);
-    await managerRef.current?.retryLocal();
+    await managerRef.current?.retryPrimary();
     setIsSupportKnown(true);
   }
 
@@ -192,7 +192,7 @@ export function useSpeechRecognition() {
     isSupported: engineType !== "unavailable",
     microphoneStatus,
     refreshMicrophones,
-    retryLocalASR,
+    retryASR,
     selectedMicrophoneId,
     selectMicrophone,
     startListening,

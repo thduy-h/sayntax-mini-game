@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logOperation } from "@/lib/operations/logger";
 import { getSiteUrl, isAdminEmailAllowed, isSupabaseConfigured } from "@/lib/env";
 import { createServerSupabaseClient, createServiceRoleSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser, getRedirectPathForUser } from "@/features/auth/server/data";
@@ -11,6 +12,7 @@ function getString(formData: FormData, key: string) {
 }
 
 function redirectWithMessage(path: string, key: "error" | "message", value: string): never {
+  if (key === "error") logOperation("auth_failure", { phase: "session" });
   redirect(`${path}?${key}=${encodeURIComponent(value)}`);
 }
 
@@ -124,6 +126,7 @@ export async function signOutAction() {
     redirect("/sign-in");
   }
   const supabase = await createServerSupabaseClient();
-  await supabase.auth.signOut();
+  const { error } = await supabase.auth.signOut();
+  if (error) logOperation("auth_failure", { phase: "session" });
   redirect("/sign-in");
 }

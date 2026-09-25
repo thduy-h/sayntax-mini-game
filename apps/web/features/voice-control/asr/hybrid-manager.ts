@@ -1,76 +1,44 @@
-import { getASRConfig, logASR } from "./config";
 import { BrowserSpeechRecognitionEngine } from "./browser-engine";
-import { checkLocalASRHealth } from "./local-health";
-import { LocalASREngine } from "./local-engine";
-import type { ASREngine, ASREngineCallbacks, ASREngineType, ASRMode, ASRState, LocalASRHealth } from "./types";
+import { logASR } from "./config";
+import { ServerASREngine } from "./local-engine";
+import type { ASREngine, ASREngineCallbacks, ASREngineType, ASRError, ASRState } from "./types";
 
 interface HybridASRManagerOptions {
   callbacks: ASREngineCallbacks;
+  createBrowserEngine?: (callbacks: ASREngineCallbacks) => ASREngine;
+  createServerEngine?: (callbacks: ASREngineCallbacks) => ASREngine;
   selectedDeviceId: () => string;
+}
+
+export function shouldFallbackToBrowser(error: ASRError) {
+  return error.code === "upstream_unavailable";
 }
 
 export class HybridASRManager {
   private activeEngine: ASREngine | null = null;
-  private browserEngine: BrowserSpeechRecognitionEngine;
+  private browserEngine: ASREngine;
   private callbacks: ASREngineCallbacks;
-  private config = getASRConfig();
   private engineType: ASREngineType = "unavailable";
-  private localHealth: LocalASRHealth | null = null;
-  private localUrl = this.config.localUrl;
-  private mode: ASRMode = this.config.mode;
-  private selectedDeviceId: () => string;
+  private serverEngine: ASREngine;
   private state: ASRState = "checking";
 
   constructor(options: HybridASRManagerOptions) {
     this.callbacks = options.callbacks;
-    this.selectedDeviceId = options.selectedDeviceId;
-    this.browserEngine = new BrowserSpeechRecognitionEngine(this.wrapCallbacks("browser"));
+    const browserCallbacks = this.wrapCallbacks("browser");
+    const serverCallbacks = this.wrapCallbacks("server");
+    this.browserEngine = options.createBrowserEngine?.(browserCallbacks)
+      ?? new BrowserSpeechRecognitionEngine(browserCallbacks);
+    this.serverEngine = options.createServerEngine?.(serverCallbacks)
+      ?? new ServerASREngine({ selectedDeviceId: options.selectedDeviceId }, serverCallbacks);
   }
 
-  getEngineType() {
-    return this.engineType;
-  }
-
-  getEngineLabel() {
-    if (this.engineType === "local") {
-      const detail = this.localHealth ? ` (${this.localHealth.model}, ${this.localHealth.device})` : "";
-      return `Local AI${detail}`;
-    }
-    if (this.engineType === "browser") return "Nhận dạng của trình duyệt";
-    return "Không khả dụng";
-  }
-
-  getState() {
-    return this.state;
-  }
-
-  isSupported() {
-    return this.engineType !== "unavailable";
-  }
-
-  async initialize(options: { forceLocalCheck?: boolean } = {}) {
+  async initialize() {
     this.setState("checking");
-    if (this.mode !== "browser") {
-      this.localHealth = await checkLocalASRHealth(this.localUrl, this.config.healthTimeoutMs, {
-        force: options.forceLocalCheck,
-      });
-      if (this.localHealth) {
-        this.setActiveEngine("local");
-        this.setState("stopped");
-        return;
-      }
-      if (this.mode === "local") {
-        this.setActiveEngine("unavailable");
-        this.callbacks.onError?.({
-          code: "network",
-          message: "Không tìm thấy ASR local. Hãy bật server local hoặc đổi cấu hình sang browser.",
-          recoverable: true,
-        });
-        this.setState("unavailable");
-        return;
-      }
+    if (this.serverEngine.isSupported()) {
+      this.setActiveEngine("server");
+      this.setState("stopped");
+      return;
     }
-
     if (this.browserEngine.isSupported()) {
       this.setActiveEngine("browser");
       this.setState("stopped");
@@ -79,15 +47,15 @@ export class HybridASRManager {
     this.setActiveEngine("unavailable");
     this.callbacks.onError?.({
       code: "not_supported",
-      message: "Trình duyệt này chưa hỗ trợ nhận dạng giọng nói. Hãy thử Edge hoặc Chrome, hoặc bật ASR local.",
+      message: "Trình duyệt chưa hỗ trợ nhận dạng giọng nói. Em vẫn có thể dùng thanh Nhập lệnh.",
       recoverable: false,
     });
     this.setState("unavailable");
   }
 
-  async retryLocal() {
-    if (this.state === "listening" || this.state === "processing" || this.state === "starting") return;
-    await this.initialize({ forceLocalCheck: true });
+  async retryPrimary() {
+    if (["listening", "processing", "starting"].includes(this.state)) return;
+    await this.initialize();
   }
 
   async start() {
@@ -102,39 +70,45 @@ export class HybridASRManager {
   }
 
   dispose() {
-    this.activeEngine?.dispose();
     this.browserEngine.dispose();
+    this.serverEngine.dispose();
+    this.activeEngine = null;
   }
 
-  private wrapCallbacks(engine: ASREngineType): ASREngineCallbacks {
+  private wrapCallbacks(engine: "server" | "browser"): ASREngineCallbacks {
     return {
       onError: (error) => {
         this.callbacks.onError?.(error);
-        if (engine === "local" && error.code === "transcribe_failed" && this.mode === "auto") {
-          this.setActiveEngine(this.browserEngine.isSupported() ? "browser" : "unavailable");
+        if (engine === "server" && shouldFallbackToBrowser(error)) {
+          if (this.browserEngine.isSupported()) {
+            this.setActiveEngine("browser");
+            void this.browserEngine.start();
+          } else {
+            this.setActiveEngine("unavailable");
+            this.setState("unavailable");
+          }
         }
       },
-      onFinalResult: this.callbacks.onFinalResult,
+      onFinalResult: (result) => {
+        if (result.engine === "cloud") this.publishEngine("cloud", "Nhận dạng giọng nói SAYNTAX");
+        if (result.engine === "local") this.publishEngine("local", "Nhận dạng giọng nói SAYNTAX");
+        this.callbacks.onFinalResult?.(result);
+      },
       onInterimResult: this.callbacks.onInterimResult,
       onStateChange: (state) => this.setState(state),
     };
   }
 
-  private setActiveEngine(type: ASREngineType) {
-    this.activeEngine?.dispose();
+  private publishEngine(type: ASREngineType, label: string) {
     this.engineType = type;
-    if (type === "local") {
-      this.activeEngine = new LocalASREngine(
-        { localUrl: this.localUrl, selectedDeviceId: this.selectedDeviceId },
-        this.wrapCallbacks("local"),
-      );
-    } else if (type === "browser") {
-      this.activeEngine = this.browserEngine;
-    } else {
-      this.activeEngine = null;
-    }
+    this.callbacks.onEngineChange?.(type, label);
+  }
+
+  private setActiveEngine(type: "server" | "browser" | "unavailable") {
+    this.activeEngine = type === "server" ? this.serverEngine : type === "browser" ? this.browserEngine : null;
+    const label = type === "server" ? "Nhận dạng giọng nói SAYNTAX" : type === "browser" ? "Nhận dạng của trình duyệt" : "Không khả dụng";
+    this.publishEngine(type, label);
     logASR(`Selected engine: ${type}`);
-    this.callbacks.onEngineChange?.(type, this.getEngineLabel());
   }
 
   private setState(state: ASRState) {

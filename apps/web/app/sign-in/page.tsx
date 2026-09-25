@@ -33,7 +33,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
     <AuthShell
       description="Dùng tài khoản của bạn để tiếp tục bài học, theo dõi tiến độ và truy cập nội dung phù hợp với vai trò."
       eyebrow="Truy cập tài khoản"
-      title="Đăng nhập vào SheCanCode Voice"
+      title="Đăng nhập vào SAYNTAX"
     >
       <CardHeader>
         <CardTitle>Chào mừng bạn quay lại</CardTitle>

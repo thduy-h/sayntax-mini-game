@@ -970,6 +970,13 @@ export function VoiceLessonClient({
     setHintIndex((index) => (index + 1) % currentStep.hints.length);
   }
 
+  function requestHintFromButton() {
+    advanceHint();
+    if (currentStep.action.kind === "ask_hint") {
+      evaluateAndMaybeAdvance({ kind: "ask_hint" });
+    }
+  }
+
   function captureUndoSnapshot(label: string) {
     const workspace = workspaceRef.current;
     if (!workspace) return;
@@ -1015,10 +1022,13 @@ export function VoiceLessonClient({
       }
       return;
     }
-    void markLessonV2StepCompletedAction(lesson.slug, stepId).catch(() => {
-      setLastFeedback("Không thể lưu tiến độ lên tài khoản, nhưng bạn vẫn có thể tiếp tục học.");
-      /* swallow — persistence is best-effort */
-    });
+    void markLessonV2StepCompletedAction(lesson.slug, stepId)
+      .then((result) => {
+        if (!result.ok) setLastFeedback("Không thể lưu tiến độ lên tài khoản, nhưng bạn vẫn có thể tiếp tục học.");
+      })
+      .catch(() => {
+        setLastFeedback("Không thể lưu tiến độ lên tài khoản, nhưng bạn vẫn có thể tiếp tục học.");
+      });
   }
 
   function persistProgramRun(program: ProgramWorkspace, exec: ProgramExecutionResult) {
@@ -2168,8 +2178,8 @@ export function VoiceLessonClient({
           <div className="border-b-4 border-black bg-[#fff6a8] px-3 py-2 text-xs text-black">
             <p className="font-bold">
               {isDemoMode
-                ? "Chế độ demo chỉ lưu tiến độ trên thiết bị này. Nếu bật micro, câu lệnh được xử lý trong trình duyệt và không gửi log lên server."
-                : "Trước khi học bằng giọng nói: app có thể lưu câu lệnh giọng nói dưới dạng văn bản, không lưu âm thanh thô. Giáo viên/admin có thể xem tiến độ và log để hỗ trợ học tốt hơn."}
+                ? "Chế độ demo chỉ lưu tiến độ trên thiết bị này. SAYNTAX không lưu âm thanh thô; giọng nói chỉ được gửi tới dịch vụ nhận dạng đang được sử dụng."
+                : "SAYNTAX không lưu âm thanh thô. Giọng nói được gửi tới dịch vụ nhận dạng đang được sử dụng; câu lệnh dạng văn bản có thể được lưu để giáo viên hỗ trợ học tập."}
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <Button
@@ -2221,16 +2231,16 @@ export function VoiceLessonClient({
             {speech.isListening ? "Dừng" : "Nói"}
           </Button>
           <Button
-            aria-label="Thử kết nối lại ASR local"
+            aria-label="Thử kết nối lại dịch vụ nhận dạng giọng nói"
             disabled={speech.isListening || speech.isStarting}
             onClick={() => {
-              void speech.retryLocalASR();
+              void speech.retryASR();
             }}
             size="sm"
             type="button"
             variant="outline"
           >
-            Thử lại ASR local
+            Thử lại nhận dạng
           </Button>
           <label className="min-w-[180px] text-[10px] font-black uppercase tracking-[0.12em] text-black">
             Micro
@@ -2422,15 +2432,15 @@ export function VoiceLessonClient({
           )}
           {!speech.isSupportKnown && (
             <p className="text-zinc-500">
-              Đang kết nối ASR local...
+              Đang kết nối nhận dạng giọng nói...
             </p>
           )}
           <p className="min-w-0 break-words text-zinc-600">
-            ASR trên thiết bị này: <span className="font-semibold text-black">{speech.engineLabel}</span>
+            Đang dùng: <span className="font-semibold text-black">{speech.engineLabel}</span>
           </p>
           {speech.isSupportKnown && !speech.isSupported && (
             <p className="text-red-600">
-              Trình duyệt này chưa hỗ trợ nhận dạng giọng nói ổn định và không kết nối được ASR local. Em vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
+              Trình duyệt này chưa hỗ trợ nhận dạng giọng nói và dịch vụ nhận dạng đang không khả dụng. Em vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
             </p>
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
@@ -2559,7 +2569,7 @@ export function VoiceLessonClient({
             <Button
               size="sm"
               variant="secondary"
-              onClick={advanceHint}
+              onClick={requestHintFromButton}
               disabled={currentStep.hints.length === 0}
             >
               Đổi

@@ -18,7 +18,7 @@ const FEEDBACK = {
 } as const;
 
 export type LessonStepAction =
-  | { kind: "add_block"; blockType: BlockKind; label?: string }
+  | { kind: "add_block"; blockType: BlockKind; label?: string; minimumCount?: number }
   | { kind: "insert_into"; parentBlockType: BlockKind; childBlockType: BlockKind; slot?: string }
   | { kind: "set_text"; blockId: string; field: string; expectedText: string }
   | { kind: "set_number"; blockId: string; field: string; expectedNumber: number }
@@ -104,10 +104,19 @@ export function evaluateStepAction(
   const blocks = flattenBlocks(workspace.blocks);
 
   switch (action.kind) {
-    case "add_block":
-      return blocks.some((block) => block.type === action.blockType)
+    case "add_block": {
+      const requiredCount = action.minimumCount ?? 1;
+      const currentCount = blocks.filter((block) => block.type === action.blockType).length;
+      return currentCount >= requiredCount
         ? { completed: true, feedback: FEEDBACK.add_block_pass }
-        : { completed: false, feedback: `Bạn còn thiếu khối ${labelFor(action.blockType)}. Hãy nói: thêm khối ${labelFor(action.blockType)}.` };
+        : {
+            completed: false,
+            feedback:
+              requiredCount > 1
+                ? `Bạn cần ${requiredCount} khối ${labelFor(action.blockType)}. Hiện có ${currentCount}. Hãy thêm một khối ${labelFor(action.blockType)} nữa.`
+                : `Bạn còn thiếu khối ${labelFor(action.blockType)}. Hãy nói hoặc nhập: thêm khối ${labelFor(action.blockType)}.`,
+          };
+    }
     case "insert_into": {
       const hasNested = blocks.some(
         (block) =>

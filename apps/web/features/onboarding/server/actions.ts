@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logOperation } from "@/lib/operations/logger";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/features/auth/server/data";
 import { onboardingSchema } from "@/features/onboarding/schemas";
@@ -36,6 +37,7 @@ export async function completeOnboardingAction(formData: FormData) {
   });
 
   if (!parsed.success) {
+    logOperation("onboarding_failure", { phase: "validation" });
     redirect(`/onboarding?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid onboarding details.")}`);
   }
 
@@ -52,6 +54,7 @@ export async function completeOnboardingAction(formData: FormData) {
   });
 
   if (accessibilityError) {
+    logOperation("onboarding_failure", { phase: "persistence" });
     redirect(`/onboarding?error=${encodeURIComponent(accessibilityError.message)}`);
   }
 
@@ -67,6 +70,7 @@ export async function completeOnboardingAction(formData: FormData) {
     });
 
     if (profileError) {
+      logOperation("onboarding_failure", { phase: "persistence" });
       redirect(`/onboarding?error=${encodeURIComponent(profileError.message)}`);
     }
   }
@@ -77,9 +81,9 @@ export async function completeOnboardingAction(formData: FormData) {
     .eq("id", user.id);
 
   if (userError) {
+    logOperation("onboarding_failure", { phase: "persistence" });
     redirect(`/onboarding?error=${encodeURIComponent(userError.message)}`);
   }
 
   redirect(user.role === "admin" ? "/admin" : "/dashboard");
 }
-

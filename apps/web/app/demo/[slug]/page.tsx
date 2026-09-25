@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSeedV2LessonBySlug, type LessonV2WithSteps } from "@shecancode/lesson-engine";
+import { BrandLogo } from "@/components/brand-logo";
 import { VoiceLessonClient } from "@/features/lesson-v2/components/voice-lesson-client";
 
 interface DemoLessonPageProps {
@@ -17,6 +18,7 @@ export default async function DemoLessonPage({ params }: DemoLessonPageProps) {
     <main className="mx-auto flex h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-6">
       <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border-4 border-black bg-white px-4 py-3 shadow-[6px_6px_0_#121212]">
         <div className="flex flex-wrap items-baseline gap-3">
+          <BrandLogo className="w-[120px]" />
           <Link className="text-xs font-black uppercase text-black underline decoration-2 underline-offset-4" href="/demo">
             ← Danh sách demo
           </Link>

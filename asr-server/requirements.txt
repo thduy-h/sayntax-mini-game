@@ -1,6 +1,6 @@
-fastapi
-uvicorn[standard]
-faster-whisper
-python-multipart
-numpy
-pydantic
+fastapi==0.139.2
+uvicorn[standard]==0.51.0
+faster-whisper==1.2.1
+python-multipart==0.0.32
+numpy==2.5.1
+pydantic==2.13.4

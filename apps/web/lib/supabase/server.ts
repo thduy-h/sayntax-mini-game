@@ -28,6 +28,19 @@ export async function createServerSupabaseClient() {
   });
 }
 
+export async function getAuthenticatedServerSupabase() {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    return user ? { supabase, user } : null;
+  } catch {
+    // Authentication must fail closed when Supabase is unavailable.
+    return null;
+  }
+}
+
 export function createServiceRoleSupabaseClient() {
   const env = getEnv();
 

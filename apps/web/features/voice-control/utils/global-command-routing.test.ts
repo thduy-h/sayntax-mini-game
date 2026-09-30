@@ -2,9 +2,18 @@ import assert from "node:assert/strict";
 
 import {
   chooseGlobalCommandTarget,
+  commandResultForLessonRegistration,
   createGlobalCommandRegistry,
+  shouldClearCommandResultForLesson,
   type GlobalCommandExecutionResult,
 } from "./global-command-routing";
+
+assert.equal(shouldClearCommandResultForLesson(null, "lesson-a"), false);
+assert.equal(shouldClearCommandResultForLesson("lesson-a", "lesson-a"), false);
+assert.equal(shouldClearCommandResultForLesson("lesson-a", "lesson-b"), true);
+const lessonAFeedback = { feedback: "Đã thêm khối bắt đầu." };
+assert.equal(commandResultForLessonRegistration(lessonAFeedback, "lesson-a", "lesson-a"), lessonAFeedback);
+assert.equal(commandResultForLessonRegistration(lessonAFeedback, "lesson-a", "lesson-b"), null);
 
 function website(command: string): GlobalCommandExecutionResult {
   return { command, feedback: `website:${command}`, handled: true, target: "website", understoodAs: command === "quay lại" ? "history:back" : command === "cuộn xuống" ? "scroll:down" : "website" };

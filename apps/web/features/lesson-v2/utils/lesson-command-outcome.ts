@@ -2,6 +2,20 @@ import type { VoiceIntent } from "@shecancode/voice-parser";
 
 export type LessonCommandOutcome = "applied" | "not_applied" | "unsupported" | "pending";
 
+export function unknownCommandRecovery(input: {
+  cursorLabel: string;
+  sampleUtterance?: string | null;
+  selectableBlockCount: number;
+}) {
+  if (input.selectableBlockCount > 0) {
+    return `Mình chưa hiểu câu lệnh này. Vị trí chèn vẫn là ${input.cursorLabel}. Em có thể nói: chọn khối 2, chèn sau khối 2, hoặc gợi ý.`;
+  }
+  const sample = input.sampleUtterance?.trim();
+  return sample
+    ? `Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Em có thể nói: “${sample}”, hoặc “gợi ý”.`
+    : "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Hãy thêm khối phù hợp với yêu cầu hiện tại hoặc nói “gợi ý”.";
+}
+
 export function nextLessonHint(hints: readonly string[], currentIndex: number) {
   if (hints.length === 0) return null;
   const index = (currentIndex + 1) % hints.length;

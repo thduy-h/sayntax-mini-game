@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-import { nextLessonHint, resolveLessonCommandOutcome } from "./lesson-command-outcome";
+import { nextLessonHint, resolveLessonCommandOutcome, unknownCommandRecovery } from "./lesson-command-outcome";
 import { commandFeedbackAnnouncement } from "../../voice-control/utils/accessible-announcements";
 
 assert.deepEqual(
@@ -12,6 +12,23 @@ assert.deepEqual(
     understoodAs: "thêm khối bắt đầu",
   }),
   { feedback: "Đã thêm khối bắt đầu.", handled: true, outcome: "applied" },
+);
+
+assert.equal(
+  unknownCommandRecovery({ cursorLabel: "cuối chương trình", sampleUtterance: "thêm khối bắt đầu", selectableBlockCount: 0 }),
+  "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Em có thể nói: “thêm khối bắt đầu”, hoặc “gợi ý”.",
+);
+assert.equal(
+  unknownCommandRecovery({ cursorLabel: "cuối chương trình", sampleUtterance: null, selectableBlockCount: 0 }),
+  "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Hãy thêm khối phù hợp với yêu cầu hiện tại hoặc nói “gợi ý”.",
+);
+assert.match(
+  unknownCommandRecovery({ cursorLabel: "sau khối 1", sampleUtterance: "thêm khối in", selectableBlockCount: 2 }),
+  /chọn khối 2, chèn sau khối 2/,
+);
+assert.doesNotMatch(
+  unknownCommandRecovery({ cursorLabel: "cuối chương trình", sampleUtterance: null, selectableBlockCount: 0 }),
+  /chọn khối \d/,
 );
 
 assert.deepEqual(

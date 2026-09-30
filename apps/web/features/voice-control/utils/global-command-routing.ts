@@ -29,6 +29,18 @@ export function chooseGlobalCommandTarget(workspace: WorkspaceCommandRegistratio
   return "workspace";
 }
 
+export function shouldClearCommandResultForLesson(previousLessonSlug: string | null, nextLessonSlug: string) {
+  return previousLessonSlug !== null && previousLessonSlug !== nextLessonSlug;
+}
+
+export function commandResultForLessonRegistration<T>(
+  currentResult: T,
+  previousLessonSlug: string | null,
+  nextLessonSlug: string,
+) {
+  return shouldClearCommandResultForLesson(previousLessonSlug, nextLessonSlug) ? null : currentResult;
+}
+
 export function createGlobalCommandRegistry() {
   let workspace: WorkspaceCommandRegistration | null = null;
 

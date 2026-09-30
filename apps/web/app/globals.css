@@ -60,6 +60,16 @@ body {
   font-family: var(--font-body);
 }
 
+@media (max-height: 500px) {
+  .scc-lesson-voice-strip {
+    padding-bottom: calc(3.75rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  .scc-global-command-collapsed {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+}
+
 a,
 button,
 input,

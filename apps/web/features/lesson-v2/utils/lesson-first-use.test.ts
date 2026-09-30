@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 
 const lesson = readFileSync("features/lesson-v2/components/voice-lesson-client.tsx", "utf8");
 const commandBar = readFileSync("features/voice-control/components/global-command-bar.tsx", "utf8");
+const globals = readFileSync("app/globals.css", "utf8");
 const demoPage = readFileSync("app/demo/[slug]/page.tsx", "utf8");
 const studentPage = readFileSync("app/lessons-v2/[slug]/page.tsx", "utf8");
 
@@ -21,5 +22,8 @@ assert.ok(lesson.includes("max-h-[calc(100dvh-1rem)]"));
 assert.ok(lesson.includes("overflow-y-auto overscroll-contain"));
 assert.ok(demoPage.includes("min-h-[calc(100dvh-var(--global-command-bar-height,0px))]"));
 assert.ok(studentPage.includes("min-h-[calc(100dvh-var(--global-command-bar-height,0px))]"));
+assert.ok(lesson.includes("scc-lesson-voice-strip"));
+assert.ok(commandBar.includes("scc-global-command-collapsed"));
+assert.ok(globals.includes("@media (max-height: 500px)"));
 
 console.log("lesson first-use contracts passed");

@@ -78,16 +78,19 @@ export class HybridASRManager {
   private wrapCallbacks(engine: "server" | "browser"): ASREngineCallbacks {
     return {
       onError: (error) => {
-        this.callbacks.onError?.(error);
         if (engine === "server" && shouldFallbackToBrowser(error)) {
           if (this.browserEngine.isSupported()) {
             this.setActiveEngine("browser");
             void this.browserEngine.start();
+            return;
           } else {
+            this.callbacks.onError?.(error);
             this.setActiveEngine("unavailable");
             this.setState("unavailable");
+            return;
           }
         }
+        this.callbacks.onError?.(error);
       },
       onFinalResult: (result) => {
         if (result.engine === "cloud") this.publishEngine("cloud", "Nhận dạng giọng nói SAYNTAX");

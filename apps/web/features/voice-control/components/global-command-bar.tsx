@@ -86,7 +86,7 @@ export function GlobalCommandBar() {
     return (
       <div
         ref={barRef}
-        className="fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3"
+        className="scc-global-command-collapsed fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3"
       >
         <Button
           aria-expanded="false"

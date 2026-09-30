@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   normalizeVoiceText,
@@ -9,6 +9,8 @@ import {
 } from "../utils/global-voice-control";
 import {
   chooseGlobalCommandTarget,
+  commandResultForLessonRegistration,
+  shouldClearCommandResultForLesson,
   type GlobalCommandExecutionResult,
   type WorkspaceCommandRegistration,
 } from "../utils/global-command-routing";
@@ -109,8 +111,18 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   const [lastResult, setLastResult] = useState<GlobalCommandExecutionResult | null>(null);
   const [lastResultId, setLastResultId] = useState(0);
   const [commandBarHeight, setCommandBarHeight] = useState(0);
+  const activeLessonSlugRef = useRef<string | null>(null);
 
   const registerWorkspaceCommand = useCallback((registration: WorkspaceCommandRegistration) => {
+    const previousLessonSlug = activeLessonSlugRef.current;
+    if (shouldClearCommandResultForLesson(previousLessonSlug, registration.lessonSlug)) {
+      setLastResult((current) => commandResultForLessonRegistration(
+        current,
+        previousLessonSlug,
+        registration.lessonSlug,
+      ));
+    }
+    activeLessonSlugRef.current = registration.lessonSlug;
     setWorkspace(registration);
     return () => {
       setWorkspace((current) => (current?.id === registration.id ? null : current));

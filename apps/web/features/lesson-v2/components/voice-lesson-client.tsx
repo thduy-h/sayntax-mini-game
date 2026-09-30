@@ -60,7 +60,8 @@ import {
   type VoiceCommandSource,
 } from "../utils/voice-command-input";
 import { runCompletionModalCommand } from "../utils/completion-modal-command";
-import { nextLessonHint, resolveLessonCommandOutcome } from "../utils/lesson-command-outcome";
+import { nextLessonHint, resolveLessonCommandOutcome, unknownCommandRecovery } from "../utils/lesson-command-outcome";
+import { resolveAuthoritativeEditTarget } from "../utils/lesson-edit-target";
 import { completedStepAnnouncement, completedStepResult, completedStepWithFeedback, type CompletedStepResult } from "../utils/lesson-step-transition";
 import { lessonVoicePresentation } from "../utils/lesson-voice-presentation";
 import { planStepNavigation, willReplaceWorkspace, workspaceContentSignature } from "../utils/step-navigation";
@@ -827,8 +828,8 @@ export function VoiceLessonClient({
   }
 
   function getSelectedBlock() {
-    const selected = Blockly.common.getSelected();
-    return selected instanceof Blockly.BlockSvg ? selected : null;
+    const workspace = workspaceRef.current;
+    return workspace ? selectedBlockForDisplay(workspace) : null;
   }
 
   function getLastAffectedBlock(workspace: Blockly.WorkspaceSvg) {
@@ -1141,17 +1142,27 @@ export function VoiceLessonClient({
     intent: Extract<VoiceIntent, { kind: "set_text" | "set_number" | "set_variable_output" }>,
   ) {
     const selected = getSelectedBlock();
-    if (selected && isBlockCompatibleWithVoiceEdit(selected, intent)) return selected;
-
-    const lastAffected = getLastAffectedBlock(workspace);
-    if (lastAffected && isBlockCompatibleWithVoiceEdit(lastAffected, intent)) return lastAffected;
-
-    if (currentStep?.action.kind === intent.kind) {
-      const stepTarget = resolveTargetBlock(workspace, currentStep.action);
-      if (stepTarget && isBlockCompatibleWithVoiceEdit(stepTarget as Blockly.BlockSvg, intent)) return stepTarget as Blockly.BlockSvg;
+    let fallback: Blockly.BlockSvg | null = null;
+    if (!selected) {
+      const lastAffected = getLastAffectedBlock(workspace);
+      if (lastAffected && isBlockCompatibleWithVoiceEdit(lastAffected, intent)) fallback = lastAffected;
+      if (!fallback && currentStep?.action.kind === intent.kind) {
+        const stepTarget = resolveTargetBlock(workspace, currentStep.action);
+        if (stepTarget && isBlockCompatibleWithVoiceEdit(stepTarget as Blockly.BlockSvg, intent)) fallback = stepTarget as Blockly.BlockSvg;
+      }
+      fallback ??= findRecentEditableBlock(workspace, intent);
     }
+    return resolveAuthoritativeEditTarget({
+      fallback,
+      isCompatible: (block) => isBlockCompatibleWithVoiceEdit(block, intent),
+      selected,
+    });
+  }
 
-    return findRecentEditableBlock(workspace, intent);
+  function incompatibleEditSelectionFeedback(intent: Extract<VoiceIntent, { kind: "set_text" | "set_number" | "set_variable_output" }>) {
+    if (intent.kind === "set_variable_output") return "Khối đang chọn không thể in biến. Hãy chọn một khối in rồi thử lại.";
+    if (intent.kind === "set_text") return "Khối đang chọn không có ô chữ. Hãy chọn một khối in, chữ hoặc biến rồi thử lại.";
+    return "Khối đang chọn không có ô số. Hãy chọn một khối lặp, số hoặc biến rồi thử lại.";
   }
 
   function resolveFieldName(block: Blockly.Block, action: LessonStepAction, defaults: string[]) {
@@ -1345,10 +1356,19 @@ export function VoiceLessonClient({
   function setFieldFromIntent(intent: Extract<VoiceIntent, { kind: "set_text" | "set_number" }>) {
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return false;
-    const target = resolveVoiceEditTargetBlock(workspace, intent);
+    const resolution = resolveVoiceEditTargetBlock(workspace, intent);
+    if (resolution.incompatibleSelection) {
+      setLastFeedback(incompatibleEditSelectionFeedback(intent));
+      return false;
+    }
+    const target = resolution.target;
     if (!target) {
       setLastFeedback(intent.kind === "set_text" ? "Hãy chọn khối trước khi đặt chữ." : "Hãy chọn khối trước khi đặt số.");
       return false;
+    }
+    if (resolution.usedFallback) {
+      target.select();
+      refreshVoiceCursor();
     }
     const value = intent.kind === "set_text" ? intent.text : String(intent.value);
     // Special-case scc_print: TEXT is a value_input slot, not a field. We
@@ -1412,10 +1432,19 @@ export function VoiceLessonClient({
   function setVariableOutputFromIntent(intent: Extract<VoiceIntent, { kind: "set_variable_output" }>) {
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return false;
-    const target = resolveVoiceEditTargetBlock(workspace, intent);
+    const resolution = resolveVoiceEditTargetBlock(workspace, intent);
+    if (resolution.incompatibleSelection) {
+      setLastFeedback(incompatibleEditSelectionFeedback(intent));
+      return false;
+    }
+    const target = resolution.target;
     if (!target || target.type !== "scc_print") {
       setLastFeedback("Hãy chọn khối in trước khi nói in biến.");
       return false;
+    }
+    if (resolution.usedFallback) {
+      target.select();
+      refreshVoiceCursor();
     }
     const currentInput = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
     if (currentInput?.type === "scc_variable_get" && String(currentInput.getFieldValue("NAME") ?? "") === intent.name) {
@@ -1879,7 +1908,11 @@ export function VoiceLessonClient({
       case "cancel":
         return { changed: false, shouldEvaluate: false };
       case "unknown":
-        setLastFeedback(`Mình chưa hiểu câu lệnh này. Vị trí chèn vẫn là ${cursorPositionLabel(insertCursor)}. Em có thể nói: chọn khối 2, chèn sau khối 2, hoặc gợi ý.`);
+        setLastFeedback(unknownCommandRecovery({
+          cursorLabel: cursorPositionLabel(insertCursor),
+          sampleUtterance,
+          selectableBlockCount: buildBlocklyVoiceCursorIndex(workspace).items.length,
+        }));
         return { changed: false, shouldEvaluate: false };
       default:
         return { changed: false, shouldEvaluate: false };
@@ -2570,7 +2603,7 @@ export function VoiceLessonClient({
           {sampleUtterance && (
             <p className="mt-2 break-words text-[0.9em] text-zinc-800">Em có thể nói: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>
           )}
-          <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border-2 border-black bg-[#fffdf3] p-2">
+          <div className="scc-lesson-voice-strip mt-3 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border-2 border-black bg-[#fffdf3] p-2">
             <Button
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
               aria-label={speech.isListening ? "Dừng nghe lệnh bài học" : "Bắt đầu nói lệnh bài học"}

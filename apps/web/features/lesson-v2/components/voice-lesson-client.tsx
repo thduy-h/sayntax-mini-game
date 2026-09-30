@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as Blockly from "blockly";
 import { executeProgram } from "@shecancode/block-engine";
 import { listSeedV2Lessons, type LessonV2WithSteps } from "@shecancode/lesson-engine";
@@ -42,6 +43,7 @@ import {
   rankVoiceCommandAlternatives,
   type VoiceCommandSource,
 } from "../utils/voice-command-input";
+import { runCompletionModalCommand } from "../utils/completion-modal-command";
 import {
   calculateWorkspacePanTarget,
   clampWorkspaceScale,
@@ -469,6 +471,7 @@ export function VoiceLessonClient({
   accessibilitySettings = null,
   mode = "authenticated",
 }: VoiceLessonClientProps): JSX.Element {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
   const suppressEvaluationRef = useRef(false);
@@ -496,6 +499,7 @@ export function VoiceLessonClient({
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
   const [lastIntent, setLastIntent] = useState<VoiceIntent | null>(null);
   const [lessonComplete, setLessonComplete] = useState(initialAllCompleted);
+  const [completionCommand, setCompletionCommand] = useState("");
   const [voiceCursorItems, setVoiceCursorItems] = useState<VoiceCursorDisplayItem[]>([]);
   const [insertCursor, setInsertCursor] = useState<InsertCursor>({
     position: "end",
@@ -1637,7 +1641,34 @@ export function VoiceLessonClient({
     return { command, feedback, handled, pendingPreview, target: "workspace", understoodAs };
   }
 
+  function restartLesson() {
+    setLessonComplete(false);
+    setCurrentStepIndex(0);
+    setRunResult(null);
+    setLastFeedback(null);
+    setCompletionCommand("");
+  }
+
+  function handleCompletionCommand(command: string): GlobalCommandExecutionResult {
+    const action = runCompletionModalCommand(command, Boolean(nextLesson), {
+      next: () => router.push(nextLessonHref),
+      list: () => router.push(lessonsHref),
+      restart: restartLesson,
+    });
+    const feedback = action === "next"
+      ? "Đang mở bài tiếp theo."
+      : action === "list"
+        ? "Đang mở danh sách bài."
+        : action === "restart"
+          ? "Đang làm lại bài này."
+          : "Hộp thoại hoàn thành chỉ nhận: bài tiếp theo, danh sách bài, hoặc làm lại.";
+    setRecognizedCommand(command);
+    setLastFeedback(feedback);
+    return { command, feedback, handled: action !== null, target: "workspace", understoodAs: action ?? undefined };
+  }
+
   function handleTranscriptCommand(rawTranscript: string, source: VoiceCommandSource = "microphone"): GlobalCommandExecutionResult {
+    if (lessonComplete) return handleCompletionCommand(rawTranscript);
     const parsed = parseVoiceCommandInput(source, rawTranscript);
     if (!parsed) return makeWorkspaceCommandResult(rawTranscript, "Hãy nhập một câu lệnh.", false);
     const { intent, transcript } = parsed;
@@ -1721,6 +1752,7 @@ export function VoiceLessonClient({
 
   function handleSpeechAlternatives(alternatives: readonly SpeechAlternativeInput[]): GlobalCommandExecutionResult {
     const heardTranscript = alternatives[0]?.transcript.trim() ?? "";
+    if (lessonComplete) return handleCompletionCommand(heardTranscript);
     if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false);
     const ranking = rankVoiceCommandAlternatives(
       alternatives,
@@ -2083,16 +2115,48 @@ export function VoiceLessonClient({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => {
-                  setLessonComplete(false);
-                  setCurrentStepIndex(0);
-                  setRunResult(null);
-                  setLastFeedback(null);
-                }}
+                onClick={restartLesson}
               >
                 Làm lại
               </Button>
             </div>
+            <form
+              className="mt-4 flex flex-wrap items-end gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const result = handleTranscriptCommand(completionCommand, "text");
+                if (result.handled) setCompletionCommand("");
+              }}
+            >
+              <label className="min-w-0 flex-1 text-sm font-semibold text-black" htmlFor="completion-command">
+                Nhập lệnh hoàn thành
+                <input
+                  className="mt-1 min-h-10 w-full rounded border-2 border-black bg-white px-3 py-2 text-black"
+                  id="completion-command"
+                  onChange={(event) => setCompletionCommand(event.target.value)}
+                  value={completionCommand}
+                />
+              </label>
+              <Button size="sm" type="submit">Thực hiện</Button>
+              <Button
+                aria-label={speech.isListening ? "Dừng nghe lệnh hoàn thành" : "Nói lệnh hoàn thành"}
+                disabled={!speech.isSupportKnown || !speech.isSupported || !voicePrivacyAcknowledged}
+                onClick={() => {
+                  if (speech.isListening) void speech.stopListening();
+                  else void speech.startListening();
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+                {speech.isListening ? "Dừng" : "Nói"}
+              </Button>
+            </form>
+            <p className="mt-2 text-xs text-zinc-700">Có thể nói hoặc nhập: bài tiếp theo, danh sách bài, làm lại.</p>
+            {(lastFeedback || speech.errorMessage) && (
+              <p className="mt-2 text-sm text-black" role="status">{speech.errorMessage ?? lastFeedback}</p>
+            )}
           </div>
         </div>,
         document.body,

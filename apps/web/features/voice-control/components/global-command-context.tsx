@@ -18,6 +18,7 @@ type ActionElement = HTMLAnchorElement | HTMLButtonElement | HTMLInputElement | 
 interface GlobalCommandContextValue {
   commandBarHeight: number;
   lastResult: GlobalCommandExecutionResult | null;
+  lastResultId: number;
   registerWorkspaceCommand: (registration: WorkspaceCommandRegistration) => () => void;
   setCommandBarHeight: (height: number) => void;
   submitCommand: (command: string) => GlobalCommandExecutionResult;
@@ -106,6 +107,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [workspace, setWorkspace] = useState<WorkspaceCommandRegistration | null>(null);
   const [lastResult, setLastResult] = useState<GlobalCommandExecutionResult | null>(null);
+  const [lastResultId, setLastResultId] = useState(0);
   const [commandBarHeight, setCommandBarHeight] = useState(0);
 
   const registerWorkspaceCommand = useCallback((registration: WorkspaceCommandRegistration) => {
@@ -214,17 +216,19 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
       result = submitWebsiteCommand(trimmed);
     }
     setLastResult(result);
+    setLastResultId((current) => current + 1);
     return result;
   }, [submitWebsiteCommand, workspace]);
 
   const value = useMemo<GlobalCommandContextValue>(() => ({
     commandBarHeight,
     lastResult,
+    lastResultId,
     registerWorkspaceCommand,
     setCommandBarHeight,
     submitCommand,
     workspace,
-  }), [commandBarHeight, lastResult, registerWorkspaceCommand, submitCommand, workspace]);
+  }), [commandBarHeight, lastResult, lastResultId, registerWorkspaceCommand, submitCommand, workspace]);
 
   return <GlobalCommandContext.Provider value={value}>{children}</GlobalCommandContext.Provider>;
 }

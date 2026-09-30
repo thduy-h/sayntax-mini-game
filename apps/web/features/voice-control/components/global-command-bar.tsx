@@ -5,6 +5,7 @@ import { Command, PanelTopClose, PanelTopOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGlobalCommand } from "./global-command-context";
+import { conciseAnnouncement } from "../utils/accessible-announcements";
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -15,7 +16,7 @@ function isTypingTarget(target: EventTarget | null) {
 }
 
 export function GlobalCommandBar() {
-  const { lastResult, setCommandBarHeight, submitCommand, workspace } = useGlobalCommand();
+  const { lastResult, lastResultId, setCommandBarHeight, submitCommand, workspace } = useGlobalCommand();
   const [command, setCommand] = useState("");
   const [collapsed, setCollapsed] = useState(false);
   const barRef = useRef<HTMLDivElement | null>(null);
@@ -124,7 +125,7 @@ export function GlobalCommandBar() {
             Nhập lệnh
             <Input
               ref={inputRef}
-              aria-describedby="globalCommandHelp globalCommandFeedback"
+              aria-describedby="globalCommandHelp"
               className="mt-1 font-mono normal-case tracking-normal"
               id="globalCommandInput"
               onChange={(event) => setCommand(event.target.value)}
@@ -160,7 +161,7 @@ export function GlobalCommandBar() {
           )}
         </form>
 
-        <div aria-live="polite" className="mt-2 min-w-0 space-y-1 text-xs" id="globalCommandFeedback">
+        <div className="mt-2 min-w-0 space-y-1 text-xs" id="globalCommandFeedback">
           <p className="text-zinc-600" id="globalCommandHelp">
             {workspace
               ? workspace.workspaceReady
@@ -189,6 +190,11 @@ export function GlobalCommandBar() {
             </p>
           )}
         </div>
+        <p aria-atomic="true" className="sr-only" role="status">
+          <span key={lastResultId}>
+            {lastResult && lastResult.target !== "workspace" ? conciseAnnouncement(lastResult.feedback) : ""}
+          </span>
+        </p>
       </section>
     </div>
   );

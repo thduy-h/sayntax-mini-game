@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Mic, MicOff, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,12 @@ import {
   type GlobalVoiceCommand,
 } from "../utils/global-voice-control";
 import { isWorkspaceVoiceRoute } from "../utils/global-voice-routes";
+import {
+  conciseAnnouncement,
+  distinctAnnouncement,
+  speechStatusAnnouncement,
+  type SpeechAnnouncementState,
+} from "../utils/accessible-announcements";
 
 type ActionElement = HTMLAnchorElement | HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
@@ -65,7 +71,48 @@ export function GlobalVoiceControl() {
   const [enabled, setEnabled] = useState(false);
   const [feedback, setFeedback] = useState("Nói: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, hoặc trợ giúp.");
   const [lastCommand, setLastCommand] = useState<GlobalVoiceCommand | null>(null);
+  const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
+  const previousSpeechStatusRef = useRef<SpeechAnnouncementState | null>(null);
+  const previousFeedbackRef = useRef(feedback);
+  const previousCommandRef = useRef<GlobalVoiceCommand | null>(null);
+  const lastAnnouncementRef = useRef("");
   const hiddenForWorkspace = isWorkspaceVoiceRoute(pathname);
+
+  const announce = useCallback((message: string | null, repeatEvent = false) => {
+    const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
+    if (!next) return;
+    lastAnnouncementRef.current = next;
+    setAnnouncement((current) => ({ id: current.id + 1, text: next }));
+  }, []);
+
+  useEffect(() => {
+    if (hiddenForWorkspace || (!enabled && !speech.isListening)) {
+      previousSpeechStatusRef.current = null;
+      return;
+    }
+    const current: SpeechAnnouncementState = {
+      errorMessage: speech.errorMessage,
+      isListening: speech.isListening,
+      isSupportKnown: speech.isSupportKnown,
+      isSupported: speech.isSupported,
+    };
+    const message = speechStatusAnnouncement(
+      previousSpeechStatusRef.current,
+      current,
+      "Em có thể dùng thanh Nhập lệnh ở cuối màn hình.",
+    );
+    announce(message);
+    previousSpeechStatusRef.current = current;
+  }, [announce, enabled, hiddenForWorkspace, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
+
+  useEffect(() => {
+    const commandChanged = lastCommand !== previousCommandRef.current;
+    if ((feedback !== previousFeedbackRef.current || commandChanged) && !hiddenForWorkspace) {
+      announce(conciseAnnouncement(feedback), commandChanged);
+    }
+    previousFeedbackRef.current = feedback;
+    previousCommandRef.current = lastCommand;
+  }, [announce, feedback, hiddenForWorkspace, lastCommand]);
 
   useEffect(() => {
     if (hiddenForWorkspace || !enabled || !speech.transcript || speech.finalResultId === lastFinalResultIdRef.current) return;
@@ -188,6 +235,7 @@ export function GlobalVoiceControl() {
       className="fixed right-4 z-[var(--z-global-voice)] w-[min(22rem,calc(100vw-2rem))]"
       style={{ bottom: "calc(var(--global-command-bar-height, 0px) + 1rem)" }}
     >
+      <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
       {!expanded ? (
         <Button
           aria-label="Bật điều khiển web bằng giọng nói"

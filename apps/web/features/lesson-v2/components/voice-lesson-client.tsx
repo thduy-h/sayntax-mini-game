@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,6 +19,14 @@ import { Mic, MicOff, Lightbulb, Play, PanelLeftClose, PanelLeftOpen } from "luc
 import { Button } from "@/components/ui/button";
 import { useGlobalCommand } from "@/features/voice-control/components/global-command-context";
 import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
+import {
+  commandFeedbackAnnouncement,
+  conciseAnnouncement,
+  distinctAnnouncement,
+  programResultAnnouncement,
+  speechStatusAnnouncement,
+  type SpeechAnnouncementState,
+} from "@/features/voice-control/utils/accessible-announcements";
 import {
   evaluateStepAction,
   type LessonStepAction,
@@ -499,6 +507,8 @@ export function VoiceLessonClient({
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
   const [lastIntent, setLastIntent] = useState<VoiceIntent | null>(null);
   const [lessonComplete, setLessonComplete] = useState(initialAllCompleted);
+  const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
+  const [lastCommandResult, setLastCommandResult] = useState<GlobalCommandExecutionResult | null>(null);
   const [completionCommand, setCompletionCommand] = useState("");
   const [voiceCursorItems, setVoiceCursorItems] = useState<VoiceCursorDisplayItem[]>([]);
   const [insertCursor, setInsertCursor] = useState<InsertCursor>({
@@ -516,6 +526,12 @@ export function VoiceLessonClient({
   const [toolboxOpen, setToolboxOpen] = useState(true);
   const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
+  const previousSpeechStatusRef = useRef<SpeechAnnouncementState | null>(null);
+  const previousFeedbackRef = useRef<string | null>(null);
+  const previousRunResultRef = useRef<ProgramExecutionResult | null>(null);
+  const previousCommandResultRef = useRef<GlobalCommandExecutionResult | null>(null);
+  const previousAnnouncedStepRef = useRef(currentStepIndex);
+  const lastAnnouncementRef = useRef("");
   const { commandBarHeight, registerWorkspaceCommand } = useGlobalCommand();
   const currentStep = lesson.steps[currentStepIndex];
   const isDemoMode = mode === "demo";
@@ -530,6 +546,53 @@ export function VoiceLessonClient({
   const sampleUtterance = currentStep && !isChallenge
     ? extractSampleFromInstructions(currentStep.instructions) ?? deriveSampleUtterance(currentStep.action)
     : null;
+
+  const announce = useCallback((message: string | null, repeatEvent = false) => {
+    const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
+    if (!next) return;
+    lastAnnouncementRef.current = next;
+    setAnnouncement((current) => ({ id: current.id + 1, text: next }));
+  }, []);
+
+  useEffect(() => {
+    const current: SpeechAnnouncementState = {
+      errorMessage: speech.errorMessage,
+      isListening: speech.isListening,
+      isSupportKnown: speech.isSupportKnown,
+      isSupported: speech.isSupported,
+    };
+    const fallback = lessonComplete
+      ? "Em có thể nhập lệnh trong hộp thoại hoàn thành."
+      : "Em có thể dùng thanh Nhập lệnh ở cuối màn hình.";
+    announce(speechStatusAnnouncement(previousSpeechStatusRef.current, current, fallback));
+    previousSpeechStatusRef.current = current;
+  }, [announce, lessonComplete, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
+
+  useEffect(() => {
+    const feedbackChanged = lastFeedback !== previousFeedbackRef.current;
+    const runChanged = runResult !== previousRunResultRef.current;
+    const commandChanged = lastCommandResult !== previousCommandResultRef.current;
+    const message = runChanged && runResult
+      ? programResultAnnouncement(runResult, lastFeedback)
+      : feedbackChanged && lastFeedback
+        ? conciseAnnouncement(lastFeedback)
+        : commandChanged && lastCommandResult
+          ? commandFeedbackAnnouncement(lastCommandResult)
+          : null;
+    announce(message, feedbackChanged || runChanged || commandChanged);
+    previousFeedbackRef.current = lastFeedback;
+    previousRunResultRef.current = runResult;
+    previousCommandResultRef.current = lastCommandResult;
+  }, [announce, lastCommandResult, lastFeedback, runResult]);
+
+  useEffect(() => {
+    if (currentStepIndex === previousAnnouncedStepRef.current) return;
+    previousAnnouncedStepRef.current = currentStepIndex;
+    const step = lesson.steps[currentStepIndex];
+    if (!step) return;
+    const result = runResult ? `${programResultAnnouncement(runResult, null)} ` : "";
+    announce(`${result}Đang ở bước ${currentStepIndex + 1}: ${step.title}.`);
+  }, [announce, currentStepIndex, lesson.steps, runResult]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1808,7 +1871,11 @@ export function VoiceLessonClient({
     return result;
   }
 
-  textCommandHandlerRef.current = (command: string) => handleTranscriptCommand(command, "text");
+  textCommandHandlerRef.current = (command: string) => {
+    const result = handleTranscriptCommand(command, "text");
+    setLastCommandResult(result);
+    return result;
+  };
 
   useEffect(() => {
     if (!currentStep) return undefined;
@@ -1934,7 +2001,8 @@ export function VoiceLessonClient({
 
   useEffect(() => {
     if (!speech.finalResultId) return;
-    handleSpeechAlternatives(speech.alternatives.length ? speech.alternatives : [{ transcript: speech.transcript }]);
+    const result = handleSpeechAlternatives(speech.alternatives.length ? speech.alternatives : [{ transcript: speech.transcript }]);
+    setLastCommandResult(result);
     // Transcript handling intentionally uses the same closure pattern as the
     // Blockly listener to avoid reprocessing while a step is advancing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2124,7 +2192,7 @@ export function VoiceLessonClient({
               className="mt-4 flex flex-wrap items-end gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
-                const result = handleTranscriptCommand(completionCommand, "text");
+                const result = textCommandHandlerRef.current(completionCommand);
                 if (result.handled) setCompletionCommand("");
               }}
             >
@@ -2155,8 +2223,9 @@ export function VoiceLessonClient({
             </form>
             <p className="mt-2 text-xs text-zinc-700">Có thể nói hoặc nhập: bài tiếp theo, danh sách bài, làm lại.</p>
             {(lastFeedback || speech.errorMessage) && (
-              <p className="mt-2 text-sm text-black" role="status">{speech.errorMessage ?? lastFeedback}</p>
+              <p className="mt-2 text-sm text-black">{speech.errorMessage ?? lastFeedback}</p>
             )}
+            <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
           </div>
         </div>,
         document.body,
@@ -2181,6 +2250,7 @@ export function VoiceLessonClient({
         .scc-reduced-motion *, .scc-reduced-motion *::before, .scc-reduced-motion *::after { transition: none !important; animation: none !important; }
       `}</style>
       {completionModal}
+      {!lessonComplete && <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>}
       <div className="flex min-h-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
         <div className="border-b-4 border-black px-4 py-2">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">

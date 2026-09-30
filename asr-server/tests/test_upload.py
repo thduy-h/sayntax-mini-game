@@ -8,9 +8,65 @@ import types
 from unittest.mock import patch
 
 from fastapi import HTTPException, UploadFile
+from fastapi.testclient import TestClient
 from starlette.datastructures import Headers
 from app.audio import save_upload_to_tempfile, remove_tempfile
 from app.upload_limit import UploadLimitMiddleware
+
+
+class TranscribeRouteTests(unittest.TestCase):
+    def test_http_route_reaches_transcription_handler(self):
+        from app import main
+
+        result = {"text": "xin chao", "language": "vi", "duration": 1.0,
+                  "processing_time": 0.1, "segments": []}
+        with patch.object(main.settings, "api_token", None):
+            with patch.object(main, "transcribe_audio", return_value=result) as inference:
+                response = TestClient(main.app).post(
+                    "/transcribe", files={"file": ("speech.webm", b"audio", "audio/webm")}
+                )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["text"], "xin chao")
+        inference.assert_called_once()
+
+    def test_http_route_requires_configured_token(self):
+        from app import main
+
+        with patch.object(main.settings, "api_token", "workshop-secret"):
+            with patch.object(main, "transcribe_audio") as inference:
+                client = TestClient(main.app)
+                for authorization in (None, "Bearer wrong"):
+                    headers = {"Authorization": authorization} if authorization else {}
+                    response = client.post(
+                        "/transcribe", headers=headers,
+                        files={"file": ("speech.webm", b"audio", "audio/webm")},
+                    )
+                    self.assertEqual(response.status_code, 401)
+                inference.assert_not_called()
+
+    def test_http_route_rejects_oversized_request(self):
+        from app import main
+
+        with patch.object(main.settings, "api_token", None):
+            with patch.object(main, "transcribe_audio") as inference:
+                response = TestClient(main.app).post(
+                    "/transcribe",
+                    files={"file": ("speech.webm", b"a" * (main.settings.max_upload_bytes + 1), "audio/webm")},
+                )
+                self.assertEqual(response.status_code, 413)
+                inference.assert_not_called()
+
+    def test_http_route_rejects_unsupported_media(self):
+        from app import main
+
+        with patch.object(main.settings, "api_token", None):
+            with patch.object(main, "transcribe_audio") as inference:
+                response = TestClient(main.app).post(
+                    "/transcribe", files={"file": ("speech.txt", b"audio", "text/plain")}
+                )
+                self.assertEqual(response.status_code, 415)
+                inference.assert_not_called()
 
 
 class UploadTests(unittest.IsolatedAsyncioTestCase):

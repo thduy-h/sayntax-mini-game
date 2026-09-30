@@ -38,7 +38,6 @@ def health() -> HealthResponse:
     return HealthResponse(status="ok", model=settings.model, device=device, compute_type=compute_type)
 
 
-@app.post("/transcribe", response_model=TranscribeResponse)
 def validate_api_token(authorization: str | None) -> None:
     if not settings.api_token:
         return
@@ -47,6 +46,7 @@ def validate_api_token(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+@app.post("/transcribe", response_model=TranscribeResponse)
 async def transcribe(
     file: Annotated[UploadFile, File(...)],
     authorization: Annotated[str | None, Header()] = None,

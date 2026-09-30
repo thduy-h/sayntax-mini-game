@@ -8,7 +8,7 @@ const studentLinks = [
   { href: "/lessons-v2", label: "Bài học" },
   { href: "/dashboard#progress", label: "Tiến độ" },
   { href: "/role-models", label: "Hình mẫu công nghệ" },
-  { href: "/onboarding", label: "Trợ giúp" },
+  { href: "/lessons-v2#help", label: "Trợ giúp" },
 ] as const;
 
 const adminLinks = [

@@ -86,6 +86,16 @@ export default async function LessonsV2Page() {
           );
         })}
       </section>
+      <Card className="bg-white" id="help">
+        <CardHeader>
+          <CardTitle>Cách học bằng giọng nói</CardTitle>
+          <CardDescription>Mở một bài, đọc yêu cầu của bước hiện tại, rồi bấm “Bắt đầu nói”.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-zinc-800">
+          <p>Mỗi bước có một câu mẫu. Em có thể nói câu đó hoặc nhập vào thanh lệnh ở cuối màn hình và bấm “Thực hiện”.</p>
+          <p>Nếu micro chưa sẵn sàng, nhập lệnh vẫn dùng được. Trong bài học, nói “gợi ý” để xem trợ giúp cho bước đang làm.</p>
+        </CardContent>
+      </Card>
     </main>
   );
 }

@@ -15,20 +15,20 @@ export default async function DemoLessonPage({ params }: DemoLessonPageProps) {
   if (!lesson) notFound();
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-6">
-      <nav className="flex flex-wrap items-center justify-between gap-3 rounded-[1.2rem] border-4 border-black bg-white px-4 py-3 shadow-[6px_6px_0_#121212]">
-        <div className="flex flex-wrap items-baseline gap-3">
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6 lg:h-[calc(100dvh-var(--global-command-bar-height,0px))]">
+      <nav className="flex flex-wrap items-center justify-between gap-2 rounded-[1.2rem] border-4 border-black bg-white px-3 py-2 shadow-[6px_6px_0_#121212] sm:px-4 sm:py-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-3">
           <BrandLogo className="w-[120px]" />
           <Link className="text-xs font-black uppercase text-black underline decoration-2 underline-offset-4" href="/demo">
             ← Danh sách demo
           </Link>
-          <h1 className="font-heading text-2xl text-black sm:text-3xl">{lesson.title}</h1>
+          <h1 className="font-heading min-w-0 break-words text-xl text-black sm:text-3xl">{lesson.title}</h1>
         </div>
-        <p className="rounded border-2 border-black bg-[#e7fff3] px-3 py-1 text-xs font-black uppercase text-black">
+        <p className="hidden rounded border-2 border-black bg-[#e7fff3] px-3 py-1 text-xs font-black uppercase text-black sm:block">
           Chế độ demo — lưu trên thiết bị này
         </p>
       </nav>
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1">
         <VoiceLessonClient
           lesson={lesson}
           mode="demo"

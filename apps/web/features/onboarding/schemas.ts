@@ -14,3 +14,14 @@ export const onboardingSchema = z.object({
   reducedMotion: z.boolean().optional(),
   schoolName: z.string().max(200, "Tên trường tối đa 200 ký tự.").optional(),
 });
+
+export function studentProfileFromOnboarding(userId: string, data: z.infer<typeof onboardingSchema>) {
+  return {
+    user_id: userId,
+    age_range: data.ageRange || null,
+    display_name: data.displayName,
+    goals: data.goals || null,
+    grade_level: data.gradeLevel || null,
+    school_name: data.schoolName || null,
+  };
+}

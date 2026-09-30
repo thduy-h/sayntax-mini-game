@@ -104,6 +104,10 @@ export function describeIntent(intent: VoiceIntent): string {
       }`;
     case "run_program":
       return "chạy chương trình";
+    case "navigate_step":
+      if (intent.target === "previous") return "về bước trước";
+      if (intent.target === "next") return "sang bước sau";
+      return `đến bước ${intent.stepNumber}`;
     case "ask_hint":
       return "mở gợi ý";
     case "check_work":

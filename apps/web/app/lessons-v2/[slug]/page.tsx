@@ -39,23 +39,23 @@ export default async function LessonV2DetailPage({ params }: LessonV2DetailPageP
     .maybeSingle();
 
   return (
-    <main className="mx-auto flex h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-6">
-      <AppNav />
+    <main className="mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6 lg:h-[calc(100dvh-var(--global-command-bar-height,0px))]">
+      <div className="hidden lg:block"><AppNav /></div>
       <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex items-baseline gap-3">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-3">
           <Link
             className="text-xs font-black uppercase text-black underline decoration-2 underline-offset-4"
             href="/lessons-v2"
           >
             ← Quay lại
           </Link>
-          <h1 className="font-heading text-2xl text-black sm:text-3xl">{lesson.title}</h1>
+          <h1 className="font-heading min-w-0 break-words text-2xl text-black sm:text-3xl">{lesson.title}</h1>
         </div>
         <p className="text-xs font-semibold text-zinc-700">
           {lesson.stepCount} bước · ~{lesson.estimatedMinutes} phút · {lesson.learningGoals[0]}
         </p>
       </header>
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 min-w-0 flex-1">
         <VoiceLessonClient
           lesson={lesson}
           initialStepIndex={initialStepIndex}

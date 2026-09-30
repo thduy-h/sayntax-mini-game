@@ -17,6 +17,12 @@ import {
   speechStatusAnnouncement,
   type SpeechAnnouncementState,
 } from "../utils/accessible-announcements";
+import {
+  acknowledgeVoiceProcessing,
+  canStartVoiceRecognition,
+  hasAcknowledgedVoiceProcessing,
+  VOICE_PROCESSING_DISCLOSURE,
+} from "../utils/voice-privacy";
 
 type ActionElement = HTMLAnchorElement | HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
@@ -69,6 +75,7 @@ export function GlobalVoiceControl() {
   const lastFinalResultIdRef = useRef(0);
   const [expanded, setExpanded] = useState(false);
   const [enabled, setEnabled] = useState(false);
+  const [voicePrivacyAcknowledged, setVoicePrivacyAcknowledged] = useState(false);
   const [feedback, setFeedback] = useState("Nói: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, hoặc trợ giúp.");
   const [lastCommand, setLastCommand] = useState<GlobalVoiceCommand | null>(null);
   const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
@@ -77,6 +84,10 @@ export function GlobalVoiceControl() {
   const previousCommandRef = useRef<GlobalVoiceCommand | null>(null);
   const lastAnnouncementRef = useRef("");
   const hiddenForWorkspace = isWorkspaceVoiceRoute(pathname);
+
+  useEffect(() => {
+    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage));
+  }, []);
 
   const announce = useCallback((message: string | null, repeatEvent = false) => {
     const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
@@ -138,6 +149,7 @@ export function GlobalVoiceControl() {
   function start() {
     if (hiddenForWorkspace) return;
     setExpanded(true);
+    if (!voicePrivacyAcknowledged) return;
     setEnabled(true);
     void speech.startListening();
   }
@@ -269,10 +281,29 @@ export function GlobalVoiceControl() {
             </button>
           </div>
 
+          {!voicePrivacyAcknowledged && (
+            <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-2 text-xs text-black">
+              <p>{VOICE_PROCESSING_DISCLOSURE}</p>
+              <Button
+                className="mt-2"
+                onClick={() => {
+                  acknowledgeVoiceProcessing(window.localStorage);
+                  setVoicePrivacyAcknowledged(true);
+                  setEnabled(true);
+                  void speech.startListening();
+                }}
+                size="sm"
+                type="button"
+              >
+                Đồng ý dùng giọng nói (không lưu lệnh)
+              </Button>
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-2">
             <Button
               aria-label={speech.isListening ? "Dừng nghe điều khiển web" : "Bắt đầu nghe điều khiển web"}
-              disabled={!speech.isSupportKnown || !speech.isSupported || speech.isStarting}
+              disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged) || speech.isStarting}
               onClick={() => {
                 setEnabled(true);
                 if (speech.isListening) void speech.stopListening();

@@ -64,7 +64,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                   <Input id="displayName" name="displayName" placeholder="Chúng tôi nên gọi bạn là gì?" required />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ageRange">Độ tuổi</Label>
+                  <Label htmlFor="ageRange">Độ tuổi (không bắt buộc)</Label>
                   <select
                     className="min-h-12 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900"
                     defaultValue=""
@@ -81,27 +81,19 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="gradeLevel">Khối lớp</Label>
+                  <Label htmlFor="gradeLevel">Khối lớp (không bắt buộc)</Label>
                   <Input id="gradeLevel" name="gradeLevel" placeholder="Ví dụ: Lớp 7" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="schoolName">Trường hoặc chương trình học</Label>
+                  <Label htmlFor="schoolName">Trường hoặc chương trình học (không bắt buộc)</Label>
                   <Input id="schoolName" name="schoolName" placeholder="Không bắt buộc" />
                 </div>
               </div>
               {appUser.role === "student" ? (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="goals">Mục tiêu học tập</Label>
+                    <Label htmlFor="goals">Mục tiêu học tập (không bắt buộc)</Label>
                     <Textarea id="goals" name="goals" placeholder="Bạn muốn học hoặc tạo ra điều gì trước?" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="disabilitySupportNotes">Ghi chú hỗ trợ</Label>
-                    <Textarea
-                      id="disabilitySupportNotes"
-                      name="disabilitySupportNotes"
-                      placeholder="Chia sẻ các hỗ trợ hoặc điều chỉnh tương tác có thể giúp bạn học tốt hơn."
-                    />
                   </div>
                 </>
               ) : null}
@@ -158,6 +150,10 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                 />
               </div>
             </section>
+
+            <p className="text-sm leading-6 text-slate-600">
+              Trong pilot, nếu muốn nhận bản sao hoặc yêu cầu xóa dữ liệu tài khoản, hãy liên hệ người phụ trách chương trình của bạn.
+            </p>
 
             <FormSubmitButton pendingLabel="Đang lưu thiết lập..." size="lg">
               Hoàn tất thiết lập

@@ -1,5 +1,14 @@
 # SAYNTAX pilot operations
 
+The [privacy and data governance decision pass](privacy-data-governance.md) now
+records approved pilot collection choices and remaining release work. Lesson
+command logging defaults off and requires a separate opt-in for each lesson
+session. The 30-day voice-log retention target is not automatically enforced.
+Before real-user registration, establish the assisted export/deletion request
+channel, verify speech-provider behavior, and assign backup and host-log
+retention. SQL `ON DELETE CASCADE` alone is not a user-facing account deletion
+process.
+
 Server failures emit one-line JSON to stderr (Vercel function logs):
 `progress_write_failure`, `program_save_failure`, `program_run_failure`,
 `voice_log_failure`, `auth_failure`, `onboarding_failure`.

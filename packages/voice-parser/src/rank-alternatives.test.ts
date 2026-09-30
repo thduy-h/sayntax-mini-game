@@ -48,4 +48,8 @@ const nearAsr = rankSpeechAlternatives([{ transcript: "tạo vòng lập" }], ad
 assert.equal(nearAsr.status, "accept");
 assert.deepEqual(nearAsr.best.intent, { kind: "add_block", blockType: "repeat" });
 
+const navigation = rankSpeechAlternatives([{ confidence: 0.95, transcript: "bước trước" }], addRepeatContext);
+assert.equal(navigation.status, "accept");
+assert.deepEqual(navigation.best.intent, { kind: "navigate_step", target: "previous" });
+
 console.log("rank-alternatives tests passed");

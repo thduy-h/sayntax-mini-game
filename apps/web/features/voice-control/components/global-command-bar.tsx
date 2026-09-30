@@ -21,6 +21,7 @@ export function GlobalCommandBar() {
   const [collapsed, setCollapsed] = useState(false);
   const barRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const wasWorkspaceRef = useRef(false);
   const hiddenForModal = workspace?.modalOpen === true;
   const contextLabel = workspace ? `Điều khiển bài học: ${workspace.lessonTitle}` : "Điều khiển website";
   const sampleUtterance = workspace?.sampleUtterance ?? null;
@@ -55,6 +56,23 @@ export function GlobalCommandBar() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    const focusCommandBar = () => {
+      setCollapsed(false);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    };
+    window.addEventListener("scc:focus-command-bar", focusCommandBar);
+    return () => window.removeEventListener("scc:focus-command-bar", focusCommandBar);
+  }, []);
+
+  useEffect(() => {
+    const inWorkspace = Boolean(workspace);
+    if (inWorkspace && !wasWorkspaceRef.current) {
+      window.queueMicrotask(() => setCollapsed(true));
+    }
+    wasWorkspaceRef.current = inWorkspace;
+  }, [workspace]);
 
   function sendCommand(value: string) {
     const result = submitCommand(value);
@@ -94,7 +112,7 @@ export function GlobalCommandBar() {
     >
       <section
         aria-label="Thanh nhập lệnh toàn cục"
-        className="scc-voice-debug-panel w-full max-w-4xl rounded-[1rem] border-4 border-black bg-white p-3 text-black shadow-[8px_8px_0_#121212]"
+        className="scc-voice-debug-panel max-h-[65dvh] w-full max-w-4xl overflow-y-auto rounded-[1rem] border-4 border-black bg-white p-3 text-black shadow-[8px_8px_0_#121212]"
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
@@ -121,7 +139,7 @@ export function GlobalCommandBar() {
             sendCommand(command);
           }}
         >
-          <label className="min-w-[220px] flex-1 text-xs font-black uppercase tracking-[0.12em] text-black" htmlFor="globalCommandInput">
+          <label className="min-w-0 basis-full flex-1 text-xs font-black uppercase tracking-[0.12em] text-black sm:basis-[220px]" htmlFor="globalCommandInput">
             Nhập lệnh
             <Input
               ref={inputRef}
@@ -146,7 +164,7 @@ export function GlobalCommandBar() {
                 window.setTimeout(() => inputRef.current?.focus(), 0);
               }}
             >
-              Dùng câu mẫu
+              Điền câu mẫu vào ô
             </Button>
           )}
           {workspace?.pendingPreview && (

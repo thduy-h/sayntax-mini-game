@@ -37,6 +37,8 @@ assert.equal(describeIntent({ kind: "delete_block", target: "display_id", displa
 assert.equal(describeIntent({ kind: "delete_last" }), "xoá khối cuối");
 assert.equal(describeIntent({ kind: "move_block", target: "selected", direction: "outside" }), "di chuyển khối đang chọn ra ngoài");
 assert.equal(describeIntent({ kind: "run_program" }), "chạy chương trình");
+assert.equal(describeIntent({ kind: "navigate_step", target: "previous" }), "về bước trước");
+assert.equal(describeIntent({ kind: "navigate_step", target: "number", stepNumber: 3 }), "đến bước 3");
 assert.equal(describeIntent({ kind: "ask_hint" }), "mở gợi ý");
 assert.equal(describeIntent({ kind: "undo_last" }), "hoàn tác thao tác gần nhất");
 assert.equal(describeIntent({ kind: "unknown", reason: "no_match" }), "chưa hiểu câu lệnh");

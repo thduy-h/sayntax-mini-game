@@ -44,6 +44,7 @@ export type VoiceIntent =
       parentDisplayId?: string;
     }
   | { kind: "run_program" }
+  | { kind: "navigate_step"; target: "previous" | "next" | "number"; stepNumber?: number }
   | { kind: "ask_hint" }
   | { kind: "check_work" }
   | { kind: "explain_block" }
@@ -538,6 +539,13 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
 
   if (matchPhrasePrefix(normalized, CONFIRM_PHRASES)) return { kind: "confirm" };
   if (matchPhrasePrefix(normalized, CANCEL_PHRASES)) return { kind: "cancel" };
+  if (normalized === "buoc truoc" || normalized === "ve buoc truoc") return { kind: "navigate_step", target: "previous" };
+  if (normalized === "buoc sau" || normalized === "sang buoc sau") return { kind: "navigate_step", target: "next" };
+  const stepNavigation = normalized.match(/^(?:den|mo|chuyen den) buoc (.+)$/);
+  if (stepNavigation) {
+    const stepNumber = parseNumberPayload(stepNavigation[1]);
+    if (stepNumber !== null) return { kind: "navigate_step", target: "number", stepNumber };
+  }
   if (matchPhrasePrefix(normalized, UNDO_PHRASES)) return { kind: "undo_last" };
   if (matchPhrasePrefix(normalized, CHECK_WORK_PHRASES)) return { kind: "check_work" };
   if (matchPhrasePrefix(normalized, EXPLAIN_BLOCK_PHRASES)) return { kind: "explain_block" };

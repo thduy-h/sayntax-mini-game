@@ -10,6 +10,7 @@ export type CommandRegistryId =
   | "set_text"
   | "set_number"
   | "run_program"
+  | "navigate_step"
   | "ask_hint"
   | "undo_last"
   | "select_block"
@@ -86,6 +87,12 @@ export const COMMAND_REGISTRY = [
     intentKind: "run_program",
     canonical: "chạy chương trình",
     aliases: ["chay chuong trinh", "chay thu", "chay code", "chay di", "chay"],
+  },
+  {
+    id: "navigate_step",
+    intentKind: "navigate_step",
+    canonical: "bước trước",
+    aliases: ["buoc truoc", "ve buoc truoc", "buoc sau", "sang buoc sau", "den buoc", "mo buoc", "chuyen den buoc"],
   },
   {
     id: "ask_hint",

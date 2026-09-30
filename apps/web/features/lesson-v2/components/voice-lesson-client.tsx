@@ -11,6 +11,7 @@ import { SPEECH_RANKING_THRESHOLDS, type SpeechAlternativeInput, type ToolboxCat
 import type {
   AccessibilitySettings,
   BlockKind,
+  LessonStepEvaluationResult,
   ProgramExecutionResult,
   ProgramWorkspace,
   WorkspaceBlock,
@@ -19,6 +20,13 @@ import { Mic, MicOff, Lightbulb, Play, PanelLeftClose, PanelLeftOpen } from "luc
 import { Button } from "@/components/ui/button";
 import { useGlobalCommand } from "@/features/voice-control/components/global-command-context";
 import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
+import {
+  acknowledgeVoiceProcessing,
+  canStartVoiceRecognition,
+  hasAcknowledgedVoiceProcessing,
+  shouldPersistVoiceCommandLog,
+  VOICE_PROCESSING_DISCLOSURE,
+} from "@/features/voice-control/utils/voice-privacy";
 import {
   commandFeedbackAnnouncement,
   conciseAnnouncement,
@@ -52,6 +60,10 @@ import {
   type VoiceCommandSource,
 } from "../utils/voice-command-input";
 import { runCompletionModalCommand } from "../utils/completion-modal-command";
+import { nextLessonHint, resolveLessonCommandOutcome } from "../utils/lesson-command-outcome";
+import { completedStepAnnouncement, completedStepResult, completedStepWithFeedback, type CompletedStepResult } from "../utils/lesson-step-transition";
+import { lessonVoicePresentation } from "../utils/lesson-voice-presentation";
+import { planStepNavigation, willReplaceWorkspace, workspaceContentSignature } from "../utils/step-navigation";
 import {
   calculateWorkspacePanTarget,
   clampWorkspaceScale,
@@ -74,9 +86,17 @@ interface VoiceLessonClientProps {
   mode?: "authenticated" | "demo";
 }
 
-type PendingVoiceAction = {
-  intent: VoiceIntent;
-  preview: string;
+type PendingVoiceAction =
+  | { kind: "workspace"; intent: VoiceIntent; preview: string }
+  | { kind: "step_navigation"; fromStepIndex: number; targetIndex: number; preview: string };
+
+type StepNavigationNotice = { targetIndex: number; feedback: string };
+
+type LessonIntentApplication = {
+  applied?: boolean;
+  changed: boolean;
+  evaluation?: LessonStepEvaluationResult | null;
+  shouldEvaluate: boolean;
 };
 
 type UndoSnapshot = {
@@ -459,6 +479,11 @@ function updateBlocklyVoiceBadges(
   }
 }
 
+function selectedBlockForDisplay(workspace: Blockly.WorkspaceSvg) {
+  return (workspace.getAllBlocks(false) as Blockly.BlockSvg[])
+    .find((block) => block.getSvgRoot()?.classList.contains("blocklySelected")) ?? null;
+}
+
 function stripInstructionText(value: string) {
   return value.replace(/\*\*/g, "").trim();
 }
@@ -482,6 +507,7 @@ export function VoiceLessonClient({
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null);
+  const workspaceStarterSignatureRef = useRef<string | null>(null);
   const suppressEvaluationRef = useRef(false);
   const stepIndexRef = useRef(initialStepIndex);
   const advancingRef = useRef(false);
@@ -500,17 +526,22 @@ export function VoiceLessonClient({
   const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [hintIndex, setHintIndex] = useState(0);
+  const hintIndexRef = useRef(0);
   const [failCount, setFailCount] = useState(0);
-  const [lastFeedback, setLastFeedback] = useState<string | null>(null);
+  const [lastFeedback, setLastFeedbackState] = useState<string | null>(null);
+  const commandFeedbackRef = useRef<string | null>(null);
   const [voiceLog, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
+  const [previousStepResult, setPreviousStepResult] = useState<CompletedStepResult | null>(null);
+  const [stepNavigationNotice, setStepNavigationNotice] = useState<StepNavigationNotice | null>(null);
   const [lastIntent, setLastIntent] = useState<VoiceIntent | null>(null);
   const [lessonComplete, setLessonComplete] = useState(initialAllCompleted);
   const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
   const [lastCommandResult, setLastCommandResult] = useState<GlobalCommandExecutionResult | null>(null);
   const [completionCommand, setCompletionCommand] = useState("");
   const [voiceCursorItems, setVoiceCursorItems] = useState<VoiceCursorDisplayItem[]>([]);
+  const [selectedBlockSummary, setSelectedBlockSummary] = useState<string | null>(null);
   const [insertCursor, setInsertCursor] = useState<InsertCursor>({
     position: "end",
     targetBlockId: null,
@@ -518,7 +549,7 @@ export function VoiceLessonClient({
   });
   const [pendingAction, setPendingAction] = useState<PendingVoiceAction | null>(null);
   const [voicePrivacyAcknowledged, setVoicePrivacyAcknowledged] = useState(false);
-  const [voiceLoggingEnabled, setVoiceLoggingEnabled] = useState(true);
+  const [voiceLoggingEnabled, setVoiceLoggingEnabled] = useState(false);
   const [recognizedCommand, setRecognizedCommand] = useState("");
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspaceRetryKey, setWorkspaceRetryKey] = useState(0);
@@ -547,6 +578,11 @@ export function VoiceLessonClient({
     ? extractSampleFromInstructions(currentStep.instructions) ?? deriveSampleUtterance(currentStep.action)
     : null;
 
+  function setLastFeedback(message: string | null) {
+    commandFeedbackRef.current = message;
+    setLastFeedbackState(message);
+  }
+
   const announce = useCallback((message: string | null, repeatEvent = false) => {
     const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
     if (!next) return;
@@ -569,10 +605,13 @@ export function VoiceLessonClient({
   }, [announce, lessonComplete, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
 
   useEffect(() => {
+    const stepChanged = currentStepIndex !== previousAnnouncedStepRef.current;
     const feedbackChanged = lastFeedback !== previousFeedbackRef.current;
     const runChanged = runResult !== previousRunResultRef.current;
     const commandChanged = lastCommandResult !== previousCommandResultRef.current;
-    const message = runChanged && runResult
+    const message = stepChanged
+      ? null
+      : runChanged && runResult
       ? programResultAnnouncement(runResult, lastFeedback)
       : feedbackChanged && lastFeedback
         ? conciseAnnouncement(lastFeedback)
@@ -583,21 +622,23 @@ export function VoiceLessonClient({
     previousFeedbackRef.current = lastFeedback;
     previousRunResultRef.current = runResult;
     previousCommandResultRef.current = lastCommandResult;
-  }, [announce, lastCommandResult, lastFeedback, runResult]);
+  }, [announce, currentStepIndex, lastCommandResult, lastFeedback, runResult]);
 
   useEffect(() => {
     if (currentStepIndex === previousAnnouncedStepRef.current) return;
     previousAnnouncedStepRef.current = currentStepIndex;
     const step = lesson.steps[currentStepIndex];
     if (!step) return;
-    const result = runResult ? `${programResultAnnouncement(runResult, null)} ` : "";
-    announce(`${result}Đang ở bước ${currentStepIndex + 1}: ${step.title}.`);
-  }, [announce, currentStepIndex, lesson.steps, runResult]);
+    const completed = previousStepResult?.toStepIndex === currentStepIndex ? previousStepResult : null;
+    const navigation = stepNavigationNotice?.targetIndex === currentStepIndex ? stepNavigationNotice : null;
+    announce(completed
+      ? completedStepAnnouncement(completed, step.title)
+      : navigation?.feedback ?? `Đang ở bước ${currentStepIndex + 1}: ${step.title}.`);
+  }, [announce, currentStepIndex, lesson.steps, previousStepResult, stepNavigationNotice]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setVoicePrivacyAcknowledged(window.localStorage.getItem("scc_voice_privacy_ack") === "true");
-    setVoiceLoggingEnabled(window.localStorage.getItem("scc_voice_logging_disabled") !== "true");
+    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage));
   }, []);
 
   useEffect(() => {
@@ -624,8 +665,10 @@ export function VoiceLessonClient({
     setFailCount(0);
     setLastFeedback(null);
     setShowSkip(false);
+    hintIndexRef.current = 0;
     setHintIndex(0);
     setRunResult(null);
+    setPreviousStepResult((result) => result?.toStepIndex === currentStepIndex ? result : null);
     setLastIntent(null);
     setPendingAction(null);
     // Hold the advancing guard briefly while Blockly's load events for the
@@ -668,12 +711,77 @@ export function VoiceLessonClient({
     });
   }, [currentStepIndex, isDemoMode, lesson.slug]);
 
+  function performStepNavigation(targetIndex: number, command: string): GlobalCommandExecutionResult {
+    const target = lesson.steps[targetIndex]!;
+    const hasBlocks = Boolean(workspaceRef.current?.getAllBlocks(false).length);
+    const replacesWorkspace = willReplaceWorkspace(currentStepIndex, targetIndex, hasBlocks);
+    const feedback = `Đã chuyển đến bước ${targetIndex + 1}: ${target.title}. ${replacesWorkspace
+      ? "Workspace đã nạp nội dung bắt đầu của bước này."
+      : "Các khối hiện tại được giữ lại."}`;
+    setPendingAction(null);
+    setPreviousStepResult(null);
+    setRunResult(null);
+    setUndoSnapshot(null);
+    setLastCommandResult(null);
+    setInsertCursor({ position: "end", targetBlockId: null, workspaceId: lesson.slug });
+    if (replacesWorkspace) {
+      setVoiceCursorItems([]);
+      setSelectedBlockSummary(null);
+    }
+    lastAffectedBlockIdRef.current = null;
+    setStepNavigationNotice({ targetIndex, feedback });
+    setLastFeedback(null);
+    setCurrentStepIndex(targetIndex);
+    return makeWorkspaceCommandResult(command, feedback, true, `đến bước ${targetIndex + 1}`, null, "applied");
+  }
+
+  function requestStepNavigation(targetIndex: number, command: string, ignorePending = false): GlobalCommandExecutionResult {
+    if (pendingAction && !ignorePending) {
+      const feedback = "Hãy xác nhận hoặc hủy thao tác đang chờ trước khi chuyển bước.";
+      setLastFeedback(feedback);
+      return makeWorkspaceCommandResult(command, feedback, false, undefined, pendingAction.preview, "pending");
+    }
+    const workspace = workspaceRef.current;
+    const hasBlocks = Boolean(workspace?.getAllBlocks(false).length);
+    const currentSignature = workspace
+      ? workspaceContentSignature(Blockly.serialization.workspaces.save(workspace) as Record<string, unknown>)
+      : null;
+    const plan = planStepNavigation(
+      currentStepIndex,
+      targetIndex,
+      lesson.steps.length,
+      hasBlocks,
+      currentSignature !== null && currentSignature === workspaceStarterSignatureRef.current,
+    );
+    if (plan.status !== "navigate") {
+      const feedback = plan.status === "same"
+        ? `Em đang ở bước ${currentStepIndex + 1}.`
+        : "Không tìm thấy bước học được yêu cầu.";
+      setLastFeedback(feedback);
+      return makeWorkspaceCommandResult(command, feedback, false, undefined, null, "not_applied");
+    }
+    if (plan.needsConfirmation) {
+      const preview = `Chuyển đến bước ${targetIndex + 1} sẽ thay các khối hiện tại bằng nội dung bắt đầu của bước đó. Nói “đúng rồi” để tiếp tục hoặc “hủy” để giữ nguyên.`;
+      setPendingAction({ kind: "step_navigation", fromStepIndex: currentStepIndex, targetIndex, preview });
+      setStepNavigationNotice(null);
+      setLastFeedback(preview);
+      return makeWorkspaceCommandResult(command, preview, true, `đến bước ${targetIndex + 1}`, preview, "pending");
+    }
+    return performStepNavigation(targetIndex, command);
+  }
+
   function prevStep() {
-    setCurrentStepIndex((index) => Math.max(0, index - 1));
+    requestStepNavigation(currentStepIndex - 1, "bước trước");
   }
 
   function nextStep() {
-    setCurrentStepIndex((index) => Math.min(lesson.steps.length - 1, index + 1));
+    return requestStepNavigation(currentStepIndex + 1, "bước sau");
+  }
+
+  function targetStepIndex(intent: Extract<VoiceIntent, { kind: "navigate_step" }>) {
+    if (intent.target === "previous") return currentStepIndex - 1;
+    if (intent.target === "next") return currentStepIndex + 1;
+    return (intent.stepNumber ?? 0) - 1;
   }
 
   function resetAfterSuccess(shouldAdvance: boolean) {
@@ -685,6 +793,8 @@ export function VoiceLessonClient({
       // before React commits the state update.
       advancingRef.current = true;
       setLastFeedback(null);
+      setRunResult(null);
+      setStepNavigationNotice(null);
       setCurrentStepIndex((index) => Math.min(lesson.steps.length - 1, index + 1));
     }
   }
@@ -732,7 +842,9 @@ export function VoiceLessonClient({
     displayIdToBlockIdRef.current = index.displayIdToBlockId;
     blockIdToDisplayIdRef.current = index.blockIdToDisplayId;
     setVoiceCursorItems(index.items);
-    const selectedId = getSelectedBlock()?.id ?? null;
+    const selectedId = selectedBlockForDisplay(workspace)?.id ?? null;
+    const selectedItem = index.items.find((item) => item.blockId === selectedId);
+    setSelectedBlockSummary(selectedItem ? `Khối ${selectedItem.displayId}: ${selectedItem.label}` : null);
     updateBlocklyVoiceBadges(workspace, index.items, selectedId, insertCursor.targetBlockId);
   }
 
@@ -849,6 +961,10 @@ export function VoiceLessonClient({
       setLastFeedback("Không tìm thấy nhóm khối này.");
       return false;
     }
+    if (toolboxInstance.getSelectedItem()?.getId() === item.getId()) {
+      setLastFeedback(`Nhóm khối ${TOOLBOX_CATEGORY_LABEL[category]} đã mở.`);
+      return false;
+    }
     toolboxInstance.setSelectedItem(item);
     toolboxInstance.refreshSelection();
     item.getDiv()?.scrollIntoView({ block: "nearest" });
@@ -871,12 +987,18 @@ export function VoiceLessonClient({
     const workspace = workspaceRef.current;
     if (!workspace) {
       setLastFeedback("Workspace chưa sẵn sàng.");
-      return { changed: false, shouldEvaluate: false };
+      return { applied: false, changed: false, shouldEvaluate: false };
     }
     if (intent.kind === "pan_workspace") {
       const metrics = workspace.getMetricsManager().getMetrics();
       const next = calculateWorkspacePanTarget(metrics, intent.direction);
       workspace.scroll(next.x, next.y);
+      const after = workspace.getMetricsManager().getMetrics();
+      const moved = Math.abs(after.viewLeft - metrics.viewLeft) > 0.5 || Math.abs(after.viewTop - metrics.viewTop) > 0.5;
+      if (!moved) {
+        setLastFeedback("Workspace đã ở mép này. Em có thể cuộn theo hướng khác hoặc nói: vừa màn hình.");
+        return { applied: false, changed: false, shouldEvaluate: false };
+      }
       setLastFeedback(
         {
           down: "Đã cuộn workspace xuống.",
@@ -885,44 +1007,50 @@ export function VoiceLessonClient({
           up: "Đã cuộn workspace lên.",
         }[intent.direction],
       );
-      return { changed: false, shouldEvaluate: false };
+      return { applied: true, changed: false, shouldEvaluate: false };
     }
     if (intent.kind === "center_workspace") {
       if (intent.target === "selected_block") {
-        centerBlockInWorkspace(workspace, getSelectedBlock() ?? getLastAffectedBlock(workspace), "Chưa có khối đang chọn để đưa về giữa.");
-        return { changed: false, shouldEvaluate: false };
+        const applied = centerBlockInWorkspace(workspace, getSelectedBlock() ?? getLastAffectedBlock(workspace), "Chưa có khối đang chọn để đưa về giữa.");
+        return { applied, changed: false, shouldEvaluate: false };
       }
       if (intent.target === "display_id") {
-        centerBlockInWorkspace(
+        const applied = centerBlockInWorkspace(
           workspace,
           intent.displayId ? getBlockByDisplayId(workspace, intent.displayId) : null,
           `Không tìm thấy khối ${intent.displayId}. Vị trí workspace không bị thay đổi.`,
         );
-        return { changed: false, shouldEvaluate: false };
+        return { applied, changed: false, shouldEvaluate: false };
       }
       const start = (workspace.getTopBlocks(true) as Blockly.BlockSvg[]).find((candidate) => candidate.type === "scc_start") ?? null;
       if (start) workspace.centerOnBlock(start.id);
       else workspace.zoomToFit();
       setLastFeedback("Đã đưa chương trình về giữa.");
-      return { changed: false, shouldEvaluate: false };
+      return { applied: true, changed: false, shouldEvaluate: false };
     }
     if (intent.level === "fit") {
       workspace.zoomToFit();
       workspace.setScale(clampWorkspaceScale(workspace.scale, 0.7, 0.85));
       setLastFeedback("Đã hiển thị toàn bộ chương trình vừa màn hình.");
-      return { changed: false, shouldEvaluate: false };
+      return { applied: true, changed: false, shouldEvaluate: false };
     }
     if (intent.level === "reset") {
+      const wasDefaultScale = Math.abs(workspace.scale - 0.85) < 0.001;
       workspace.setScale(0.85);
       const start = (workspace.getTopBlocks(true) as Blockly.BlockSvg[]).find((candidate) => candidate.type === "scc_start") ?? null;
       if (start) workspace.centerOnBlock(start.id);
-      setLastFeedback("Đã đặt lại zoom workspace.");
-      return { changed: false, shouldEvaluate: false };
+      setLastFeedback(wasDefaultScale && !start ? "Zoom đã ở mức mặc định." : "Đã đặt lại zoom workspace.");
+      return { applied: !wasDefaultScale || Boolean(start), changed: false, shouldEvaluate: false };
     }
-    workspace.setScale(clampWorkspaceScale(workspace.scale * (intent.level === "in" ? 1.15 : 0.87)));
+    const nextScale = clampWorkspaceScale(workspace.scale * (intent.level === "in" ? 1.15 : 0.87));
+    if (Math.abs(nextScale - workspace.scale) < 0.001) {
+      setLastFeedback(intent.level === "in" ? "Đã ở mức phóng to tối đa." : "Đã ở mức thu nhỏ tối đa.");
+      return { applied: false, changed: false, shouldEvaluate: false };
+    }
+    workspace.setScale(nextScale);
     Blockly.svgResize(workspace);
     setLastFeedback(intent.level === "in" ? "Đã phóng to workspace." : "Đã thu nhỏ workspace.");
-    return { changed: false, shouldEvaluate: false };
+    return { applied: true, changed: false, shouldEvaluate: false };
   }
 
   function isBlockCompatibleWithAction(block: Blockly.BlockSvg, action: LessonStepAction) {
@@ -1033,15 +1161,30 @@ export function VoiceLessonClient({
   }
 
   function advanceHint() {
-    if (!currentStep?.hints.length) return;
-    setHintIndex((index) => (index + 1) % currentStep.hints.length);
+    const next = nextLessonHint(currentStep?.hints ?? [], hintIndexRef.current);
+    if (!next) return null;
+    hintIndexRef.current = next.index;
+    setHintIndex(next.index);
+    return next.feedback;
+  }
+
+  function deliverHintFeedback(feedback: string, evaluation: LessonStepEvaluationResult | null) {
+    if (evaluation?.completed && currentStepIndex < lesson.steps.length - 1) {
+      setPreviousStepResult((result) => completedStepWithFeedback(result, currentStepIndex, feedback));
+      return;
+    }
+    setLastFeedback(feedback);
   }
 
   function requestHintFromButton() {
-    advanceHint();
-    if (currentStep.action.kind === "ask_hint") {
-      evaluateAndMaybeAdvance({ kind: "ask_hint" });
+    setStepNavigationNotice(null);
+    const feedback = advanceHint();
+    if (!feedback) {
+      setLastFeedback("Bước này chưa có gợi ý để xem.");
+      return;
     }
+    const evaluation = currentStep.action.kind === "ask_hint" ? evaluateAndMaybeAdvance({ kind: "ask_hint" }) : null;
+    deliverHintFeedback(feedback, evaluation);
   }
 
   function captureUndoSnapshot(label: string) {
@@ -1115,12 +1258,12 @@ export function VoiceLessonClient({
     });
   }
 
-  function persistVoiceCommandLog(transcript: string, intent: VoiceIntent, outcome: { changed: boolean; shouldEvaluate: boolean }) {
+  function persistVoiceCommandLog(transcript: string, intent: VoiceIntent, outcome: LessonIntentApplication) {
     if (!currentStep) return;
-    if (!shouldUseServerPersistence(mode)) return;
-    if (!voiceLoggingEnabled) return;
+    if (!shouldPersistVoiceCommandLog(mode, voiceLoggingEnabled)) return;
     const isUnknown = intent.kind === "unknown";
-    const status = isUnknown ? "unsupported" : outcome.changed || outcome.shouldEvaluate ? "success" : "error";
+    const applied = outcome.applied ?? outcome.changed;
+    const status = isUnknown ? "unsupported" : applied ? "success" : "error";
     void fetch("/api/voice-command-logs", {
       body: JSON.stringify({
         failureReason: isUnknown ? intent.reason : status === "error" ? "intent_not_applied" : null,
@@ -1138,47 +1281,63 @@ export function VoiceLessonClient({
     });
   }
 
-  function evaluateAndMaybeAdvance(intent?: VoiceIntent) {
-    if (advancingRef.current) return;
+  function evaluateAndMaybeAdvance(intent?: VoiceIntent): LessonStepEvaluationResult | null {
+    if (advancingRef.current) return null;
     const workspace = workspaceRef.current;
-    if (!workspace || !currentStep) return;
+    if (!workspace || !currentStep) return null;
     // Only run_program is allowed to evaluate without an explicit user intent.
     // Bare workspace events (CREATE/MOVE bursts during load) must NOT trigger
     // an unrelated step's evaluator — they previously caused 1->4 cascades.
     if (!intent && currentStep.action.kind !== "set_text" && currentStep.action.kind !== "set_number" && currentStep.action.kind !== "set_variable_output" && currentStep.action.kind !== "insert_into" && currentStep.action.kind !== "add_block") {
-      return;
+      return null;
     }
     const program = toProgram(workspace);
     const exec = intent?.kind === "run_program" ? executeProgram(program) : SUCCESS_EXECUTION;
     if (intent?.kind === "run_program") {
-      setRunResult(exec);
       persistProgramRun(program, exec);
     }
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
-    setLastFeedback(evaluation.feedback);
+    if (intent?.kind === "run_program" && (!evaluation.completed || currentStepIndex >= lesson.steps.length - 1)) {
+      setRunResult(exec);
+    }
     if (evaluation.completed) {
+      if (currentStepIndex >= lesson.steps.length - 1 && intent?.kind !== "ask_hint") setLastFeedback(evaluation.feedback);
+      const completed = completedStepResult(
+        evaluation,
+        currentStepIndex,
+        lesson.steps.length,
+        currentStep.title,
+        intent?.kind === "run_program" ? exec : null,
+      );
+      setPreviousStepResult(completed);
       persistStepCompleted(currentStep.id);
       markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
-      return;
+      return evaluation;
     }
+    setLastFeedback(evaluation.feedback);
     setFailCount((count) => count + 1);
+    return evaluation;
   }
 
   function runProgramFromButton() {
+    setStepNavigationNotice(null);
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return;
     const program = toProgram(workspace);
     const exec = executeProgram(program);
-    setRunResult(exec);
     persistProgramRun(program, exec);
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
-    setLastFeedback(evaluation.feedback);
+    if (!evaluation.completed || currentStepIndex >= lesson.steps.length - 1) setRunResult(exec);
     if (evaluation.completed) {
+      if (currentStepIndex >= lesson.steps.length - 1) setLastFeedback(evaluation.feedback);
+      const completed = completedStepResult(evaluation, currentStepIndex, lesson.steps.length, currentStep.title, exec);
+      setPreviousStepResult(completed);
       persistStepCompleted(currentStep.id);
       markStepPassed();
       resetAfterSuccess(currentStepIndex < lesson.steps.length - 1);
     } else {
+      setLastFeedback(evaluation.feedback);
       setFailCount((count) => count + 1);
     }
   }
@@ -1196,7 +1355,15 @@ export function VoiceLessonClient({
     // write the new value into the connected text_literal reporter (creating
     // one if the slot is empty).
     if (target.type === "scc_print" && intent.kind === "set_text") {
+      if (!target.getInput("TEXT")?.connection) {
+        setLastFeedback("Khối in đang chọn không có ô chữ. Hãy chọn hoặc thêm một khối in khác.");
+        return false;
+      }
       let textLiteral = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
+      if (textLiteral?.type === "scc_text_literal" && String(textLiteral.getFieldValue("VALUE") ?? "") === value) {
+        setLastFeedback(`Khối in đã có nội dung “${value}”. Em có thể chọn khối khác hoặc tiếp tục.`);
+        return false;
+      }
       if (!textLiteral || textLiteral.type !== "scc_text_literal") {
         const created = workspace.newBlock("scc_text_literal") as Blockly.BlockSvg;
         created.initSvg();
@@ -1216,6 +1383,10 @@ export function VoiceLessonClient({
         textLiteral = created;
       }
       textLiteral.setFieldValue(value, "VALUE");
+      if (String(textLiteral.getFieldValue("VALUE") ?? "") !== value) {
+        setLastFeedback("Chưa đặt được chữ vào khối in. Hãy thử lại hoặc chọn một khối in khác.");
+        return false;
+      }
       rememberAffectedBlock(target as Blockly.BlockSvg);
       return true;
     }
@@ -1224,7 +1395,16 @@ export function VoiceLessonClient({
       setLastFeedback("Không tìm thấy ô dữ liệu phù hợp trong khối đang chọn.");
       return false;
     }
+    const previousValue = String(target.getFieldValue(fieldName) ?? "");
+    if (previousValue === value) {
+      setLastFeedback(`Giá trị đã là “${value}”. Em có thể chọn khối khác hoặc tiếp tục.`);
+      return false;
+    }
     target.setFieldValue(value, fieldName);
+    if (String(target.getFieldValue(fieldName) ?? "") === previousValue) {
+      setLastFeedback("Giá trị trong khối chưa thay đổi. Hãy kiểm tra khối đang chọn rồi thử lại.");
+      return false;
+    }
     rememberAffectedBlock(target as Blockly.BlockSvg);
     return true;
   }
@@ -1235,6 +1415,15 @@ export function VoiceLessonClient({
     const target = resolveVoiceEditTargetBlock(workspace, intent);
     if (!target || target.type !== "scc_print") {
       setLastFeedback("Hãy chọn khối in trước khi nói in biến.");
+      return false;
+    }
+    const currentInput = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
+    if (currentInput?.type === "scc_variable_get" && String(currentInput.getFieldValue("NAME") ?? "") === intent.name) {
+      setLastFeedback(`Khối in đã dùng biến ${intent.name}. Em có thể tiếp tục.`);
+      return false;
+    }
+    if (!target.getInput("TEXT")?.connection) {
+      setLastFeedback("Khối in đang chọn không có ô dữ liệu. Hãy chọn hoặc thêm một khối in khác.");
       return false;
     }
     setPrintVariableInput(workspace, target as Blockly.BlockSvg, intent.name);
@@ -1497,7 +1686,7 @@ export function VoiceLessonClient({
     return previewConfirmation(intent);
   }
 
-  function applyIntentToWorkspace(intent: VoiceIntent) {
+  function applyIntentToWorkspace(intent: VoiceIntent): LessonIntentApplication {
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return { changed: false, shouldEvaluate: false };
     switch (intent.kind) {
@@ -1521,13 +1710,14 @@ export function VoiceLessonClient({
         setCursorForBlock(block, "after");
         setLastFeedback(`Đã chọn ${describeBlock(block)}.`);
         refreshVoiceCursor();
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: false };
       }
       case "set_insert_cursor": {
         if (intent.position === "end") {
+          const alreadyAtEnd = insertCursor.position === "end";
           setInsertCursor({ position: "end", targetBlockId: null, workspaceId: lesson.slug });
-          setLastFeedback("Vị trí chèn hiện tại là cuối chương trình.");
-          return { changed: false, shouldEvaluate: false };
+          setLastFeedback(alreadyAtEnd ? "Vị trí chèn đã ở cuối chương trình." : "Vị trí chèn hiện tại là cuối chương trình.");
+          return { applied: !alreadyAtEnd, changed: false, shouldEvaluate: false };
         }
         const target = resolveInsertCursorTarget(workspace, intent);
         if (!target) {
@@ -1543,6 +1733,11 @@ export function VoiceLessonClient({
           setLastFeedback(`Khối ${displayId || "này"} không hỗ trợ chèn vào trong. Em có thể chèn trước hoặc chèn sau khối này.`);
           return { changed: false, shouldEvaluate: false };
         }
+        const alreadyThere = insertCursor.position === intent.position && insertCursor.targetBlockId === target.id;
+        if (alreadyThere) {
+          setLastFeedback(`Vị trí chèn đã ở ${cursorPositionLabel(insertCursor)}.`);
+          return { applied: false, changed: false, shouldEvaluate: false };
+        }
         target.select();
         setCursorForBlock(target, intent.position);
         setLastFeedback(`Đã đặt vị trí chèn ${cursorPositionLabel({
@@ -1552,7 +1747,7 @@ export function VoiceLessonClient({
           workspaceId: lesson.slug,
         })}.`);
         refreshVoiceCursor();
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: false };
       }
       case "query_position": {
         const selected = getSelectedBlock() ?? getLastAffectedBlock(workspace);
@@ -1561,26 +1756,37 @@ export function VoiceLessonClient({
             ? `Em đang chọn ${describeBlock(selected)}. Vị trí chèn là ${cursorPositionLabel(insertCursor)}.`
             : `Chưa chọn khối nào. Vị trí chèn là ${cursorPositionLabel(insertCursor)}.`,
         );
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: false };
       }
       case "pan_workspace":
       case "center_workspace":
       case "zoom_workspace":
         return applyWorkspaceViewportAction(intent);
       case "set_toolbox_visibility":
+        if (toolboxOpen === intent.visible) {
+          setLastFeedback(intent.visible ? "Danh sách khối đã mở." : "Danh sách khối đã thu gọn.");
+          return { applied: false, changed: false, shouldEvaluate: false };
+        }
         setBlocklyToolboxOpen(intent.visible);
         setLastFeedback(intent.visible ? "Đã mở danh sách khối." : "Đã thu gọn danh sách khối.");
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: false };
       case "open_toolbox_category":
-        openBlocklyToolboxCategory(intent.category);
-        return { changed: false, shouldEvaluate: false };
-      case "close_toolbox_category":
+        return { applied: openBlocklyToolboxCategory(intent.category), changed: false, shouldEvaluate: false };
+      case "close_toolbox_category": {
+        if (!workspace.getToolbox()?.getSelectedItem()) {
+          setLastFeedback("Chưa mở nhóm khối nào để đóng.");
+          return { applied: false, changed: false, shouldEvaluate: false };
+        }
         workspace.getToolbox()?.setSelectedItem(null);
         setLastFeedback("Đã đóng nhóm khối.");
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: false };
+      }
       case "add_block": {
         const blocklyType = typeMap[intent.blockType];
-        if (!blocklyType) return { changed: false, shouldEvaluate: false };
+        if (!blocklyType) {
+          setLastFeedback("Khối này chưa có trong workspace. Em có thể chọn khối trong danh sách hiện có.");
+          return { changed: false, shouldEvaluate: false };
+        }
         const block = workspace.newBlock(blocklyType) as Blockly.BlockSvg;
         block.initSvg();
         block.render();
@@ -1648,17 +1854,26 @@ export function VoiceLessonClient({
       case "move_block":
         return { changed: moveBlockByIntent(intent), shouldEvaluate: false };
       case "run_program":
-        return { changed: false, shouldEvaluate: true };
-      case "ask_hint":
-        advanceHint();
-        return { changed: false, shouldEvaluate: currentStep.action.kind === "ask_hint" };
-      case "check_work":
-        evaluateAndMaybeAdvance(intent);
-        return { changed: false, shouldEvaluate: false };
+        return { applied: true, changed: false, shouldEvaluate: true };
+      case "navigate_step":
+        return { applied: false, changed: false, shouldEvaluate: false };
+      case "ask_hint": {
+        const feedback = advanceHint();
+        if (!feedback) {
+          setLastFeedback("Bước này chưa có gợi ý để xem. Em có thể xem lại yêu cầu hiện tại.");
+          return { applied: false, changed: false, shouldEvaluate: false };
+        }
+        commandFeedbackRef.current = feedback;
+        return { applied: true, changed: false, shouldEvaluate: currentStep.action.kind === "ask_hint" };
+      }
+      case "check_work": {
+        const evaluation = evaluateAndMaybeAdvance(intent);
+        return { applied: evaluation !== null, changed: false, evaluation, shouldEvaluate: false };
+      }
       case "explain_block": {
         const selected = getSelectedBlock() ?? getLastAffectedBlock(workspace);
         setLastFeedback(selected ? `${describeBlock(selected)}. Khối này dùng để ${getBlocklyBlockVoiceLabel(selected).toLowerCase()}.` : "Hãy chọn một khối trước để mình giải thích.");
-        return { changed: false, shouldEvaluate: false };
+        return { applied: Boolean(selected), changed: false, shouldEvaluate: false };
       }
       case "confirm":
       case "cancel":
@@ -1671,21 +1886,37 @@ export function VoiceLessonClient({
     }
   }
 
-  function executePendingAction(transcript: string) {
-    if (!pendingAction) return;
-    suppressEvaluationRef.current = true;
-    if (isUndoableIntent(pendingAction.intent)) {
-      captureUndoSnapshot(describeIntent(pendingAction.intent));
+  function executePendingAction(transcript: string): GlobalCommandExecutionResult | null {
+    if (!pendingAction) return null;
+    if (pendingAction.kind === "step_navigation") {
+      if (pendingAction.fromStepIndex !== currentStepIndex) {
+        const feedback = "Bước học đã thay đổi. Hãy yêu cầu chuyển bước lại nếu em vẫn muốn đi tiếp.";
+        setPendingAction(null);
+        setLastFeedback(feedback);
+        return makeWorkspaceCommandResult(transcript, feedback, false, undefined, null, "not_applied");
+      }
+      return performStepNavigation(pendingAction.targetIndex, transcript);
     }
-    const outcome = applyIntentToWorkspace(pendingAction.intent);
-    persistVoiceCommandLog(transcript, pendingAction.intent, outcome);
-    const executedIntent = pendingAction.intent;
+    const intent = pendingAction.intent;
+    if (intent.kind === "navigate_step") {
+      setPendingAction(null);
+      return requestStepNavigation(targetStepIndex(intent), transcript, true);
+    }
+    commandFeedbackRef.current = null;
+    suppressEvaluationRef.current = true;
+    if (isUndoableIntent(intent)) {
+      captureUndoSnapshot(describeIntent(intent));
+    }
+    const outcome = applyIntentToWorkspace(intent);
+    const actionFeedback = commandFeedbackRef.current;
+    persistVoiceCommandLog(transcript, intent, outcome);
     setPendingAction(null);
     window.setTimeout(() => {
       suppressEvaluationRef.current = false;
     }, 50);
-    if (outcome.shouldEvaluate) evaluateAndMaybeAdvance(executedIntent);
+    const evaluation = outcome.shouldEvaluate ? evaluateAndMaybeAdvance(intent) : outcome.evaluation ?? null;
     refreshVoiceCursor();
+    return finishLessonCommand(transcript, intent, outcome, actionFeedback, evaluation);
   }
 
   function cancelPendingAction(transcript?: string) {
@@ -1700,13 +1931,36 @@ export function VoiceLessonClient({
     handled: boolean,
     understoodAs?: string,
     pendingPreview?: string | null,
+    outcome?: GlobalCommandExecutionResult["outcome"],
   ): GlobalCommandExecutionResult {
-    return { command, feedback, handled, pendingPreview, target: "workspace", understoodAs };
+    return { command, feedback, handled, outcome, pendingPreview, target: "workspace", understoodAs };
+  }
+
+  function finishLessonCommand(
+    command: string,
+    intent: VoiceIntent,
+    application: LessonIntentApplication,
+    actionFeedback: string | null,
+    evaluation: LessonStepEvaluationResult | null,
+  ): GlobalCommandExecutionResult {
+    const understoodAs = describeIntent(intent);
+    const result = resolveLessonCommandOutcome({
+      actionFeedback,
+      applied: application.applied ?? application.changed,
+      evaluation,
+      intentKind: intent.kind,
+      understoodAs,
+    });
+    if (intent.kind === "ask_hint" && result.outcome === "applied") deliverHintFeedback(result.feedback, evaluation);
+    else if (!evaluation?.completed) setLastFeedback(result.feedback);
+    return makeWorkspaceCommandResult(command, result.feedback, result.handled, understoodAs, null, result.outcome);
   }
 
   function restartLesson() {
     setLessonComplete(false);
     setCurrentStepIndex(0);
+    setPreviousStepResult(null);
+    setStepNavigationNotice(null);
     setRunResult(null);
     setLastFeedback(null);
     setCompletionCommand("");
@@ -1727,83 +1981,83 @@ export function VoiceLessonClient({
           : "Hộp thoại hoàn thành chỉ nhận: bài tiếp theo, danh sách bài, hoặc làm lại.";
     setRecognizedCommand(command);
     setLastFeedback(feedback);
-    return { command, feedback, handled: action !== null, target: "workspace", understoodAs: action ?? undefined };
+    return { command, feedback, handled: action !== null, outcome: action ? "applied" : "not_applied", target: "workspace", understoodAs: action ?? undefined };
   }
 
   function handleTranscriptCommand(rawTranscript: string, source: VoiceCommandSource = "microphone"): GlobalCommandExecutionResult {
     if (lessonComplete) return handleCompletionCommand(rawTranscript);
     const parsed = parseVoiceCommandInput(source, rawTranscript);
-    if (!parsed) return makeWorkspaceCommandResult(rawTranscript, "Hãy nhập một câu lệnh.", false);
+    if (!parsed) return makeWorkspaceCommandResult(rawTranscript, "Hãy nhập một câu lệnh.", false, undefined, null, "not_applied");
     const { intent, transcript } = parsed;
     const understoodAs = describeIntent(intent);
     if (source === "microphone" && transcript === lastTranscriptRef.current) {
-      return makeWorkspaceCommandResult(transcript, "Đã bỏ qua câu lệnh trùng.", false, understoodAs);
+      return makeWorkspaceCommandResult(transcript, "Đã bỏ qua câu lệnh trùng.", false, understoodAs, null, "not_applied");
     }
     if (source === "microphone") lastTranscriptRef.current = transcript;
     if (advancingRef.current) {
-      return makeWorkspaceCommandResult(transcript, "Bài học đang chuyển bước. Vui lòng thử lại sau giây lát.", false, understoodAs);
+      return makeWorkspaceCommandResult(transcript, "Bài học đang chuyển bước. Vui lòng thử lại sau giây lát.", false, understoodAs, null, "not_applied");
     }
     setRecognizedCommand(transcript);
     setVoiceLog((items) => [...items, transcript].slice(-5));
     setLastIntent(intent);
     if (pendingAction) {
       if (intent.kind === "confirm") {
-        executePendingAction(transcript);
-        return makeWorkspaceCommandResult(transcript, "Đã xác nhận và thực hiện thao tác.", true, understoodAs);
+        return executePendingAction(transcript)
+          ?? makeWorkspaceCommandResult(transcript, "Không còn thao tác nào cần xác nhận.", false, understoodAs, null, "not_applied");
       }
       if (intent.kind === "cancel") {
         cancelPendingAction(transcript);
-        return makeWorkspaceCommandResult(transcript, "Đã hủy thao tác.", true, understoodAs);
+        return makeWorkspaceCommandResult(transcript, "Đã hủy thao tác.", true, understoodAs, null, "applied");
       }
       setLastFeedback("Em hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.");
-      return makeWorkspaceCommandResult(transcript, "Em hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.", false, understoodAs, pendingAction.preview);
+      return makeWorkspaceCommandResult(transcript, "Em hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.", false, understoodAs, pendingAction.preview, "pending");
     }
+    if (intent.kind !== "navigate_step") setStepNavigationNotice(null);
     if (intent.kind === "confirm") {
       setLastFeedback("Hiện không có hành động nào cần xác nhận.");
       persistVoiceCommandLog(transcript, intent, { changed: false, shouldEvaluate: false });
-      return makeWorkspaceCommandResult(transcript, "Hiện không có hành động nào cần xác nhận.", false, understoodAs);
+      return makeWorkspaceCommandResult(transcript, "Hiện không có hành động nào cần xác nhận.", false, understoodAs, null, "not_applied");
     }
     if (intent.kind === "cancel") {
       setLastFeedback("Hiện không có hành động nào cần hủy.");
       persistVoiceCommandLog(transcript, intent, { changed: false, shouldEvaluate: false });
-      return makeWorkspaceCommandResult(transcript, "Hiện không có hành động nào cần hủy.", false, understoodAs);
+      return makeWorkspaceCommandResult(transcript, "Hiện không có hành động nào cần hủy.", false, understoodAs, null, "not_applied");
     }
     if (intent.kind === "undo_last") {
       const changed = restoreUndoSnapshot();
       persistVoiceCommandLog(transcript, intent, { changed, shouldEvaluate: false });
-      return makeWorkspaceCommandResult(transcript, changed ? "Đã hoàn tác thao tác gần nhất." : "Chưa có thao tác nào để hoàn tác.", changed, understoodAs);
+      return makeWorkspaceCommandResult(transcript, changed ? "Đã hoàn tác thao tác gần nhất." : "Chưa có thao tác nào để hoàn tác.", changed, understoodAs, null, changed ? "applied" : "not_applied");
+    }
+    if (intent.kind === "navigate_step") {
+      return requestStepNavigation(targetStepIndex(intent), transcript);
     }
     if (requiresConfirmation(intent)) {
+      commandFeedbackRef.current = null;
       const preview = prepareDangerousAction(intent);
       if (preview) {
-        setPendingAction({ intent, preview });
+        setPendingAction({ kind: "workspace", intent, preview });
         setLastFeedback(preview);
         persistVoiceCommandLog(transcript, intent, { changed: false, shouldEvaluate: false });
-        return makeWorkspaceCommandResult(transcript, preview, true, understoodAs, preview);
+        return makeWorkspaceCommandResult(transcript, preview, true, understoodAs, preview, "pending");
       }
-      return makeWorkspaceCommandResult(transcript, lastFeedback ?? "Không thể chuẩn bị thao tác này.", false, understoodAs);
+      return makeWorkspaceCommandResult(transcript, commandFeedbackRef.current ?? "Không thể chuẩn bị thao tác này.", false, understoodAs, null, "not_applied");
     }
+    commandFeedbackRef.current = null;
     suppressEvaluationRef.current = true;
     if (isUndoableIntent(intent)) {
       captureUndoSnapshot(describeIntent(intent));
     }
     const outcome = applyIntentToWorkspace(intent);
+    const actionFeedback = commandFeedbackRef.current;
     persistVoiceCommandLog(transcript, intent, outcome);
     // Hold suppression briefly so any sync Blockly events from newBlock()
     // / connect() don't slip past before we run the user-driven evaluation.
     window.setTimeout(() => {
       suppressEvaluationRef.current = false;
     }, 50);
-    if (outcome.shouldEvaluate) evaluateAndMaybeAdvance(intent);
+    const evaluation = outcome.shouldEvaluate ? evaluateAndMaybeAdvance(intent) : outcome.evaluation ?? null;
     refreshVoiceCursor();
-    return makeWorkspaceCommandResult(
-      transcript,
-      intent.kind === "unknown"
-        ? `Mình chưa hiểu câu lệnh này. Vị trí chèn vẫn là ${cursorPositionLabel(insertCursor)}.`
-        : `Đã xử lý: ${understoodAs}.`,
-      intent.kind !== "unknown",
-      understoodAs,
-    );
+    return finishLessonCommand(transcript, intent, outcome, actionFeedback, evaluation);
   }
 
   function formatSpeechRankingCandidates(candidates: ReturnType<typeof rankVoiceCommandAlternatives>["candidates"]) {
@@ -1816,7 +2070,7 @@ export function VoiceLessonClient({
   function handleSpeechAlternatives(alternatives: readonly SpeechAlternativeInput[]): GlobalCommandExecutionResult {
     const heardTranscript = alternatives[0]?.transcript.trim() ?? "";
     if (lessonComplete) return handleCompletionCommand(heardTranscript);
-    if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false);
+    if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false, undefined, null, "unsupported");
     const ranking = rankVoiceCommandAlternatives(
       alternatives,
       createVoiceCommandRankingContext(currentStep?.action, sampleUtterance),
@@ -1826,7 +2080,7 @@ export function VoiceLessonClient({
       setRecognizedCommand(heardTranscript);
       setLastIntent({ kind: "unknown", reason: "empty" });
       setLastFeedback("Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.");
-      return makeWorkspaceCommandResult(heardTranscript, "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false, "chưa hiểu câu lệnh");
+      return makeWorkspaceCommandResult(heardTranscript, "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false, "chưa hiểu câu lệnh", null, "unsupported");
     }
 
     if (ranking.status === "reject") {
@@ -1836,7 +2090,7 @@ export function VoiceLessonClient({
       setVoiceLog((items) => [...items, heardTranscript].slice(-5));
       setLastFeedback(feedback);
       persistVoiceCommandLog(heardTranscript, best.intent, { changed: false, shouldEvaluate: false });
-      return makeWorkspaceCommandResult(heardTranscript, feedback, false, describeIntent(best.intent));
+      return makeWorkspaceCommandResult(heardTranscript, feedback, false, describeIntent(best.intent), null, "not_applied");
     }
 
     if (ranking.status === "confirm") {
@@ -1850,16 +2104,16 @@ export function VoiceLessonClient({
         setVoiceLog((items) => [...items, heardTranscript].slice(-5));
         setLastFeedback(feedback);
         persistVoiceCommandLog(heardTranscript, best.intent, { changed: false, shouldEvaluate: false });
-        return makeWorkspaceCommandResult(heardTranscript, feedback, false, describeIntent(best.intent));
+        return makeWorkspaceCommandResult(heardTranscript, feedback, false, describeIntent(best.intent), null, "not_applied");
       }
       const preview = `Hệ thống nghe chưa chắc: ${describeIntent(best.intent)}. Nói “đúng rồi” để thực hiện, hoặc “hủy” để bỏ qua.`;
       setRecognizedCommand(heardTranscript);
       setLastIntent(best.intent);
       setVoiceLog((items) => [...items, heardTranscript].slice(-5));
-      setPendingAction({ intent: best.intent, preview });
+      setPendingAction({ kind: "workspace", intent: best.intent, preview });
       setLastFeedback(preview);
       persistVoiceCommandLog(heardTranscript, best.intent, { changed: false, shouldEvaluate: false });
-      return makeWorkspaceCommandResult(heardTranscript, preview, true, describeIntent(best.intent), preview);
+      return makeWorkspaceCommandResult(heardTranscript, preview, true, describeIntent(best.intent), preview, "pending");
     }
 
     const result = handleTranscriptCommand(best.transcript, "microphone");
@@ -1934,6 +2188,7 @@ export function VoiceLessonClient({
     return () => {
       workspaceRef.current?.dispose();
       workspaceRef.current = null;
+      workspaceStarterSignatureRef.current = null;
       setWorkspaceReady(false);
     };
   }, [workspaceRetryKey]);
@@ -1948,17 +2203,19 @@ export function VoiceLessonClient({
     const workspace = workspaceRef.current;
     if (!workspaceReady || !workspace || !currentStep) return;
     const prevIndex = prevStepIndexRef.current;
-    const isInitialLoad = workspace.getAllBlocks(false).length === 0;
-    const isAdjacentForward = currentStepIndex === prevIndex + 1;
+    const hasBlocks = workspace.getAllBlocks(false).length > 0;
     prevStepIndexRef.current = currentStepIndex;
     // Adjacent forward advance: don't touch the workspace.
-    if (!isInitialLoad && isAdjacentForward) {
+    if (!willReplaceWorkspace(prevIndex, currentStepIndex, hasBlocks)) {
       return;
     }
     // Backward, jump, or first load: reset to this step's starter.
     suppressEvaluationRef.current = true;
     workspace.clear();
     Blockly.serialization.workspaces.load(starterStateFromWorkspace(currentStep.starterWorkspace), workspace);
+    workspaceStarterSignatureRef.current = workspaceContentSignature(
+      Blockly.serialization.workspaces.save(workspace) as Record<string, unknown>,
+    );
     window.setTimeout(refreshVoiceCursor, 0);
     const id = window.setTimeout(() => {
       suppressEvaluationRef.current = false;
@@ -2011,7 +2268,7 @@ export function VoiceLessonClient({
   useEffect(() => {
     const workspace = workspaceRef.current;
     if (!workspace) return;
-    updateBlocklyVoiceBadges(workspace, voiceCursorItems, getSelectedBlock()?.id ?? null, insertCursor.targetBlockId);
+    updateBlocklyVoiceBadges(workspace, voiceCursorItems, selectedBlockForDisplay(workspace)?.id ?? null, insertCursor.targetBlockId);
   }, [insertCursor, voiceCursorItems]);
 
   useEffect(() => {
@@ -2123,6 +2380,23 @@ export function VoiceLessonClient({
   }
 
   const activeHint = currentStep.hints[hintIndex % Math.max(currentStep.hints.length, 1)];
+  const voicePresentation = lessonVoicePresentation({
+    asrState: speech.asrState,
+    errorMessage: speech.errorMessage,
+    isSupportKnown: speech.isSupportKnown,
+    isSupported: speech.isSupported,
+    outcome: pendingAction ? "pending" : lastCommandResult?.outcome,
+    privacyAcknowledged: voicePrivacyAcknowledged,
+  });
+  const voiceToneClass = {
+    active: "bg-[#7df2c3]",
+    ready: "bg-white",
+    success: "bg-[#c8f5d8]",
+    warning: "bg-[#fff0a8]",
+    working: "bg-[#a8e6ff]",
+  }[voicePresentation.tone];
+  const visiblePreviousStepResult = previousStepResult?.toStepIndex === currentStepIndex ? previousStepResult : null;
+  const visibleStepNavigationNotice = stepNavigationNotice?.targetIndex === currentStepIndex ? stepNavigationNotice : null;
   const fontSize = accessibilitySettings?.fontScale === "x-large" ? "1.2rem" : accessibilitySettings?.fontScale === "large" ? "1.1rem" : "1rem";
   const accessibilityClass = [
     accessibilitySettings?.highContrast ? "scc-high-contrast" : "",
@@ -2137,14 +2411,14 @@ export function VoiceLessonClient({
           ref={completionModalRef}
           aria-labelledby="lesson-complete-title"
           aria-modal="true"
-          className="fixed inset-0 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm"
+          className="fixed inset-0 flex min-w-0 items-center justify-center bg-black/45 p-2 backdrop-blur-sm sm:p-4"
           role="dialog"
           style={{ zIndex: "var(--z-completion-modal)" }}
           tabIndex={-1}
         >
-          <div className="w-full max-w-lg rounded-[1.4rem] border-4 border-black bg-[#fff6fb] p-6 shadow-[10px_10px_0_#121212]">
+          <div className="max-h-[calc(100dvh-1rem)] min-w-0 w-full max-w-lg overflow-y-auto overscroll-contain rounded-[1.4rem] border-4 border-black bg-[#fff6fb] p-3 shadow-[10px_10px_0_#121212] sm:max-h-[calc(100dvh-2rem)] sm:p-6">
             <p className="text-xs font-black uppercase tracking-[0.22em] text-black">Hoàn thành</p>
-            <h2 id="lesson-complete-title" className="font-heading mt-2 text-3xl text-black">Xong bài &quot;{lesson.title}&quot;!</h2>
+            <h2 id="lesson-complete-title" className="font-heading mt-2 break-words text-2xl text-black sm:text-3xl">Xong bài &quot;{lesson.title}&quot;!</h2>
             <p className="mt-3 text-sm text-zinc-800">
               Bạn đã làm xong toàn bộ {lesson.steps.length} bước. Tiếp tục để học khái niệm tiếp theo, hoặc làm lại bài này nếu muốn ôn.
             </p>
@@ -2162,14 +2436,14 @@ export function VoiceLessonClient({
               {nextLesson ? (
                 <Link
                   href={nextLessonHref}
-                  className="inline-flex min-h-10 items-center rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
+                  className="inline-flex min-h-10 min-w-0 max-w-full items-center break-words rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
                 >
                   Bài tiếp theo: {nextLesson.title} →
                 </Link>
               ) : (
                 <Link
                   href={lessonsHref}
-                  className="inline-flex min-h-10 items-center rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
+                  className="inline-flex min-h-10 min-w-0 max-w-full items-center break-words rounded-[0.75rem] border-4 border-black bg-[#a8e6ff] px-4 py-2 text-sm font-black uppercase text-black shadow-[4px_4px_0_#121212] transition hover:-translate-y-0.5"
                 >
                   Đã xong toàn bộ - Về danh sách
                 </Link>
@@ -2189,14 +2463,14 @@ export function VoiceLessonClient({
               </Button>
             </div>
             <form
-              className="mt-4 flex flex-wrap items-end gap-2"
+              className="mt-4 flex min-w-0 flex-wrap items-end gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 const result = textCommandHandlerRef.current(completionCommand);
                 if (result.handled) setCompletionCommand("");
               }}
             >
-              <label className="min-w-0 flex-1 text-sm font-semibold text-black" htmlFor="completion-command">
+              <label className="min-w-0 basis-full flex-1 text-sm font-semibold text-black sm:basis-[180px]" htmlFor="completion-command">
                 Nhập lệnh hoàn thành
                 <input
                   className="mt-1 min-h-10 w-full rounded border-2 border-black bg-white px-3 py-2 text-black"
@@ -2208,7 +2482,7 @@ export function VoiceLessonClient({
               <Button size="sm" type="submit">Thực hiện</Button>
               <Button
                 aria-label={speech.isListening ? "Dừng nghe lệnh hoàn thành" : "Nói lệnh hoàn thành"}
-                disabled={!speech.isSupportKnown || !speech.isSupported || !voicePrivacyAcknowledged}
+                disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
                 onClick={() => {
                   if (speech.isListening) void speech.stopListening();
                   else void speech.startListening();
@@ -2221,6 +2495,26 @@ export function VoiceLessonClient({
                 {speech.isListening ? "Dừng" : "Nói"}
               </Button>
             </form>
+            {!voicePrivacyAcknowledged && (
+              <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-3 text-xs text-black">
+                <p>Giọng nói có thể được xử lý qua Groq, máy chủ SAYNTAX hoặc dịch vụ trình duyệt. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
+                <details className="mt-1">
+                  <summary className="cursor-pointer font-semibold underline underline-offset-2">Xem thông tin đầy đủ về giọng nói</summary>
+                  <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
+                </details>
+                <Button
+                  className="mt-2"
+                  onClick={() => {
+                    acknowledgeVoiceProcessing(window.localStorage);
+                    setVoicePrivacyAcknowledged(true);
+                  }}
+                  size="sm"
+                  type="button"
+                >
+                  Đồng ý, bật giọng nói
+                </Button>
+              </div>
+            )}
             <p className="mt-2 text-xs text-zinc-700">Có thể nói hoặc nhập: bài tiếp theo, danh sách bài, làm lại.</p>
             {(lastFeedback || speech.errorMessage) && (
               <p className="mt-2 text-sm text-black">{speech.errorMessage ?? lastFeedback}</p>
@@ -2234,14 +2528,14 @@ export function VoiceLessonClient({
 
   return (
     <section
-      className={`relative grid h-full min-h-0 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)] ${accessibilityClass}`}
+      className={`relative grid min-h-0 min-w-0 gap-3 lg:h-full lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)] ${accessibilityClass}`}
       style={{ fontSize }}
     >
       <style>{`
         .scc-voice-badge { pointer-events: none; }
         .scc-voice-badge rect { fill: #121212; stroke: #ffffff; stroke-width: 2px; }
         .scc-voice-badge text { fill: #ffffff; font: 700 12px system-ui, sans-serif; pointer-events: none; }
-        .scc-voice-selected .blocklyPath { stroke: #006bff !important; stroke-width: 4px !important; }
+        .scc-voice-selected .blocklyPath { stroke: #0052cc !important; stroke-width: 6px !important; filter: drop-shadow(0 0 0.2rem #ffffff) drop-shadow(0 0 0.2rem #0052cc); }
         .scc-voice-cursor .blocklyPath { filter: drop-shadow(0 0 0.35rem #ff5f87); }
         .scc-high-contrast .blocklyMainBackground { fill: #ffffff !important; }
         .scc-high-contrast, .scc-high-contrast * { color-scheme: light; }
@@ -2251,8 +2545,8 @@ export function VoiceLessonClient({
       `}</style>
       {completionModal}
       {!lessonComplete && <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>}
-      <div className="flex min-h-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
-        <div className="border-b-4 border-black px-4 py-2">
+      <div className="flex min-h-0 min-w-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
+        <div className="border-b-4 border-black px-3 py-3 sm:px-4">
           <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">
             Bước {currentStepIndex + 1} / {lesson.steps.length}
             {isChallenge && (
@@ -2261,8 +2555,8 @@ export function VoiceLessonClient({
               </span>
             )}
           </p>
-          <p className="mt-0.5 text-base font-bold text-black">{currentStep.title}</p>
-          <p className="mt-0.5 line-clamp-2 text-xs text-zinc-700">
+          <h2 className="mt-1 text-[1.15em] font-bold leading-snug text-black">{currentStep.title}</h2>
+          <p className="mt-1 text-[0.95em] leading-relaxed text-zinc-800">
             {splitBoldSegments(currentStep.instructions).map((seg, i) =>
               seg.bold ? (
                 <strong key={i} className="font-black text-black">
@@ -2274,15 +2568,66 @@ export function VoiceLessonClient({
             )}
           </p>
           {sampleUtterance && (
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-600">
-                Câu mẫu
-              </span>
-              <span className="rounded border-2 border-black bg-[#fff6fb] px-2 py-0.5 font-mono text-[11px] font-semibold text-black">
-                “{sampleUtterance}”
-              </span>
+            <p className="mt-2 break-words text-[0.9em] text-zinc-800">Em có thể nói: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>
+          )}
+          <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border-2 border-black bg-[#fffdf3] p-2">
+            <Button
+              aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
+              aria-label={speech.isListening ? "Dừng nghe lệnh bài học" : "Bắt đầu nói lệnh bài học"}
+              aria-pressed={speech.asrState === "listening"}
+              className="min-h-12 text-[0.9em]"
+              disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
+              onClick={() => {
+                if (speech.isListening) void speech.stopListening();
+                else void speech.startListening();
+              }}
+              size="sm"
+              type="button"
+            >
+              {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+              {speech.isListening ? "Dừng nghe" : "Bắt đầu nói"}
+            </Button>
+            <span id="lesson-voice-status" className={`min-w-0 break-words rounded border-2 border-black px-2 py-1 text-[0.85em] font-bold text-black ${voiceToneClass}`}>
+              {voicePresentation.label}
+            </span>
+            {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && (
+              <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline">
+                Thử lại giọng nói
+              </Button>
+            )}
+            <button
+              className="min-h-10 text-left text-[0.85em] font-semibold text-black underline decoration-2 underline-offset-4"
+              onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))}
+              type="button"
+            >
+              Nhập thay vì nói
+            </button>
+          </div>
+          {!voicePrivacyAcknowledged && (
+            <div className="mt-2 rounded-lg border-2 border-black bg-[#fff6a8] p-2 text-[0.8em] text-black" id="lesson-voice-privacy">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="min-w-0 basis-full flex-1 sm:basis-0">Giọng nói có thể được xử lý qua Groq, máy chủ SAYNTAX hoặc dịch vụ trình duyệt. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
+                <Button
+                  className="text-[0.85em]"
+                  onClick={() => {
+                    acknowledgeVoiceProcessing(window.localStorage);
+                    setVoicePrivacyAcknowledged(true);
+                  }}
+                  size="sm"
+                  type="button"
+                >
+                  Đồng ý, bật giọng nói
+                </Button>
+              </div>
+              <details className="mt-1">
+                <summary className="cursor-pointer font-semibold underline underline-offset-2">Xem thông tin đầy đủ về giọng nói</summary>
+                <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
+              </details>
             </div>
           )}
+          <p className="mt-2 break-words rounded border-l-4 border-[#0052cc] bg-[#eef5ff] px-2 py-1 text-[0.85em] text-black">
+            <strong>Khối đang chọn:</strong> {selectedBlockSummary ?? "Chưa chọn khối. Có thể nói “chọn khối 1”."}
+          </p>
         </div>
         <div className="relative min-h-[320px] w-full flex-1 border-b-4 border-black">
           <div ref={containerRef} className="h-full min-h-[320px] w-full" />
@@ -2308,40 +2653,6 @@ export function VoiceLessonClient({
             </div>
           )}
         </div>
-        {!voicePrivacyAcknowledged && (
-          <div className="border-b-4 border-black bg-[#fff6a8] px-3 py-2 text-xs text-black">
-            <p className="font-bold">
-              {isDemoMode
-                ? "Chế độ demo chỉ lưu tiến độ trên thiết bị này. SAYNTAX không lưu âm thanh thô; giọng nói chỉ được gửi tới dịch vụ nhận dạng đang được sử dụng."
-                : "SAYNTAX không lưu âm thanh thô. Giọng nói được gửi tới dịch vụ nhận dạng đang được sử dụng; câu lệnh dạng văn bản có thể được lưu để giáo viên hỗ trợ học tập."}
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                type="button"
-                onClick={() => {
-                  window.localStorage.setItem("scc_voice_privacy_ack", "true");
-                  setVoicePrivacyAcknowledged(true);
-                }}
-              >
-                Đồng ý học bằng giọng nói
-              </Button>
-              <Button
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  window.localStorage.setItem("scc_voice_privacy_ack", "true");
-                  window.localStorage.setItem("scc_voice_logging_disabled", "true");
-                  setVoicePrivacyAcknowledged(true);
-                  setVoiceLoggingEnabled(false);
-                }}
-              >
-                Học nhưng tắt ghi log
-              </Button>
-            </div>
-          </div>
-        )}
         <div className="relative z-[var(--z-app-controls)] flex flex-wrap items-center gap-2 border-b-4 border-black bg-white px-3 py-2">
           <Button
             aria-label={toolboxOpen ? "Thu gọn danh sách khối" : "Mở danh sách khối"}
@@ -2352,29 +2663,6 @@ export function VoiceLessonClient({
           >
             {toolboxOpen ? <PanelLeftClose className="mr-2 h-4 w-4" /> : <PanelLeftOpen className="mr-2 h-4 w-4" />}
             {toolboxOpen ? "Thu gọn" : "Mở danh sách khối"}
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              if (speech.isListening) void speech.stopListening();
-              else void speech.startListening();
-            }}
-            disabled={!speech.isSupportKnown || !speech.isSupported || !voicePrivacyAcknowledged}
-          >
-            {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-            {speech.isListening ? "Dừng" : "Nói"}
-          </Button>
-          <Button
-            aria-label="Thử kết nối lại dịch vụ nhận dạng giọng nói"
-            disabled={speech.isListening || speech.isStarting}
-            onClick={() => {
-              void speech.retryASR();
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            Thử lại nhận dạng
           </Button>
           <label className="min-w-[180px] text-[10px] font-black uppercase tracking-[0.12em] text-black">
             Micro
@@ -2507,14 +2795,16 @@ export function VoiceLessonClient({
           >
             Sau →
           </Button>
+          <span className="text-xs text-zinc-600">Có thể nói hoặc nhập: “bước trước”, “bước sau”, “đến bước 3”.</span>
           {showSkip && (
             <Button
               size="sm"
               variant="secondary"
               onClick={() => {
-                nextStep();
-                setFailCount(0);
-                setShowSkip(false);
+                if (nextStep().outcome === "applied") {
+                  setFailCount(0);
+                  setShowSkip(false);
+                }
               }}
             >
               Bỏ qua
@@ -2525,20 +2815,15 @@ export function VoiceLessonClient({
           )}
           {voicePrivacyAcknowledged && (
             <Button
+              aria-pressed={voiceLoggingEnabled}
               size="sm"
               type="button"
               variant="outline"
               onClick={() => {
-                const next = !voiceLoggingEnabled;
-                setVoiceLoggingEnabled(next);
-                if (next) {
-                  window.localStorage.removeItem("scc_voice_logging_disabled");
-                } else {
-                  window.localStorage.setItem("scc_voice_logging_disabled", "true");
-                }
+                setVoiceLoggingEnabled((enabled) => !enabled);
               }}
             >
-              {voiceLoggingEnabled ? "Đang ghi log text" : "Đã tắt ghi log"}
+              {voiceLoggingEnabled ? "Tắt lưu câu lệnh" : "Bật lưu câu lệnh nói/nhập (tùy chọn)"}
             </Button>
           )}
           {isDemoMode && (
@@ -2550,6 +2835,8 @@ export function VoiceLessonClient({
                 resetDemoProgressInStorage(window.localStorage);
                 setCurrentStepIndex(0);
                 setLessonComplete(false);
+                setPreviousStepResult(null);
+                setStepNavigationNotice(null);
                 setRunResult(null);
                 setLastFeedback("Đã đặt lại bản demo.");
               }}
@@ -2558,11 +2845,38 @@ export function VoiceLessonClient({
             </Button>
           )}
         </div>
-        <div className="scc-voice-debug-panel flex min-h-[60px] min-w-0 max-w-full flex-col gap-1 overflow-hidden px-3 py-1.5 text-xs">
+        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[60px] min-w-0 max-w-full flex-col gap-1 overflow-y-auto px-3 py-1.5 text-xs" role="region" tabIndex={0}>
           {isDemoMode && (
             <p className="rounded border-2 border-black bg-[#e7fff3] px-2 py-1 font-semibold text-black">
               Chế độ demo — tiến độ chỉ được lưu trên thiết bị này.
             </p>
+          )}
+          {visibleStepNavigationNotice && (
+            <p className="min-w-0 break-words rounded border-2 border-black bg-[#e7f5ff] px-2 py-1 font-semibold text-black">
+              {visibleStepNavigationNotice.feedback}
+            </p>
+          )}
+          {visiblePreviousStepResult && (
+            <div className="min-w-0 rounded border-2 border-zinc-400 bg-zinc-50 px-2 py-1 text-zinc-700">
+              <p className="font-bold">Vừa hoàn thành bước {visiblePreviousStepResult.fromStepIndex + 1}: {visiblePreviousStepResult.stepTitle}</p>
+              <p className="break-words">{visiblePreviousStepResult.feedback}</p>
+              {visiblePreviousStepResult.runResult && (
+                <div className="mt-1 font-mono">
+                  <p className="font-bold">Đầu ra của bước vừa xong</p>
+                  {visiblePreviousStepResult.runResult.success ? (
+                    visiblePreviousStepResult.runResult.output.length > 0 ? (
+                      <ul className="list-none">
+                        {visiblePreviousStepResult.runResult.output.map((line, i) => <li key={i} className="break-words">{line}</li>)}
+                      </ul>
+                    ) : <p>(không có đầu ra)</p>
+                  ) : (
+                    <ul className="list-none text-red-700">
+                      {visiblePreviousStepResult.runResult.errors.map((error, i) => <li key={i} className="break-words">{error}</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
           )}
           {!speech.isSupportKnown && (
             <p className="text-zinc-500">
@@ -2683,7 +2997,7 @@ export function VoiceLessonClient({
             {lesson.steps.map((step, i) => (
               <li key={step.id}>
                 <button
-                  onClick={() => setCurrentStepIndex(i)}
+                  onClick={() => requestStepNavigation(i, "sidebar")}
                   className={`w-full rounded border-2 border-black px-2 py-1 text-left text-xs transition ${
                     i === currentStepIndex ? "bg-[#a8e6ff] font-black" : "bg-white hover:bg-[#fff6fb]"
                   }`}

@@ -13,6 +13,8 @@ assert.deepEqual(parseVoiceCommandInput("text", "abc xyz")?.intent, { kind: "unk
 assert.deepEqual(parseVoiceCommandInput("text", "hoàn tác")?.intent, { kind: "undo_last" });
 assert.deepEqual(parseVoiceCommandInput("text", "đúng rồi")?.intent, { kind: "confirm" });
 assert.deepEqual(parseVoiceCommandInput("text", "hủy")?.intent, { kind: "cancel" });
+assert.deepEqual(parseVoiceCommandInput("text", "bước trước")?.intent, { kind: "navigate_step", target: "previous" });
+assert.deepEqual(parseVoiceCommandInput("microphone", "đến bước 3")?.intent, { kind: "navigate_step", target: "number", stepNumber: 3 });
 
 const rankingContext = createVoiceCommandRankingContext(
   { blockType: "repeat", kind: "add_block" },

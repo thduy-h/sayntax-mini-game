@@ -265,6 +265,13 @@ assert.deepEqual(parseVoiceIntent("đang chọn gì"), { kind: "query_position" 
 assert.deepEqual(parseVoiceIntent("đúng rồi"), { kind: "confirm" });
 assert.deepEqual(parseVoiceIntent("đồng ý"), { kind: "confirm" });
 assert.deepEqual(parseVoiceIntent("hủy"), { kind: "cancel" });
+assert.deepEqual(parseVoiceIntent("bước trước"), { kind: "navigate_step", target: "previous" });
+assert.deepEqual(parseVoiceIntent("về bước trước"), { kind: "navigate_step", target: "previous" });
+assert.deepEqual(parseVoiceIntent("bước sau"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("đến bước 3"), { kind: "navigate_step", target: "number", stepNumber: 3 });
+assert.deepEqual(parseVoiceIntent("đến bước ba"), { kind: "navigate_step", target: "number", stepNumber: 3 });
+assert.deepEqual(parseVoiceIntent("chuyển đến bước 12"), { kind: "navigate_step", target: "number", stepNumber: 12 });
+assert.deepEqual(parseVoiceIntent("đến bước không rõ"), { kind: "unknown", reason: "no_match" });
 assert.deepEqual(parseVoiceIntent("hoàn tác"), { kind: "undo_last" });
 assert.deepEqual(parseVoiceIntent("quay lại"), { kind: "undo_last" });
 assert.deepEqual(parseVoiceIntent("undo"), { kind: "undo_last" });

@@ -4,6 +4,7 @@ export interface GlobalCommandExecutionResult {
   command: string;
   feedback: string;
   handled: boolean;
+  outcome?: "applied" | "not_applied" | "unsupported" | "pending";
   pendingPreview?: string | null;
   target: GlobalCommandTarget;
   understoodAs?: string;

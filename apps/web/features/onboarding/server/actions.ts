@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { logOperation } from "@/lib/operations/logger";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getCurrentAppUser } from "@/features/auth/server/data";
-import { onboardingSchema } from "@/features/onboarding/schemas";
+import { onboardingSchema, studentProfileFromOnboarding } from "@/features/onboarding/schemas";
 
 function getString(formData: FormData, key: string) {
   return formData.get(key)?.toString() ?? "";
@@ -24,7 +24,6 @@ export async function completeOnboardingAction(formData: FormData) {
   const parsed = onboardingSchema.safeParse({
     ageRange: getString(formData, "ageRange"),
     audioInstructions: getBoolean(formData, "audioInstructions"),
-    disabilitySupportNotes: getString(formData, "disabilitySupportNotes"),
     displayName: getString(formData, "displayName"),
     fontScale: getString(formData, "fontScale"),
     goals: getString(formData, "goals"),
@@ -59,15 +58,7 @@ export async function completeOnboardingAction(formData: FormData) {
   }
 
   if (user.role === "student") {
-    const { error: profileError } = await supabase.from("student_profiles").upsert({
-      user_id: user.id,
-      age_range: parsed.data.ageRange || null,
-      disability_support_notes: parsed.data.disabilitySupportNotes || null,
-      display_name: parsed.data.displayName,
-      goals: parsed.data.goals || null,
-      grade_level: parsed.data.gradeLevel || null,
-      school_name: parsed.data.schoolName || null,
-    });
+    const { error: profileError } = await supabase.from("student_profiles").upsert(studentProfileFromOnboarding(user.id, parsed.data));
 
     if (profileError) {
       logOperation("onboarding_failure", { phase: "persistence" });

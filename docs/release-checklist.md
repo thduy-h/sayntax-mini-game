@@ -13,6 +13,18 @@
 
 - [ ] Vercel production has Supabase URL/anon key, service-role key, site URL and admin allowlist.
 - [ ] Supabase migrations, RLS policies and seed lesson IDs match the release commit.
+- [ ] Run the repository pair gate: `node --import tsx scripts/lesson-seed-mapping.test.ts` (also included in `npm test`). It checks the exact five lesson and 25 step rows, step parents, duplicate IDs, and API pair guards.
+- [ ] After applying migrations and seed to **staging**, set `STAGING_SUPABASE_URL` and `STAGING_SUPABASE_SERVICE_ROLE_KEY` through the operator's secret environment, then run `node --import tsx scripts/verify-v2-seed-live.ts`. The script performs only SELECT queries; it does not prove RLS or foreign-key writes.
+- [ ] With a disposable staging student account, POST a valid V2 pair to `/api/programs`, `/api/program-runs`, and `/api/voice-command-logs`; require success and inspect the owned rows. Repeat with a wrong-parent pair and require `400`, then query with a second student and require no cross-user rows. Delete the disposable account/data after review. This is the required live FK/RLS check; no production learner account should be used.
+
+For the disposable staging write check, set `STAGING_BASE_URL` and `STAGING_STUDENT_COOKIE` in the operator environment. These commands use lesson 1, step 1. Expect `200`, `200`, `201`, then `400`; do not run them against production:
+
+```bash
+curl -i --cookie "$STAGING_STUDENT_COOKIE" -H 'Content-Type: application/json' -d '{"lessonId":"40000000-0000-0000-0000-000000000001","lessonStepId":"40000000-0000-0000-0000-000000000101","workspaceState":{"version":1,"blocks":[]}}' "$STAGING_BASE_URL/api/programs"
+curl -i --cookie "$STAGING_STUDENT_COOKIE" -H 'Content-Type: application/json' -d '{"lessonId":"40000000-0000-0000-0000-000000000001","lessonStepId":"40000000-0000-0000-0000-000000000101","workspaceState":{"version":1,"blocks":[]},"executionResult":{"errors":[],"output":[],"success":true,"variables":{}}}' "$STAGING_BASE_URL/api/program-runs"
+curl -i --cookie "$STAGING_STUDENT_COOKIE" -H 'Content-Type: application/json' -d '{"lessonId":"40000000-0000-0000-0000-000000000001","lessonStepId":"40000000-0000-0000-0000-000000000101","transcript":"staging-check","normalizedTranscript":"staging-check","parsedAction":{"type":"unknown"},"status":"unsupported"}' "$STAGING_BASE_URL/api/voice-command-logs"
+curl -i --cookie "$STAGING_STUDENT_COOKIE" -H 'Content-Type: application/json' -d '{"lessonId":"40000000-0000-0000-0000-000000000001","lessonStepId":"40000000-0000-0000-0000-000000000201","workspaceState":{"version":1,"blocks":[]}}' "$STAGING_BASE_URL/api/programs"
+```
 - [ ] A recent database backup exists and restore ownership is assigned.
 - [ ] `ASR_MODE=cloud`, `GROQ_API_KEY` and `GROQ_ASR_MODEL=whisper-large-v3-turbo` are set server-side.
 - [ ] No secret uses a `NEXT_PUBLIC_` prefix; preview and production env are separated.

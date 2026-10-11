@@ -37,7 +37,7 @@ const demoLessonPaths = [
   "/demo/variables-basics-v2",
 ];
 
-for (const path of ["/", "/demo", ...demoLessonPaths]) {
+for (const path of ["/", "/api/health", "/demo", ...demoLessonPaths]) {
   await check(`public ${path}`, async () => expectStatus(await request(path), [200]));
 }
 

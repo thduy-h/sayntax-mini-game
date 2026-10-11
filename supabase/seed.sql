@@ -1,10 +1,5 @@
 -- Seed the course, lessons, lesson steps, and inspiration content.
--- Admin bootstrap pattern:
---   1. Create the account with normal Supabase Auth signup.
---   2. Promote it manually in SQL:
---      update public.users
---      set role = 'admin', onboarding_completed = true
---      where email = 'mentor@example.com';
+-- Existing rows are left untouched when this seed is run again.
 
 insert into public.courses (
   id,
@@ -23,13 +18,7 @@ insert into public.courses (
   80,
   true
 )
-on conflict (id) do update
-set slug = excluded.slug,
-    title = excluded.title,
-    description = excluded.description,
-    audience = excluded.audience,
-    estimated_minutes = excluded.estimated_minutes,
-    is_published = excluded.is_published;
+on conflict (id) do nothing;
 
 insert into public.lessons (
   id,
@@ -97,15 +86,7 @@ insert into public.lessons (
     20,
     true
   )
-on conflict (id) do update
-set course_id = excluded.course_id,
-    slug = excluded.slug,
-    title = excluded.title,
-    summary = excluded.summary,
-    description = excluded.description,
-    order_index = excluded.order_index,
-    estimated_minutes = excluded.estimated_minutes,
-    is_published = excluded.is_published;
+on conflict (id) do nothing;
 
 insert into public.lesson_steps (
   id,
@@ -283,15 +264,7 @@ insert into public.lesson_steps (
     '{"type":"variable_then_print","name":"score","value":5}'::jsonb,
     '{"version":1,"blocks":[{"id":"seed-start","type":"start"},{"id":"seed-variable","type":"variable","fields":{"name":"score","value":5}}]}'::jsonb
   )
-on conflict (id) do update
-set lesson_id = excluded.lesson_id,
-    title = excluded.title,
-    order_index = excluded.order_index,
-    instructions = excluded.instructions,
-    hints = excluded.hints,
-    expected_result = excluded.expected_result,
-    completion_logic = excluded.completion_logic,
-    starter_workspace = excluded.starter_workspace;
+on conflict (id) do nothing;
 
 -- Hidden relational references for the five code-seeded V2 lessons. The app
 -- renders lesson content from packages/lesson-engine; these rows only satisfy
@@ -304,15 +277,7 @@ insert into public.lessons (
   ('40000000-0000-0000-0000-000000000003', '10000000-0000-0000-0000-000000000001', 'repeat-loops-v2', 'Vòng lặp cơ bản', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 103, 16, false),
   ('40000000-0000-0000-0000-000000000004', '10000000-0000-0000-0000-000000000001', 'if-basics-v2', 'Cơ bản về điều kiện if', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 104, 18, false),
   ('40000000-0000-0000-0000-000000000005', '10000000-0000-0000-0000-000000000001', 'variables-basics-v2', 'Cơ bản về biến', 'Bài học SAYNTAX V2.', 'Nội dung được cung cấp bởi lesson engine.', 105, 20, false)
-on conflict (id) do update
-set course_id = excluded.course_id,
-    slug = excluded.slug,
-    title = excluded.title,
-    summary = excluded.summary,
-    description = excluded.description,
-    order_index = excluded.order_index,
-    estimated_minutes = excluded.estimated_minutes,
-    is_published = excluded.is_published;
+on conflict (id) do nothing;
 
 insert into public.lesson_steps (
   id, lesson_id, title, order_index, instructions, hints, expected_result, completion_logic, starter_workspace
@@ -342,11 +307,7 @@ insert into public.lesson_steps (
   ('40000000-0000-0000-0000-000000000504', '40000000-0000-0000-0000-000000000005', 'Thêm khối in', 4, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
   ('40000000-0000-0000-0000-000000000505', '40000000-0000-0000-0000-000000000005', 'In giá trị biến', 5, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}'),
   ('40000000-0000-0000-0000-000000000506', '40000000-0000-0000-0000-000000000005', 'Chạy chương trình biến', 6, 'Tham chiếu lesson engine.', '{}', '{}', '{}', '{"version":1,"blocks":[]}')
-on conflict (id) do update
-set lesson_id = excluded.lesson_id,
-    title = excluded.title,
-    order_index = excluded.order_index,
-    instructions = excluded.instructions;
+on conflict (id) do nothing;
 
 insert into public.role_model_entries (
   id,
@@ -392,12 +353,4 @@ insert into public.role_model_entries (
     3,
     true
   )
-on conflict (id) do update
-set name = excluded.name,
-    headline = excluded.headline,
-    summary = excluded.summary,
-    story = excluded.story,
-    quote = excluded.quote,
-    image_path = excluded.image_path,
-    sort_order = excluded.sort_order,
-    is_published = excluded.is_published;
+on conflict (id) do nothing;

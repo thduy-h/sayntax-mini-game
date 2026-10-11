@@ -173,14 +173,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 ADMIN_ALLOWLIST_EMAILS=
 ADMIN_EMAILS=
-NEXT_PUBLIC_ADMIN_EMAILS=
 ```
 
 Notes:
 
 - Do not expose `SUPABASE_SERVICE_ROLE_KEY` to the client.
 - Do not expose `GROQ_API_KEY` or `LOCAL_ASR_TOKEN` with a `NEXT_PUBLIC_` prefix.
-- `ADMIN_ALLOWLIST_EMAILS`, `ADMIN_EMAILS`, or `NEXT_PUBLIC_ADMIN_EMAILS` can enable admin sign-up for specific emails.
+- `ADMIN_ALLOWLIST_EMAILS` or `ADMIN_EMAILS` can enable admin sign-up for specific emails. Keep these values server-side.
 - Without Supabase env values, public demo still works; sign-in/sign-up show a friendly configuration message.
 
 ## Checks

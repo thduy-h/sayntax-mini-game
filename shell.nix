@@ -23,6 +23,7 @@ pkgs.mkShell {
   buildInputs = [
     pkgs.nodejs_22
     pkgs.git
+    pkgs.supabase-cli
   ];
 
   shellHook = ''

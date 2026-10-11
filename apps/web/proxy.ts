@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getEnvSafe } from "@/lib/env";
 
 function isPublicRoute(pathname: string) {
-  return pathname === "/" || pathname === "/demo" || pathname.startsWith("/demo/");
+  return pathname === "/" || pathname === "/api/health" || pathname === "/demo" || pathname.startsWith("/demo/");
 }
 
 export async function proxy(request: NextRequest) {

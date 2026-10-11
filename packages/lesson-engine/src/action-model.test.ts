@@ -101,7 +101,7 @@ assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", fiel
   completed: false,
   feedback: "Bạn đã có nội dung rồi, nhưng chưa đúng. Hãy nói: đổi nội dung thành Tạm biệt.",
 });
-// Mismatched blockId still passes if SOME block has the field — ID is ignored.
+// A generated Blockly ID can replace the seed ID when there is one candidate.
 assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "missing", field: "text", expectedText: "Xin chào" }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_text_pass });
 assert.deepEqual(evaluateStepAction({ kind: "set_text", blockId: "print-1", field: "text", expectedText: "Xin chào" }, workspace([]), result()), {
   completed: false,
@@ -128,7 +128,7 @@ assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "print-1", fi
   completed: false,
   feedback: "Giá trị số chưa đúng. Hãy nói: đặt số 6.",
 });
-// Mismatched blockId still passes if some block has a finite number.
+// A generated Blockly ID can replace the seed ID when there is one candidate.
 assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "missing", field: "count", expectedNumber: 5 }, workspace([printBlock]), result()), { completed: true, feedback: FEEDBACK.set_number_pass });
 // Non-numeric string fails (NaN).
 assert.deepEqual(
@@ -147,6 +147,23 @@ const repeatRep: WorkspaceBlock = {
   inputs: { times: { id: "n-1", type: "number_literal", fields: { value: 7 } } },
 };
 assert.deepEqual(evaluateStepAction({ kind: "set_number", blockId: "repeat-rep", field: "times", expectedNumber: 7 }, workspace([repeatRep]), result()), { completed: true, feedback: FEEDBACK.set_number_pass });
+
+// An earlier matching block must not finish an edit meant for a later block.
+assert.equal(evaluateStepAction({ kind: "set_text", blockId: "second", field: "text", expectedText: "Xin chào" }, workspace([
+  { id: "first", type: "print", fields: { text: "Xin chào" } },
+  { id: "second", type: "print", fields: { text: "Sai" } },
+]), result()).completed, false);
+assert.equal(evaluateStepAction({ kind: "set_number", blockId: "second", field: "times", expectedNumber: 3 }, workspace([
+  { id: "first", type: "repeat", fields: { times: 3 } },
+  { id: "second", type: "repeat", fields: { times: 2 } },
+]), result()).completed, false);
+assert.equal(evaluateStepAction({ kind: "set_text", blockId: "variable", field: "name", expectedText: "diem" }, workspace([
+  { id: "variable", type: "variable", fields: { name: "sai" } },
+  { id: "print", type: "print", inputs: { text: { id: "reporter", type: "variable_get", fields: { name: "diem" } } } },
+]), result()).completed, false);
+assert.equal(evaluateStepAction({ kind: "set_text", blockId: "print", field: "text", expectedText: "diem" }, workspace([
+  { id: "print", type: "print", inputs: { text: { id: "reporter", type: "variable_get", fields: { name: "diem" } } } },
+]), result()).completed, false);
 
 // Variable output is distinct from printing the literal text "diem".
 const printVariable: WorkspaceBlock = {

@@ -50,6 +50,7 @@ export function describeIntent(intent: VoiceIntent): string {
     case "select_block":
       if (intent.target === "main") return "chọn chương trình chính";
       if (intent.target === "last") return "chọn khối cuối";
+      if (intent.target === "block_type") return `chọn khối ${BLOCK_LABEL[intent.blockType ?? "print"] ?? intent.blockType}${intent.ordinal ? ` thứ ${intent.ordinal}` : ""}`;
       return `chọn khối ${intent.displayId}`;
     case "set_insert_cursor":
       if (intent.target === "display_id" && intent.displayId) {

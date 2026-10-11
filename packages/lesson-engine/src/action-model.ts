@@ -65,10 +65,7 @@ function labelFor(blockType: BlockKind) {
 function getTextCandidate(block: { fields?: Record<string, string | number | boolean>; inputs?: Record<string, { type: BlockKind; fields?: Record<string, string | number | boolean> }> }, field: string) {
   const literal = block.fields?.[field];
   const reporter = block.inputs?.[field];
-  const reporterValue =
-    reporter?.type === "text_literal" || reporter?.type === "variable_get"
-      ? reporter.fields?.value ?? reporter.fields?.name
-      : undefined;
+  const reporterValue = reporter?.type === "text_literal" ? reporter.fields?.value : undefined;
   const candidate = reporterValue ?? literal;
   return candidate === undefined ? null : String(candidate);
 }
@@ -94,6 +91,19 @@ function hasVariableOutput(
     typeof reporter.fields?.name === "string" &&
     normalizeText(reporter.fields.name) === normalizeText(variableName)
   );
+}
+
+function editTarget(blocks: ReturnType<typeof flattenBlocks>, blockId: string, field: string) {
+  const seeded = blocks.find((block) => block.id === blockId);
+  if (seeded) return seeded;
+  const type: BlockKind | undefined = {
+    name: "variable",
+    text: "print",
+    times: "repeat",
+    value: "variable",
+  }[field] as BlockKind | undefined;
+  const candidates = type ? blocks.filter((block) => block.type === type) : blocks;
+  return candidates[candidates.length - 1] ?? null;
 }
 
 export function evaluateStepAction(
@@ -140,17 +150,13 @@ export function evaluateStepAction(
       };
     }
     case "set_text": {
-      const matchingText = blocks.some((block) => {
-        const text = getTextCandidate(block, action.field);
-        return text !== null && normalizeText(text) === normalizeText(action.expectedText);
-      });
+      const target = editTarget(blocks, action.blockId, action.field);
+      const targetText = target ? getTextCandidate(target, action.field) : null;
+      const matchingText = targetText !== null && normalizeText(targetText) === normalizeText(action.expectedText);
       if (matchingText) {
         return { completed: true, feedback: FEEDBACK.set_text_pass };
       }
-      const hasAnyTextField = blocks.some((block) => {
-        const text = getTextCandidate(block, action.field);
-        return text !== null && text.trim().length > 0;
-      });
+      const hasAnyTextField = targetText !== null && targetText.trim().length > 0;
       return hasAnyTextField
         ? {
             completed: false,
@@ -162,7 +168,8 @@ export function evaluateStepAction(
           };
     }
     case "set_number": {
-      const matchingNumber = blocks.some((block) => getNumberCandidate(block, action.field) === action.expectedNumber);
+      const target = editTarget(blocks, action.blockId, action.field);
+      const matchingNumber = target !== null && getNumberCandidate(target, action.field) === action.expectedNumber;
       return matchingNumber
         ? { completed: true, feedback: FEEDBACK.set_number_pass }
         : {
@@ -171,15 +178,13 @@ export function evaluateStepAction(
           };
     }
     case "set_variable_output": {
-      const hasCorrectVariableOutput = blocks.some((block) => hasVariableOutput(block, action.variableName));
+      const target = editTarget(blocks, action.blockId, "text");
+      const hasCorrectVariableOutput = target !== null && hasVariableOutput(target, action.variableName);
       if (hasCorrectVariableOutput) {
         return { completed: true, feedback: "Khối in đã lấy đúng giá trị của biến." };
       }
-      const printsLiteralVariableName = blocks.some((block) => {
-        if (block.type !== "print") return false;
-        const text = getTextCandidate(block, "text");
-        return text !== null && normalizeText(text) === normalizeText(action.variableName);
-      });
+      const text = target?.type === "print" ? getTextCandidate(target, "text") : null;
+      const printsLiteralVariableName = text !== null && normalizeText(text) === normalizeText(action.variableName);
       return printsLiteralVariableName
         ? {
             completed: false,

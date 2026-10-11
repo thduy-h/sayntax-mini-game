@@ -23,7 +23,7 @@ export type VoiceIntent =
       };
     }
   | { kind: "insert_into"; parentHint?: BlockKind; childHint?: BlockKind }
-  | { kind: "select_block"; target: "display_id" | "last" | "main"; displayId?: string }
+  | { kind: "select_block"; target: "display_id" | "last" | "main" | "block_type"; displayId?: string; blockType?: BlockKind; ordinal?: number }
   | {
       kind: "set_insert_cursor";
       position: "before" | "after" | "inside" | "end";
@@ -322,7 +322,10 @@ function parseVietnameseNumber(value: string): number | null {
 
 function parseNumberPayload(value: string): number | null {
   const normalized = normalizeTranscript(value);
-  if (/^\d+$/.test(normalized)) return Number(normalized);
+  if (/^\d+$/.test(normalized)) {
+    const number = Number(normalized);
+    return Number.isSafeInteger(number) ? number : null;
+  }
   return parseVietnameseNumber(normalized);
 }
 
@@ -562,7 +565,13 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
     const target = selectMatch[1].trim();
     if (target === "cuoi" || target === "cuoi cung") return { kind: "select_block", target: "last" };
     const displayId = parseDisplayIdPayload(target);
-    return displayId ? { kind: "select_block", target: "display_id", displayId } : unknown("no_match");
+    if (displayId) return { kind: "select_block", target: "display_id", displayId };
+    const typeMatch = target.match(/^(.+?)(?:\s+thu\s+(hai|ba|bon|tu|nam|\d+))?$/);
+    const blockType = typeMatch?.[1] ? findParentHint(typeMatch[1]) : undefined;
+    const ordinal = typeMatch?.[2] ? parseNumberPayload(typeMatch[2]) : undefined;
+    return blockType && (ordinal === undefined || (ordinal !== null && ordinal > 0))
+      ? { kind: "select_block", target: "block_type", blockType, ...(typeof ordinal === "number" ? { ordinal } : {}) }
+      : unknown("no_match");
   }
   if (normalized === "chon chuong trinh chinh" || normalized === "chon chuong trinh") {
     return { kind: "select_block", target: "main" };
@@ -644,6 +653,7 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
     /^(?:sua so lan thanh|doi so lan thanh|sua so thanh|doi so thanh|dat so lan lap la|dat so lan lap|dat so|gia tri(?: la)?|cho so|dat bang|so la|gan bang)\s+(.+)$/,
   );
   if (numberMatch) {
+    if (/-\s*\d/.test(original)) return unknown("no_match");
     const payload = numberMatch[1].trim();
     const parsed = parseNumberPayload(payload);
     return parsed === null ? unknown("no_match") : { kind: "set_number", value: parsed };
@@ -651,6 +661,7 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
 
   const repeatNumberMatch = normalized.match(/^(?:cho lap|lap lai|lap)\s+(.+?)\s+lan$/);
   if (repeatNumberMatch?.[1]) {
+    if (/-\s*\d/.test(original)) return unknown("no_match");
     const parsed = parseNumberPayload(repeatNumberMatch[1]);
     return parsed === null ? unknown("no_match") : { kind: "set_number", value: parsed };
   }
@@ -680,6 +691,7 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
     const fields: Extract<VoiceIntent, { kind: "add_block" }>["fields"] = {};
     let placementRemaining = remaining;
     if (matchedBlock.blockType === "repeat") {
+      if (/-\s*\d/.test(original)) return unknown("no_match");
       const times = parseRepeatTimesFromRemaining(remaining);
       if (times !== undefined) fields.times = times;
     }

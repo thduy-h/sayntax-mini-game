@@ -17,7 +17,7 @@ assert.ok(commandBar.includes("inWorkspace && !wasWorkspaceRef.current"));
 assert.ok(commandBar.includes("Điền câu mẫu vào ô"));
 assert.ok(lesson.includes("Khối đang chọn:"));
 assert.ok(lesson.includes("setSelectedBlockSummary(selectedItem"));
-assert.ok(lesson.includes('block.getSvgRoot()?.classList.contains("blocklySelected")'));
+assert.ok(lesson.includes("Blockly.common.getSelected()"));
 assert.ok(lesson.includes("max-h-[calc(100dvh-1rem)]"));
 assert.ok(lesson.includes("overflow-y-auto overscroll-contain"));
 assert.ok(demoPage.includes("min-h-[calc(100dvh-var(--global-command-bar-height,0px))]"));

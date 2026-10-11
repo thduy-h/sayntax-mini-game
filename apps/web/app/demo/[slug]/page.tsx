@@ -19,7 +19,7 @@ export default async function DemoLessonPage({ params }: DemoLessonPageProps) {
       <nav className="flex flex-wrap items-center justify-between gap-2 rounded-[1.2rem] border-4 border-black bg-white px-3 py-2 shadow-[6px_6px_0_#121212] sm:px-4 sm:py-3">
         <div className="flex min-w-0 flex-wrap items-baseline gap-3">
           <BrandLogo className="w-[120px]" />
-          <Link className="text-xs font-black uppercase text-black underline decoration-2 underline-offset-4" href="/demo">
+          <Link className="inline-flex min-h-11 items-center text-xs font-black uppercase text-black underline decoration-2 underline-offset-4" href="/demo">
             ← Danh sách demo
           </Link>
           <h1 className="font-heading min-w-0 break-words text-xl text-black sm:text-3xl">{lesson.title}</h1>

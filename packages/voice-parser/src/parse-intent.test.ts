@@ -163,6 +163,10 @@ assert.deepEqual(parseVoiceIntent("đổi số thành ba mươi lăm"), { kind: 
 assert.deepEqual(parseVoiceIntent("chọn khối 1"), { kind: "select_block", target: "display_id", displayId: "1" });
 assert.deepEqual(parseVoiceIntent("chọn khối 2 chấm 1"), { kind: "select_block", target: "display_id", displayId: "2.1" });
 assert.deepEqual(parseVoiceIntent("chọn khối cuối"), { kind: "select_block", target: "last" });
+assert.deepEqual(parseVoiceIntent("chọn khối in"), { kind: "select_block", target: "block_type", blockType: "print" });
+assert.deepEqual(parseVoiceIntent("chọn khối in thứ hai"), { kind: "select_block", target: "block_type", blockType: "print", ordinal: 2 });
+assert.equal(parseVoiceIntent("đặt số -1").kind, "unknown");
+assert.equal(parseVoiceIntent(`đặt số ${"9".repeat(320)}`).kind, "unknown");
 assert.deepEqual(parseVoiceIntent("chọn chương trình chính"), { kind: "select_block", target: "main" });
 assert.deepEqual(parseVoiceIntent("chèn trước"), { kind: "set_insert_cursor", position: "before" });
 assert.deepEqual(parseVoiceIntent("chèn sau"), { kind: "set_insert_cursor", position: "after" });

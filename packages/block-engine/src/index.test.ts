@@ -148,6 +148,13 @@ const noStartBlockResult = executeProgram(
 assert.equal(noStartBlockResult.success, false);
 assert.deepEqual(noStartBlockResult.errors, ["Chương trình cần có khối bắt đầu."]);
 
+const boundedResult = executeProgram(createWorkspace([
+  { id: "start-safe", type: "start" },
+  { id: "repeat-safe", type: "repeat", fields: { times: 1_000_000_000 }, children: [] },
+]));
+assert.equal(boundedResult.success, false);
+assert.match(boundedResult.errors.join(" "), /giới hạn chạy an toàn/);
+
 assert.throws(
   () => evaluateReporter({ id: "print-8", type: "print", fields: { text: "oops" } }, {}),
   /evaluateReporter does not handle non-reporter block kind: print/,

@@ -481,8 +481,8 @@ function updateBlocklyVoiceBadges(
 }
 
 function selectedBlockForDisplay(workspace: Blockly.WorkspaceSvg) {
-  return (workspace.getAllBlocks(false) as Blockly.BlockSvg[])
-    .find((block) => block.getSvgRoot()?.classList.contains("blocklySelected")) ?? null;
+  const selected = Blockly.common.getSelected();
+  return selected instanceof Blockly.BlockSvg && selected.workspace === workspace ? selected : null;
 }
 
 function stripInstructionText(value: string) {
@@ -525,6 +525,8 @@ export function VoiceLessonClient({
     target: "workspace",
   }));
   const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
+  const completedStepIdsRef = useRef(new Set(lesson.steps.filter((_, index) => initialAllCompleted || index < initialStepIndex).map((step) => step.id)));
+  const [demoProgressLoaded, setDemoProgressLoaded] = useState(false);
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [hintIndex, setHintIndex] = useState(0);
   const hintIndexRef = useRef(0);
@@ -645,10 +647,12 @@ export function VoiceLessonClient({
   useEffect(() => {
     if (!isDemoMode || typeof window === "undefined") return;
     const progress = readDemoProgressFromStorage(window.localStorage, lesson.slug);
+    completedStepIdsRef.current = new Set(progress.completedStepIds);
     const nextIndex = Math.min(progress.currentStepIndex, Math.max(lesson.steps.length - 1, 0));
     const allCompleted = lesson.steps.length > 0 && lesson.steps.every((step) => progress.completedStepIds.includes(step.id));
     setCurrentStepIndex(nextIndex);
     setLessonComplete(allCompleted);
+    setDemoProgressLoaded(true);
   }, [isDemoMode, lesson.slug, lesson.steps]);
 
   useEffect(() => {
@@ -658,9 +662,10 @@ export function VoiceLessonClient({
   useEffect(() => {
     // Client-side lesson changes (rare — App Router does full navigation)
     // reset to the resume point derived from persisted progress.
+    if (isDemoMode) return;
     setCurrentStepIndex(initialStepIndex);
     setLessonComplete(initialAllCompleted);
-  }, [lesson.id, initialStepIndex, initialAllCompleted]);
+  }, [lesson.id, initialStepIndex, initialAllCompleted, isDemoMode]);
 
   useEffect(() => {
     setFailCount(0);
@@ -694,15 +699,16 @@ export function VoiceLessonClient({
   // (e.g. via the sidebar or "Bước trước"). The completion card should only
   // appear when the learner is genuinely on the final completed step.
   useEffect(() => {
+    if (isDemoMode && !demoProgressLoaded) return;
     if (currentStepIndex < lesson.steps.length - 1) setLessonComplete(false);
-  }, [currentStepIndex, lesson.steps.length]);
+  }, [currentStepIndex, demoProgressLoaded, isDemoMode, lesson.steps.length]);
 
   useEffect(() => {
     if (failCount >= 3) setShowSkip(true);
   }, [failCount]);
 
   useEffect(() => {
-    if (!isDemoMode || typeof window === "undefined") return;
+    if (!isDemoMode || !demoProgressLoaded || typeof window === "undefined") return;
     const current = readDemoProgressFromStorage(window.localStorage, lesson.slug);
     if (current.currentStepIndex === currentStepIndex) return;
     writeDemoProgressToStorage(window.localStorage, lesson.slug, {
@@ -710,7 +716,7 @@ export function VoiceLessonClient({
       currentStepIndex,
       updatedAt: new Date().toISOString(),
     });
-  }, [currentStepIndex, isDemoMode, lesson.slug]);
+  }, [currentStepIndex, demoProgressLoaded, isDemoMode, lesson.slug]);
 
   function performStepNavigation(targetIndex: number, command: string): GlobalCommandExecutionResult {
     const target = lesson.steps[targetIndex]!;
@@ -804,7 +810,12 @@ export function VoiceLessonClient({
     // For the final step, mark the whole lesson complete so the celebration
     // overlay takes over. Intermediate steps just advance via resetAfterSuccess.
     if (currentStepIndex >= lesson.steps.length - 1) {
-      setLessonComplete(true);
+      const firstIncomplete = lesson.steps.findIndex((step) => !completedStepIdsRef.current.has(step.id));
+      if (firstIncomplete === -1) setLessonComplete(true);
+      else {
+        setLastFeedback(`Bước cuối đã xong. Hãy hoàn thành bước ${firstIncomplete + 1} trước khi kết thúc bài.`);
+        setCurrentStepIndex(firstIncomplete);
+      }
     }
   }
 
@@ -1231,6 +1242,7 @@ export function VoiceLessonClient({
   // any unexpected rejection (network drop, DNS flake) never surfaces to
   // the learner as an unhandled promise rejection.
   function persistStepCompleted(stepId: string) {
+    completedStepIdsRef.current.add(stepId);
     if (!shouldUseServerPersistence(mode)) {
       if (typeof window !== "undefined") {
         const current = readDemoProgressFromStorage(window.localStorage, lesson.slug);
@@ -1296,6 +1308,8 @@ export function VoiceLessonClient({
     if (advancingRef.current) return null;
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return null;
+    if (currentStep.action.kind === "ask_hint" && intent?.kind !== "ask_hint") return null;
+    if (currentStep.action.kind === "run_program" && intent?.kind !== "run_program") return null;
     // Only run_program is allowed to evaluate without an explicit user intent.
     // Bare workspace events (CREATE/MOVE bursts during load) must NOT trigger
     // an unrelated step's evaluator — they previously caused 1->4 cascades.
@@ -1338,6 +1352,11 @@ export function VoiceLessonClient({
     const program = toProgram(workspace);
     const exec = executeProgram(program);
     persistProgramRun(program, exec);
+    if (currentStep.action.kind !== "run_program") {
+      setRunResult(exec);
+      setLastFeedback("Đã chạy chương trình. Hãy thực hiện yêu cầu của bước hiện tại để tiếp tục.");
+      return;
+    }
     const evaluation = evaluateStepAction(currentStep.action, program, exec);
     if (!evaluation.completed || currentStepIndex >= lesson.steps.length - 1) setRunResult(exec);
     if (evaluation.completed) {
@@ -1509,6 +1528,7 @@ export function VoiceLessonClient({
   }
 
   function connectBlockInside(parent: Blockly.BlockSvg | null, child: Blockly.BlockSvg) {
+    if (!parent || parent === child || child.getDescendants(false).includes(parent)) return false;
     const slot = parent?.getInput("DO");
     if (!slot?.connection || !child.previousConnection) return false;
     const firstChild = slot.connection.targetBlock() as Blockly.BlockSvg | null;
@@ -1638,6 +1658,10 @@ export function VoiceLessonClient({
         setLastFeedback("Chưa tìm thấy khối cha để đưa vào trong.");
         return false;
       }
+      if (!parent.getInput("DO")?.connection || parent === block || block.getDescendants(false).includes(parent)) {
+        setLastFeedback("Không thể đưa khối vào chính nó, khối con của nó hoặc khối không chứa lệnh.");
+        return false;
+      }
       block.unplug(true);
       if (!connectBlockInside(parent, block)) {
         setLastFeedback("Khối cha này chưa hỗ trợ chứa khối bên trong.");
@@ -1728,11 +1752,15 @@ export function VoiceLessonClient({
           block = voiceCursorItems.length
             ? (workspace.getBlockById(voiceCursorItems[voiceCursorItems.length - 1]!.blockId) as Blockly.BlockSvg | null)
             : null;
+        } else if (intent.target === "block_type" && intent.blockType) {
+          const matches = buildBlocklyVoiceCursorIndex(workspace).items.filter((item) => item.type === intent.blockType);
+          const match = intent.ordinal === undefined ? matches[matches.length - 1] : matches[intent.ordinal - 1];
+          block = match ? (workspace.getBlockById(match.blockId) as Blockly.BlockSvg | null) : null;
         } else if (intent.displayId) {
           block = getBlockByDisplayId(workspace, intent.displayId);
         }
         if (!block) {
-          setLastFeedback("Chưa tìm thấy khối đó. Em có thể nói: mình đang ở đâu, hoặc chọn khối 1.");
+          setLastFeedback("Chưa tìm thấy khối đó. Hãy xem ID khối rồi thử: chọn khối 1, hoặc chọn khối in thứ hai.");
           return { changed: false, shouldEvaluate: false };
         }
         block.select();
@@ -1828,7 +1856,7 @@ export function VoiceLessonClient({
         }
         if (intent.position?.kind === "inside") {
           block.dispose(true);
-          return { changed: false, shouldEvaluate: true };
+          return { changed: false, shouldEvaluate: false };
         }
         const { x, y } = getInsertPosition(workspace);
         block.moveBy(x, y);
@@ -1839,24 +1867,31 @@ export function VoiceLessonClient({
       }
       case "insert_into": {
         const parentType = intent.parentHint ?? (currentStep.action.kind === "insert_into" ? currentStep.action.parentBlockType : undefined);
-        const childType = currentStep.action.kind === "insert_into" ? currentStep.action.childBlockType : "print";
+        const childType = intent.childHint ?? (currentStep.action.kind === "insert_into" ? currentStep.action.childBlockType : "print");
         const parentBlocklyType = parentType ? typeMap[parentType] : undefined;
         const childBlocklyType = typeMap[childType];
-        const roots = workspace.getTopBlocks(true) as Blockly.BlockSvg[];
         const parent = parentBlocklyType ? findPreferredBlockByType(workspace, parentBlocklyType) : null;
-        const child = childBlocklyType ? [...roots].reverse().find((block) => block !== parent && block.type === childBlocklyType) : undefined;
+        const selected = getSelectedBlock();
+        const candidates = childBlocklyType
+          ? (workspace.getAllBlocks(false) as Blockly.BlockSvg[]).filter((block) => block !== parent && block.type === childBlocklyType && block.previousConnection)
+          : [];
+        const child = selected && candidates.includes(selected) ? selected : candidates[candidates.length - 1];
         const input = parent?.getInput("DO");
         if (!parent || !input?.connection) {
           const parentLabel = parentType === "repeat" ? "lặp" : parentType === "if" ? "điều kiện" : "cha";
           setLastFeedback(`Chưa tìm thấy khối ${parentLabel} để đưa vào trong. Hãy thêm hoặc chọn khối ${parentLabel} trước.`);
-          return { changed: false, shouldEvaluate: true };
+          return { changed: false, shouldEvaluate: false };
         }
         if (input.connection.targetBlock()) {
           setLastFeedback("Khối cha đã có khối bên trong. Hãy chọn vị trí khác nếu cần.");
-          return { changed: false, shouldEvaluate: true };
+          return { changed: false, shouldEvaluate: false };
         }
         if (!child?.previousConnection) {
           setLastFeedback("Chưa tìm thấy khối con để đưa vào trong. Hãy thêm hoặc chọn khối con trước.");
+          return { changed: false, shouldEvaluate: false };
+        }
+        if (child.getDescendants(false).includes(parent)) {
+          setLastFeedback("Không thể đưa khối cha vào bên trong khối con của nó.");
           return { changed: false, shouldEvaluate: false };
         }
         input.connection.connect(child.previousConnection);
@@ -1868,12 +1903,12 @@ export function VoiceLessonClient({
       case "set_number": {
         const changed = setFieldFromIntent(intent);
         if (changed) setLastFeedback(`Đã ${describeIntent(intent)}.`);
-        return { changed, shouldEvaluate: true };
+        return { changed, shouldEvaluate: changed };
       }
       case "set_variable_output": {
         const changed = setVariableOutputFromIntent(intent);
         if (changed) setLastFeedback(`Đã ${describeIntent(intent)}.`);
-        return { changed, shouldEvaluate: true };
+        return { changed, shouldEvaluate: changed };
       }
       case "delete_block":
         return { changed: deleteBlockByIntent(intent), shouldEvaluate: false };
@@ -2532,7 +2567,7 @@ export function VoiceLessonClient({
               <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-3 text-xs text-black">
                 <p>Giọng nói có thể được xử lý qua Groq, máy chủ SAYNTAX hoặc dịch vụ trình duyệt. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
                 <details className="mt-1">
-                  <summary className="cursor-pointer font-semibold underline underline-offset-2">Xem thông tin đầy đủ về giọng nói</summary>
+                  <summary className="min-h-11 cursor-pointer py-2 font-semibold underline underline-offset-2 focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem thông tin đầy đủ về giọng nói</summary>
                   <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
                 </details>
                 <Button
@@ -2653,7 +2688,7 @@ export function VoiceLessonClient({
                 </Button>
               </div>
               <details className="mt-1">
-                <summary className="cursor-pointer font-semibold underline underline-offset-2">Xem thông tin đầy đủ về giọng nói</summary>
+                <summary className="min-h-11 cursor-pointer py-2 font-semibold underline underline-offset-2 focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem thông tin đầy đủ về giọng nói</summary>
                 <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
               </details>
             </div>
@@ -2926,7 +2961,7 @@ export function VoiceLessonClient({
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
           {speech.isSupportKnown && speech.isSupported && !speech.isListening && !speech.errorMessage && (
-            <p className="text-zinc-500">Đã dừng nghe. Em có thể bấm “Nói” hoặc nhập câu lệnh.</p>
+            <p className="text-zinc-500">Đã dừng nghe. Em có thể bấm “Bắt đầu nói” hoặc nhập câu lệnh.</p>
           )}
           {speech.isStarting && <p className="text-zinc-500">Micro đang khởi tạo...</p>}
           {speech.asrState === "processing" && <p className="text-zinc-500">Đang xử lý giọng nói...</p>}
@@ -3030,6 +3065,7 @@ export function VoiceLessonClient({
             {lesson.steps.map((step, i) => (
               <li key={step.id}>
                 <button
+                  aria-current={i === currentStepIndex ? "step" : undefined}
                   onClick={() => requestStepNavigation(i, "sidebar")}
                   className={`w-full rounded border-2 border-black px-2 py-1 text-left text-xs transition ${
                     i === currentStepIndex ? "bg-[#a8e6ff] font-black" : "bg-white hover:bg-[#fff6fb]"

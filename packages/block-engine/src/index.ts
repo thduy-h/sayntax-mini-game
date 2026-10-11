@@ -1,6 +1,20 @@
 import type { ProgramExecutionResult, ProgramWorkspace, WorkspaceBlock } from "@shecancode/shared-types";
 
 type PrimitiveValue = string | number | boolean;
+const MAX_EXECUTION_STEPS = 10_000;
+const MAX_NESTING_DEPTH = 64;
+const MAX_OUTPUT_LINES = 1_000;
+
+interface ExecutionBudget { remaining: number }
+
+function consumeStep(budget: ExecutionBudget, errors: string[]) {
+  if (budget.remaining <= 0) {
+    if (!errors.includes("Chương trình vượt giới hạn chạy an toàn.")) errors.push("Chương trình vượt giới hạn chạy an toàn.");
+    return false;
+  }
+  budget.remaining -= 1;
+  return true;
+}
 
 export function evaluateReporter(
   block: WorkspaceBlock,
@@ -43,11 +57,22 @@ function runBlock(
   output: string[],
   variables: Record<string, PrimitiveValue>,
   errors: string[],
+  budget: ExecutionBudget,
+  depth = 0,
 ) {
+  if (depth > MAX_NESTING_DEPTH) {
+    errors.push("Chương trình lồng quá nhiều khối.");
+    return;
+  }
+  if (!consumeStep(budget, errors)) return;
   switch (block.type) {
     case "start":
       return;
     case "print": {
+      if (output.length >= MAX_OUTPUT_LINES) {
+        errors.push("Chương trình tạo quá nhiều dòng đầu ra.");
+        return;
+      }
       const value = resolveValue(block, "text", "", variables);
       output.push(String(value));
       return;
@@ -67,7 +92,12 @@ function runBlock(
 
       const nestedBlocks = block.children ?? [];
       for (let index = 0; index < timesValue; index += 1) {
-        nestedBlocks.forEach((child) => runBlock(child, output, variables, errors));
+        if (!consumeStep(budget, errors)) break;
+        for (const child of nestedBlocks) {
+          if (errors.length) break;
+          runBlock(child, output, variables, errors, budget, depth + 1);
+        }
+        if (errors.length) break;
       }
       return;
     }
@@ -77,7 +107,10 @@ function runBlock(
         return;
       }
 
-      (block.children ?? []).forEach((child) => runBlock(child, output, variables, errors));
+      for (const child of block.children ?? []) {
+        if (errors.length) break;
+        runBlock(child, output, variables, errors, budget, depth + 1);
+      }
       return;
     }
     case "text_literal":
@@ -106,6 +139,7 @@ export function executeProgram(workspace: ProgramWorkspace): ProgramExecutionRes
   const errors: string[] = [];
   const output: string[] = [];
   const variables: Record<string, PrimitiveValue> = {};
+  const budget: ExecutionBudget = { remaining: MAX_EXECUTION_STEPS };
 
   if (!workspace.blocks.length) {
     return {
@@ -121,7 +155,10 @@ export function executeProgram(workspace: ProgramWorkspace): ProgramExecutionRes
     errors.push("Chương trình cần có khối bắt đầu.");
   }
 
-  workspace.blocks.forEach((block) => runBlock(block, output, variables, errors));
+  for (const block of workspace.blocks) {
+    if (errors.length) break;
+    runBlock(block, output, variables, errors, budget);
+  }
 
   return {
     errors,

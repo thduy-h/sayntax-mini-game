@@ -13,8 +13,8 @@ const ready = {
 
 assert.deepEqual(lessonVoicePresentation(ready), { label: "Sẵn sàng nghe lệnh", tone: "ready" });
 assert.equal(lessonVoicePresentation({ ...ready, privacyAcknowledged: false }).tone, "warning");
-assert.deepEqual(lessonVoicePresentation({ ...ready, asrState: "listening" }), { label: "Micro đang nghe", tone: "active" });
-assert.deepEqual(lessonVoicePresentation({ ...ready, asrState: "processing" }), { label: "Đang xử lý lời nói", tone: "working" });
+assert.deepEqual(lessonVoicePresentation({ ...ready, asrState: "listening" }), { label: "Đang nghe", tone: "active" });
+assert.deepEqual(lessonVoicePresentation({ ...ready, asrState: "processing" }), { label: "Đang xử lý", tone: "working" });
 assert.equal(lessonVoicePresentation({ ...ready, asrState: "starting" }).label, "Đang mở micro");
 assert.equal(lessonVoicePresentation({ ...ready, isSupportKnown: false }).tone, "working");
 assert.equal(lessonVoicePresentation({ ...ready, isSupported: false }).tone, "warning");

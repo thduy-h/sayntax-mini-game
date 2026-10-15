@@ -64,6 +64,7 @@ import { nextLessonHint, resolveLessonCommandOutcome, unknownCommandRecovery } f
 import { resolveAuthoritativeEditTarget } from "../utils/lesson-edit-target";
 import { completedStepAnnouncement, completedStepResult, completedStepWithFeedback, type CompletedStepResult } from "../utils/lesson-step-transition";
 import { lessonVoicePresentation } from "../utils/lesson-voice-presentation";
+import { LESSON_PRIMERS } from "../utils/lesson-primer";
 import { planStepNavigation, willReplaceWorkspace, workspaceContentSignature } from "../utils/step-navigation";
 import {
   calculateWorkspacePanTarget,
@@ -73,6 +74,17 @@ import {
 } from "../utils/workspace-viewport";
 import { markLessonV2StepCompletedAction } from "../server/actions";
 import type { GlobalCommandExecutionResult } from "@/features/voice-control/utils/global-command-routing";
+
+// Resolve storage lazily so browser restrictions are caught by storage helpers.
+const lessonBrowserStorage: Storage = {
+  get length() { return window.localStorage.length; },
+  clear: () => window.localStorage.clear(),
+  getItem: (key) => window.localStorage.getItem(key),
+  setItem: (key, value) => window.localStorage.setItem(key, value),
+  removeItem: (key) => window.localStorage.removeItem(key),
+  key: (index) => window.localStorage.key(index),
+};
+const DEMO_SAVE_WARNING = "Không thể lưu tiến độ demo trên thiết bị này. Bạn vẫn có thể tiếp tục học; tiến độ có thể mất khi tải lại trang.";
 
 interface VoiceLessonClientProps {
   lesson: LessonV2WithSteps;
@@ -517,6 +529,7 @@ export function VoiceLessonClient({
   const displayIdToBlockIdRef = useRef<Record<string, string>>({});
   const blockIdToDisplayIdRef = useRef<Record<string, string>>({});
   const completionModalRef = useRef<HTMLDivElement | null>(null);
+  const primerRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const textCommandHandlerRef = useRef<(command: string) => GlobalCommandExecutionResult>((command) => ({
     command,
@@ -533,12 +546,12 @@ export function VoiceLessonClient({
   const [failCount, setFailCount] = useState(0);
   const [lastFeedback, setLastFeedbackState] = useState<string | null>(null);
   const commandFeedbackRef = useRef<string | null>(null);
-  const [voiceLog, setVoiceLog] = useState<string[]>([]);
+  const [, setVoiceLog] = useState<string[]>([]);
   const [showSkip, setShowSkip] = useState(false);
   const [runResult, setRunResult] = useState<ProgramExecutionResult | null>(null);
   const [previousStepResult, setPreviousStepResult] = useState<CompletedStepResult | null>(null);
   const [stepNavigationNotice, setStepNavigationNotice] = useState<StepNavigationNotice | null>(null);
-  const [lastIntent, setLastIntent] = useState<VoiceIntent | null>(null);
+  const [, setLastIntent] = useState<VoiceIntent | null>(null);
   const [lessonComplete, setLessonComplete] = useState(initialAllCompleted);
   const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
   const [lastCommandResult, setLastCommandResult] = useState<GlobalCommandExecutionResult | null>(null);
@@ -553,11 +566,14 @@ export function VoiceLessonClient({
   const [pendingAction, setPendingAction] = useState<PendingVoiceAction | null>(null);
   const [voicePrivacyAcknowledged, setVoicePrivacyAcknowledged] = useState(false);
   const [voiceLoggingEnabled, setVoiceLoggingEnabled] = useState(false);
-  const [recognizedCommand, setRecognizedCommand] = useState("");
+  const [, setRecognizedCommand] = useState("");
+  const [progressSaveWarning, setProgressSaveWarning] = useState<string | null>(null);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [workspaceRetryKey, setWorkspaceRetryKey] = useState(0);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const [toolboxOpen, setToolboxOpen] = useState(true);
+  const [stepPanelOpen, setStepPanelOpen] = useState(false);
+  const [showPrimer, setShowPrimer] = useState(false);
   const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
   const previousSpeechStatusRef = useRef<SpeechAnnouncementState | null>(null);
@@ -569,6 +585,7 @@ export function VoiceLessonClient({
   const { commandBarHeight, registerWorkspaceCommand } = useGlobalCommand();
   const currentStep = lesson.steps[currentStepIndex];
   const isDemoMode = mode === "demo";
+  const primer = LESSON_PRIMERS[lesson.slug];
   const nextLesson = useMemo(() => {
     const all = listSeedV2Lessons();
     const idx = all.findIndex((entry) => entry.slug === lesson.slug);
@@ -577,6 +594,10 @@ export function VoiceLessonClient({
   const lessonsHref = isDemoMode ? "/demo" : "/lessons-v2";
   const nextLessonHref = nextLesson ? `${isDemoMode ? "/demo" : "/lessons-v2"}/${nextLesson.slug}` : lessonsHref;
   const isChallenge = currentStep?.isChallenge === true;
+  function closePrimer() {
+    try { window.localStorage.setItem(`scc_primer_seen:${lesson.slug}`, "1"); } catch { /* Storage can be unavailable. */ }
+    setShowPrimer(false);
+  }
   const sampleUtterance = currentStep && !isChallenge
     ? extractSampleFromInstructions(currentStep.instructions) ?? deriveSampleUtterance(currentStep.action)
     : null;
@@ -641,12 +662,12 @@ export function VoiceLessonClient({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage));
+    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(lessonBrowserStorage));
   }, []);
 
   useEffect(() => {
     if (!isDemoMode || typeof window === "undefined") return;
-    const progress = readDemoProgressFromStorage(window.localStorage, lesson.slug);
+    const progress = readDemoProgressFromStorage(lessonBrowserStorage, lesson.slug);
     completedStepIdsRef.current = new Set(progress.completedStepIds);
     const nextIndex = Math.min(progress.currentStepIndex, Math.max(lesson.steps.length - 1, 0));
     const allCompleted = lesson.steps.length > 0 && lesson.steps.every((step) => progress.completedStepIds.includes(step.id));
@@ -654,6 +675,39 @@ export function VoiceLessonClient({
     setLessonComplete(allCompleted);
     setDemoProgressLoaded(true);
   }, [isDemoMode, lesson.slug, lesson.steps]);
+
+  useEffect(() => {
+    if (isDemoMode && !demoProgressLoaded) return;
+    if (initialAllCompleted || completedStepIdsRef.current.size > 0 || currentStepIndex > 0) return;
+    try {
+      setShowPrimer(window.localStorage.getItem(`scc_primer_seen:${lesson.slug}`) !== "1");
+    } catch {
+      setShowPrimer(true);
+    }
+  // Check once when restored demo progress is ready; step changes must not reopen it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson.slug, isDemoMode, demoProgressLoaded]);
+
+  useEffect(() => {
+    if (!showPrimer) return;
+    primerRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { closePrimer(); return; }
+      if (event.key !== "Tab") return;
+      const panel = primerRef.current;
+      if (!panel) return;
+      const controls = Array.from(panel.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]'));
+      if (!controls.length) return;
+      const first = controls[0]!;
+      const last = controls[controls.length - 1]!;
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === panel)) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  // Primer dismissal uses the current lesson slug and does not change while open.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPrimer]);
 
   useEffect(() => {
     stepIndexRef.current = currentStepIndex;
@@ -709,13 +763,14 @@ export function VoiceLessonClient({
 
   useEffect(() => {
     if (!isDemoMode || !demoProgressLoaded || typeof window === "undefined") return;
-    const current = readDemoProgressFromStorage(window.localStorage, lesson.slug);
+    const current = readDemoProgressFromStorage(lessonBrowserStorage, lesson.slug);
     if (current.currentStepIndex === currentStepIndex) return;
-    writeDemoProgressToStorage(window.localStorage, lesson.slug, {
+    const saved = writeDemoProgressToStorage(lessonBrowserStorage, lesson.slug, {
       ...current,
       currentStepIndex,
       updatedAt: new Date().toISOString(),
     });
+    if (!saved) setProgressSaveWarning(DEMO_SAVE_WARNING);
   }, [currentStepIndex, demoProgressLoaded, isDemoMode, lesson.slug]);
 
   function performStepNavigation(targetIndex: number, command: string): GlobalCommandExecutionResult {
@@ -928,22 +983,9 @@ export function VoiceLessonClient({
   function setBlocklyToolboxOpen(open: boolean) {
     setToolboxOpen(open);
     const workspace = workspaceRef.current;
-    const toolboxInstance = workspace?.getToolbox();
-    toolboxInstance?.setVisible(open);
-    if (!open) toolboxInstance?.setSelectedItem(null);
-    if (workspace) {
-      const root = workspace.getInjectionDiv();
-      const elements = Array.from(root.querySelectorAll<HTMLElement>(".blocklyToolboxDiv, .blocklyFlyout"));
-      elements.forEach((element) => {
-        element.style.display = open ? "" : "none";
-        element.style.visibility = open ? "" : "hidden";
-        if (open) element.removeAttribute("aria-hidden");
-        else element.setAttribute("aria-hidden", "true");
-      });
-      toolboxInstance?.position();
-      Blockly.svgResize(workspace);
-      window.setTimeout(() => Blockly.svgResize(workspace), 0);
-    }
+    workspace?.getToolbox()?.setVisible(open);
+    if (!open) workspace?.getToolbox()?.setSelectedItem(null);
+    if (workspace) Blockly.svgResize(workspace);
   }
 
   function getToolboxItems(toolboxInstance: Blockly.IToolbox) {
@@ -1245,22 +1287,23 @@ export function VoiceLessonClient({
     completedStepIdsRef.current.add(stepId);
     if (!shouldUseServerPersistence(mode)) {
       if (typeof window !== "undefined") {
-        const current = readDemoProgressFromStorage(window.localStorage, lesson.slug);
+        const current = readDemoProgressFromStorage(lessonBrowserStorage, lesson.slug);
         const nextIndex = Math.min(stepIndexRef.current + 1, Math.max(lesson.steps.length - 1, 0));
-        writeDemoProgressToStorage(
-          window.localStorage,
+        const saved = writeDemoProgressToStorage(
+          lessonBrowserStorage,
           lesson.slug,
           markDemoStepCompleted(current, stepId, nextIndex),
         );
+        if (!saved) setProgressSaveWarning(DEMO_SAVE_WARNING);
       }
       return;
     }
     void markLessonV2StepCompletedAction(lesson.slug, stepId)
       .then((result) => {
-        if (!result.ok) setLastFeedback("Không thể lưu tiến độ lên tài khoản, nhưng bạn vẫn có thể tiếp tục học.");
+        if (!result.ok) setProgressSaveWarning("Không thể lưu tiến độ lên tài khoản. Bạn vẫn có thể tiếp tục học; hãy kiểm tra kết nối trước khi tải lại trang.");
       })
       .catch(() => {
-        setLastFeedback("Không thể lưu tiến độ lên tài khoản, nhưng bạn vẫn có thể tiếp tục học.");
+        setProgressSaveWarning("Không thể lưu tiến độ lên tài khoản. Bạn vẫn có thể tiếp tục học; hãy kiểm tra kết nối trước khi tải lại trang.");
       });
   }
 
@@ -2227,9 +2270,21 @@ export function VoiceLessonClient({
     const workspace = workspaceRef.current;
     if (!workspace) return;
     Blockly.svgResize(workspace);
-    const id = window.setTimeout(() => Blockly.svgResize(workspace), 0);
-    return () => window.clearTimeout(id);
   }, [commandBarHeight]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (workspaceRef.current) Blockly.svgResize(workspaceRef.current);
+      });
+    });
+    observer.observe(element);
+    return () => { observer.disconnect(); window.cancelAnimationFrame(frame); };
+  }, [workspaceReady]);
 
   // Inject Blockly ONCE on mount. Don't dispose on step change — only clear
   // and reload the starter via the next effect. Disposing per step caused
@@ -2249,9 +2304,9 @@ export function VoiceLessonClient({
       });
       workspaceRef.current = workspace;
       setWorkspaceReady(true);
-    } catch (error) {
+    } catch {
       setWorkspaceReady(false);
-      setWorkspaceError(error instanceof Error ? error.message : "Blockly khởi tạo thất bại.");
+      setWorkspaceError("Không thể mở vùng khối lệnh lúc này. Hãy thử lại.");
     }
     return () => {
       workspaceRef.current?.dispose();
@@ -2360,21 +2415,7 @@ export function VoiceLessonClient({
     if (!workspace || typeof document === "undefined") return;
     workspace.getToolbox()?.setVisible(toolboxOpen);
     if (!toolboxOpen) workspace.getToolbox()?.setSelectedItem(null);
-    const root = workspace.getInjectionDiv();
-    const elements = Array.from(
-      root?.querySelectorAll<HTMLElement>(".blocklyToolboxDiv, .blocklyFlyout") ?? [],
-    );
-    elements.forEach((element) => {
-      element.style.display = toolboxOpen ? "" : "none";
-      element.style.visibility = toolboxOpen ? "" : "hidden";
-      if (toolboxOpen) {
-        element.removeAttribute("aria-hidden");
-      } else {
-        element.setAttribute("aria-hidden", "true");
-      }
-    });
     Blockly.svgResize(workspace);
-    window.setTimeout(() => Blockly.svgResize(workspace), 0);
   }, [toolboxOpen]);
 
   useEffect(() => {
@@ -2414,10 +2455,10 @@ export function VoiceLessonClient({
       }
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
-      if (event.shiftKey && document.activeElement === first) {
+      if (event.shiftKey && (document.activeElement === first || !focusable.includes(document.activeElement as HTMLElement))) {
         event.preventDefault();
         last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
+      } else if (!event.shiftKey && (document.activeElement === last || !focusable.includes(document.activeElement as HTMLElement))) {
         event.preventDefault();
         first.focus();
       }
@@ -2470,7 +2511,6 @@ export function VoiceLessonClient({
     accessibilitySettings?.highContrast ? "scc-high-contrast" : "",
     accessibilitySettings?.largeTouchTargets ? "scc-large-targets" : "",
     accessibilitySettings?.reducedMotion ? "scc-reduced-motion" : "",
-    toolboxOpen ? "" : "scc-toolbox-collapsed",
   ].filter(Boolean).join(" ");
 
   const completionModal = lessonComplete && typeof document !== "undefined"
@@ -2500,6 +2540,8 @@ export function VoiceLessonClient({
                 </ul>
               </div>
             )}
+            {progressSaveWarning && <p className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-2 text-sm text-black" role="status">{progressSaveWarning}</p>}
+            {isDemoMode && <Link className="mt-4 inline-flex min-h-11 items-center font-semibold text-black underline underline-offset-4" href="/sign-up">Tạo tài khoản để lưu tiến độ học</Link>}
             <div className="mt-5 flex flex-wrap gap-2">
               {nextLesson ? (
                 <Link
@@ -2565,7 +2607,7 @@ export function VoiceLessonClient({
             </form>
             {!voicePrivacyAcknowledged && (
               <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-3 text-xs text-black">
-                <p>Giọng nói có thể được xử lý qua Groq, máy chủ SAYNTAX hoặc dịch vụ trình duyệt. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
+                <p>Âm thanh có thể được gửi tới nhà cung cấp nhận dạng, dịch vụ trình duyệt hoặc xử lý trên máy vận hành tại workshop. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
                 <details className="mt-1">
                   <summary className="min-h-11 cursor-pointer py-2 font-semibold underline underline-offset-2 focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem thông tin đầy đủ về giọng nói</summary>
                   <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
@@ -2573,7 +2615,7 @@ export function VoiceLessonClient({
                 <Button
                   className="mt-2"
                   onClick={() => {
-                    acknowledgeVoiceProcessing(window.localStorage);
+                    acknowledgeVoiceProcessing(lessonBrowserStorage);
                     setVoicePrivacyAcknowledged(true);
                   }}
                   size="sm"
@@ -2596,7 +2638,7 @@ export function VoiceLessonClient({
 
   return (
     <section
-      className={`relative grid min-h-0 min-w-0 gap-3 lg:h-full lg:grid-cols-[minmax(0,3fr)_minmax(260px,1fr)] ${accessibilityClass}`}
+      className={`relative grid min-h-0 min-w-0 gap-3 lg:min-h-[calc(100dvh-var(--global-command-bar-height,0px)-7rem)] lg:grid-cols-[minmax(250px,0.85fr)_minmax(0,2.7fr)] ${accessibilityClass}`}
       style={{ fontSize }}
     >
       <style>{`
@@ -2612,101 +2654,57 @@ export function VoiceLessonClient({
         .scc-reduced-motion *, .scc-reduced-motion *::before, .scc-reduced-motion *::after { transition: none !important; animation: none !important; }
       `}</style>
       {completionModal}
+      {showPrimer && primer && !lessonComplete && (
+        <div className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/45 p-4" role="presentation">
+          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-black bg-white p-5 text-black shadow-xl sm:p-7" role="dialog" tabIndex={-1}>
+            <p className="text-xs font-black uppercase tracking-wide text-[#0052cc]">Kiến thức nhanh · {lesson.title}</p>
+            <h2 className="mt-2 text-2xl font-bold" id="lesson-primer-title">Trước khi bắt đầu</h2>
+            <dl className="mt-4 space-y-3 text-sm leading-relaxed">
+              <div><dt className="font-bold">Khái niệm</dt><dd>{primer.concept}</dd></div>
+              <div><dt className="font-bold">Dùng để làm gì?</dt><dd>{primer.purpose}</dd></div>
+              <div><dt className="font-bold">Ví dụ</dt><dd className="rounded-lg bg-[#f3f7ff] px-3 py-2 font-mono">{primer.example}</dd></div>
+              <div><dt className="font-bold">Trong bài này</dt><dd>{primer.goal}</dd></div>
+            </dl>
+            <Button className="mt-5 w-full" onClick={closePrimer} type="button">Bắt đầu bài học</Button>
+          </div>
+        </div>
+      )}
       {!lessonComplete && <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>}
-      <div className="flex min-h-0 min-w-0 flex-col rounded-[1.4rem] border-4 border-black bg-white shadow-[8px_8px_0_#121212]">
-        <div className="border-b-4 border-black px-3 py-3 sm:px-4">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">
-            Bước {currentStepIndex + 1} / {lesson.steps.length}
-            {isChallenge && (
-              <span className="ml-2 inline-flex items-center rounded border-2 border-black bg-[#ffb84d] px-1.5 py-0 text-[9px] font-black uppercase text-black">
-                Thử thách
-              </span>
-            )}
-          </p>
-          <h2 className="mt-1 text-[1.15em] font-bold leading-snug text-black">{currentStep.title}</h2>
-          <p className="mt-1 text-[0.95em] leading-relaxed text-zinc-800">
-            {splitBoldSegments(currentStep.instructions).map((seg, i) =>
-              seg.bold ? (
-                <strong key={i} className="font-black text-black">
-                  {seg.text}
-                </strong>
-              ) : (
-                <span key={i}>{seg.text}</span>
-              ),
-            )}
-          </p>
-          {sampleUtterance && (
-            <p className="mt-2 break-words text-[0.9em] text-zinc-800">Em có thể nói: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>
-          )}
-          <div className="scc-lesson-voice-strip mt-3 flex min-w-0 flex-wrap items-center gap-2 rounded-xl border-2 border-black bg-[#fffdf3] p-2">
+      <div className="order-2 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0_#121212]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-300 px-3 py-2 text-sm">
+          <p className="font-bold text-black">Vùng xếp khối <span className="font-normal text-zinc-600">· {selectedBlockSummary ?? "Chưa chọn khối"}</span></p>
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
               aria-label={speech.isListening ? "Dừng nghe lệnh bài học" : "Bắt đầu nói lệnh bài học"}
               aria-pressed={speech.asrState === "listening"}
-              className="min-h-12 text-[0.9em]"
               disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
-              onClick={() => {
-                if (speech.isListening) void speech.stopListening();
-                else void speech.startListening();
-              }}
-              size="sm"
-              type="button"
+              onClick={() => { if (speech.isListening) void speech.stopListening(); else void speech.startListening(); }}
+              size="sm" type="button" variant="outline"
             >
               {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-              {speech.isListening ? "Dừng nghe" : "Bắt đầu nói"}
+              {speech.isListening ? "Dừng nghe" : "Mic"}
             </Button>
-            <span id="lesson-voice-status" className={`min-w-0 break-words rounded border-2 border-black px-2 py-1 text-[0.85em] font-bold text-black ${voiceToneClass}`}>
-              {voicePresentation.label}
-            </span>
-            {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && (
-              <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline">
-                Thử lại giọng nói
-              </Button>
-            )}
-            <button
-              className="min-h-10 text-left text-[0.85em] font-semibold text-black underline decoration-2 underline-offset-4"
-              onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))}
-              type="button"
-            >
-              Nhập thay vì nói
-            </button>
+            <button className="min-h-11 text-sm font-semibold text-black underline underline-offset-2" onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))} type="button">Nhập lệnh</button>
+            <span id="lesson-voice-status" className={`rounded-lg px-2 py-1 text-xs font-semibold text-black ${voiceToneClass}`}>{voicePresentation.label}</span>
           </div>
           {!voicePrivacyAcknowledged && (
-            <div className="mt-2 rounded-lg border-2 border-black bg-[#fff6a8] p-2 text-[0.8em] text-black" id="lesson-voice-privacy">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="min-w-0 basis-full flex-1 sm:basis-0">Giọng nói có thể được xử lý qua Groq, máy chủ SAYNTAX hoặc dịch vụ trình duyệt. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
-                <Button
-                  className="text-[0.85em]"
-                  onClick={() => {
-                    acknowledgeVoiceProcessing(window.localStorage);
-                    setVoicePrivacyAcknowledged(true);
-                  }}
-                  size="sm"
-                  type="button"
-                >
-                  Đồng ý, bật giọng nói
-                </Button>
-              </div>
-              <details className="mt-1">
-                <summary className="min-h-11 cursor-pointer py-2 font-semibold underline underline-offset-2 focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem thông tin đầy đủ về giọng nói</summary>
-                <p className="mt-1">{VOICE_PROCESSING_DISCLOSURE}</p>
-              </details>
-            </div>
+            <p className="basis-full text-xs text-zinc-700" id="lesson-voice-privacy">
+              Có thể nhập lệnh mà không cần micro. <button className="min-h-11 font-bold underline underline-offset-2" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2" href="/privacy">Quyền riêng tư</Link>
+            </p>
           )}
-          <p className="mt-2 break-words rounded border-l-4 border-[#0052cc] bg-[#eef5ff] px-2 py-1 text-[0.85em] text-black">
-            <strong>Khối đang chọn:</strong> {selectedBlockSummary ?? "Chưa chọn khối. Có thể nói “chọn khối 1”."}
-          </p>
+          {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline">Thử lại giọng nói</Button>}
         </div>
-        <div className="relative min-h-[320px] w-full flex-1 border-b-4 border-black">
-          <div ref={containerRef} className="h-full min-h-[320px] w-full" />
+        <div className="relative min-h-[480px] w-full flex-1 border-b border-zinc-300 lg:min-h-[320px]">
+          <div ref={containerRef} className="h-full min-h-[480px] w-full lg:min-h-[320px]" />
           {!workspaceReady && !workspaceError && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 text-sm font-black text-black">
-              Đang tải workspace...
+              Đang mở vùng khối...
             </div>
           )}
           {workspaceError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#fff6fb] p-4 text-center">
-              <p className="font-black text-red-700">Blockly khởi tạo thất bại.</p>
+              <p className="font-black text-red-700">Vùng khối chưa mở được.</p>
               <p className="max-w-md text-sm text-zinc-700">{workspaceError}</p>
               <Button
                 type="button"
@@ -2721,203 +2719,68 @@ export function VoiceLessonClient({
             </div>
           )}
         </div>
-        <div className="relative z-[var(--z-app-controls)] flex flex-wrap items-center gap-2 border-b-4 border-black bg-white px-3 py-2">
-          <Button
-            aria-label={toolboxOpen ? "Thu gọn danh sách khối" : "Mở danh sách khối"}
-            size="sm"
-            type="button"
-            variant="outline"
-            onClick={() => setBlocklyToolboxOpen(!toolboxOpen)}
-          >
-            {toolboxOpen ? <PanelLeftClose className="mr-2 h-4 w-4" /> : <PanelLeftOpen className="mr-2 h-4 w-4" />}
-            {toolboxOpen ? "Thu gọn" : "Mở danh sách khối"}
+        <div className="relative z-[var(--z-app-controls)] flex flex-wrap items-center gap-2 border-b border-zinc-300 bg-white px-3 py-2">
+          <Button size="sm" onClick={runProgramFromButton} type="button" variant="secondary"><Play className="mr-2 h-4 w-4" />Chạy</Button>
+          <Button size="sm" type="button" variant="outline" onClick={restoreUndoSnapshot} disabled={!undoSnapshot}>Hoàn tác</Button>
+          <Button aria-label={toolboxOpen ? "Thu gọn danh sách khối" : "Mở danh sách khối"} size="sm" type="button" variant="outline" onClick={() => setBlocklyToolboxOpen(!toolboxOpen)}>
+            {toolboxOpen ? <PanelLeftClose className="mr-2 h-4 w-4" /> : <PanelLeftOpen className="mr-2 h-4 w-4" />}{toolboxOpen ? "Ẩn khối" : "Hiện khối"}
           </Button>
-          <label className="min-w-[180px] text-[10px] font-black uppercase tracking-[0.12em] text-black">
-            Micro
-            <select
-              aria-label="Chọn micro để kiểm tra nhận giọng nói"
-              className="mt-1 block min-h-9 w-full rounded border-2 border-black bg-white px-2 py-1 text-xs font-semibold normal-case tracking-normal text-black focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#ff5f87]"
-              disabled={speech.isListening || speech.isStarting}
-              onChange={(event) => speech.selectMicrophone(event.target.value)}
-              onFocus={() => {
-                void speech.refreshMicrophones();
-              }}
-              value={speech.selectedMicrophoneId}
-            >
-              <option value="">Micro mặc định</option>
-              {speech.audioInputs.map((input) => (
-                <option key={input.deviceId || input.label} value={input.deviceId}>
-                  {input.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button size="sm" variant="outline" onClick={runProgramFromButton}>
-            <Play className="mr-2 h-4 w-4" />
-            Chạy
-          </Button>
-          <Button
-            size="sm"
-            type="button"
-            variant="outline"
-            onClick={restoreUndoSnapshot}
-            disabled={!undoSnapshot}
-          >
-            Hoàn tác
-          </Button>
-          <div
-            aria-label="Điều hướng workspace"
-            className="flex flex-wrap items-center gap-1 rounded border-2 border-black bg-[#fffdf3] p-1"
-            role="group"
-          >
-            <Button
-              aria-label="Cuộn workspace lên"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction: "up" })}
-            >
-              Lên
-            </Button>
-            <Button
-              aria-label="Cuộn workspace xuống"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction: "down" })}
-            >
-              Xuống
-            </Button>
-            <Button
-              aria-label="Cuộn workspace sang trái"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction: "left" })}
-            >
-              Trái
-            </Button>
-            <Button
-              aria-label="Cuộn workspace sang phải"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction: "right" })}
-            >
-              Phải
-            </Button>
-            <Button
-              aria-label="Đưa chương trình về giữa workspace"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "center_workspace", target: "workspace" })}
-            >
-              Về giữa
-            </Button>
-            <Button
-              aria-label="Hiển thị toàn bộ chương trình vừa màn hình"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level: "fit" })}
-            >
-              Vừa màn hình
-            </Button>
-            <Button
-              aria-label="Phóng to workspace"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level: "in" })}
-            >
-              Phóng to
-            </Button>
-            <Button
-              aria-label="Thu nhỏ workspace"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level: "out" })}
-            >
-              Thu nhỏ
-            </Button>
-            <Button
-              aria-label="Đặt lại zoom workspace"
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level: "reset" })}
-            >
-              Reset zoom
-            </Button>
-          </div>
-          <Button size="sm" variant="outline" onClick={prevStep} disabled={currentStepIndex === 0}>
-            ← Trước
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={nextStep}
-            disabled={currentStepIndex >= lesson.steps.length - 1}
-          >
-            Sau →
-          </Button>
-          <span className="text-xs text-zinc-600">Có thể nói hoặc nhập: “bước trước”, “bước sau”, “đến bước 3”.</span>
-          {showSkip && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                if (nextStep().outcome === "applied") {
-                  setFailCount(0);
-                  setShowSkip(false);
-                }
-              }}
-            >
-              Bỏ qua
-            </Button>
-          )}
-          {speech.transcript && (
-            <span className="min-w-0 max-w-full break-all font-mono text-xs text-zinc-700 sm:ml-auto sm:max-w-[45%]">“{speech.transcript}”</span>
-          )}
-          {voicePrivacyAcknowledged && (
-            <Button
-              aria-pressed={voiceLoggingEnabled}
-              size="sm"
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setVoiceLoggingEnabled((enabled) => !enabled);
-              }}
-            >
-              {voiceLoggingEnabled ? "Tắt lưu câu lệnh" : "Bật lưu câu lệnh nói/nhập (tùy chọn)"}
-            </Button>
-          )}
-          {isDemoMode && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
+          <details className="relative text-sm">
+            <summary className="flex min-h-11 cursor-pointer items-center rounded-lg border border-zinc-500 bg-white px-3 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">⋯ Công cụ</summary>
+            <div className="absolute bottom-full left-0 z-50 mb-2 flex max-h-[55dvh] w-[min(90vw,330px)] flex-wrap gap-2 overflow-y-auto rounded-xl border-2 border-black bg-white p-3 shadow-lg">
+              <label className="w-full text-xs font-bold text-black">Micro
+                <select aria-label="Chọn micro" className="mt-1 block min-h-11 w-full rounded-lg border border-zinc-500 bg-white px-2 text-sm" disabled={speech.isListening || speech.isStarting} onChange={(event) => speech.selectMicrophone(event.target.value)} onFocus={() => { void speech.refreshMicrophones(); }} value={speech.selectedMicrophoneId}>
+                  <option value="">Micro mặc định</option>{speech.audioInputs.map((input) => <option key={input.deviceId || input.label} value={input.deviceId}>{input.label}</option>)}
+                </select>
+              </label>
+              <div aria-label="Điều hướng vùng khối" className="flex flex-wrap gap-2" role="group">
+                {(["up", "down", "left", "right"] as const).map((direction) => <Button key={direction} size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction })}>{{ up: "Lên", down: "Xuống", left: "Trái", right: "Phải" }[direction]}</Button>)}
+                <Button size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "center_workspace", target: "workspace" })}>Về giữa</Button>
+                {(["fit", "in", "out", "reset"] as const).map((level) => <Button key={level} size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level })}>{{ fit: "Vừa màn hình", in: "Phóng to", out: "Thu nhỏ", reset: "Reset zoom" }[level]}</Button>)}
+              </div>
+              {voicePrivacyAcknowledged && <Button aria-pressed={voiceLoggingEnabled} size="sm" type="button" variant="outline" onClick={() => setVoiceLoggingEnabled((enabled) => !enabled)}>{voiceLoggingEnabled ? "Tắt lưu câu lệnh" : "Bật lưu câu lệnh"}</Button>}
+              {isDemoMode && <Button size="sm" type="button" variant="outline" onClick={() => {
                 if (!window.confirm("Đặt lại toàn bộ tiến độ demo trên thiết bị này?")) return;
-                resetDemoProgressInStorage(window.localStorage);
-                setCurrentStepIndex(0);
-                setLessonComplete(false);
-                setPreviousStepResult(null);
-                setStepNavigationNotice(null);
-                setRunResult(null);
-                setLastFeedback("Đã đặt lại bản demo.");
-              }}
-            >
-              Đặt lại bản demo
-            </Button>
-          )}
+                if (!resetDemoProgressInStorage(lessonBrowserStorage)) setProgressSaveWarning(DEMO_SAVE_WARNING);
+                setCurrentStepIndex(0); setLessonComplete(false); setPreviousStepResult(null); setStepNavigationNotice(null); setRunResult(null); setLastFeedback("Đã đặt lại bản demo.");
+              }}>Đặt lại bản demo</Button>}
+            </div>
+          </details>
+          {showSkip && <Button size="sm" variant="secondary" onClick={() => { if (nextStep().outcome === "applied") { setFailCount(0); setShowSkip(false); } }}>Bỏ qua</Button>}
         </div>
-        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[60px] min-w-0 max-w-full flex-col gap-1 overflow-y-auto px-3 py-1.5 text-xs" role="region" tabIndex={0}>
+        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[74px] max-h-[132px] min-w-0 max-w-full flex-none flex-col gap-1 overflow-y-auto px-3 py-2 text-sm" role="region" tabIndex={0}>
           {isDemoMode && (
-            <p className="rounded border-2 border-black bg-[#e7fff3] px-2 py-1 font-semibold text-black">
+            <p className="rounded border border-zinc-400 bg-[#e7fff3] px-2 py-1 font-semibold text-black sm:hidden">
               Chế độ demo — tiến độ chỉ được lưu trên thiết bị này.
             </p>
+          )}
+          {progressSaveWarning && <p className="rounded border-2 border-black bg-[#fff6a8] px-2 py-1 font-semibold text-black" role="status">{progressSaveWarning}</p>}
+          {lastFeedback && <p className="min-w-0 break-words font-semibold text-black">{lastFeedback}</p>}
+          {runResult && (
+            <div className="rounded border-2 border-black bg-[#fffdf3] px-2 py-1 font-mono">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả</p>
+              {runResult.success ? (
+                runResult.output.length === 0 ? (
+                  <p className="text-zinc-500">(không có đầu ra)</p>
+                ) : (
+                  <ul className="list-none">
+                    {runResult.output.map((line, i) => (
+                      <li key={i} className="text-black">
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                )
+              ) : (
+                <ul className="list-none text-red-600">
+                  {runResult.errors.length > 0 ? (
+                    runResult.errors.map((err, i) => <li key={i}>{err}</li>)
+                  ) : (
+                    <li>Chương trình lỗi không xác định.</li>
+                  )}
+                </ul>
+              )}
+            </div>
           )}
           {visibleStepNavigationNotice && (
             <p className="min-w-0 break-words rounded border-2 border-black bg-[#e7f5ff] px-2 py-1 font-semibold text-black">
@@ -2951,27 +2814,15 @@ export function VoiceLessonClient({
               Đang kết nối nhận dạng giọng nói...
             </p>
           )}
-          <p className="min-w-0 break-words text-zinc-600">
-            Đang dùng: <span className="font-semibold text-black">{speech.engineLabel}</span>
-          </p>
           {speech.isSupportKnown && !speech.isSupported && (
             <p className="text-red-600">
               Trình duyệt này chưa hỗ trợ nhận dạng giọng nói và dịch vụ nhận dạng đang không khả dụng. Em vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
             </p>
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
-          {speech.isSupportKnown && speech.isSupported && !speech.isListening && !speech.errorMessage && (
-            <p className="text-zinc-500">Đã dừng nghe. Em có thể bấm “Bắt đầu nói” hoặc nhập câu lệnh.</p>
-          )}
           {speech.isStarting && <p className="text-zinc-500">Micro đang khởi tạo...</p>}
           {speech.asrState === "processing" && <p className="text-zinc-500">Đang xử lý giọng nói...</p>}
           {speech.microphoneStatus === "checking" && <p className="text-zinc-500">Đang kiểm tra quyền micro...</p>}
-          {speech.microphoneStatus === "ready" && !speech.errorMessage && (
-            <p className="text-zinc-500">
-              Micro đã sẵn sàng trong trình duyệt
-              {speech.selectedMicrophoneId ? " với thiết bị đã chọn. Web Speech vẫn có thể dùng input mặc định của hệ thống." : "."}
-            </p>
-          )}
           {speech.isListening && speech.interimTranscript && (
             <p className="min-w-0 break-words text-zinc-500">
               Đang nghe: <span className="font-mono break-words">“{speech.interimTranscript}”</span>
@@ -2979,24 +2830,6 @@ export function VoiceLessonClient({
           )}
           {speech.isListening && !speech.interimTranscript && (
             <p className="text-zinc-500">Đang nghe...</p>
-          )}
-          {recognizedCommand && (
-            <p className="min-w-0 break-words text-zinc-600">
-              Hệ thống đã nhận: <span className="font-mono break-words">“{recognizedCommand}”</span>
-            </p>
-          )}
-          {speech.transcript && (
-            <p className="min-w-0 break-words text-zinc-600">
-              Đã nghe: <span className="font-mono break-words">“{speech.transcript}”</span>
-            </p>
-          )}
-          {lastIntent && (
-            <p className="min-w-0 break-words text-zinc-600">
-              <span className="font-black uppercase tracking-[0.14em] text-[9px] text-zinc-500">
-                Mình hiểu là
-              </span>{" "}
-              <span className="font-semibold text-black">{describeIntent(lastIntent)}</span>
-            </p>
           )}
           {pendingAction && (
             <div className="min-w-0 rounded border-2 border-black bg-[#fff6a8] px-2 py-1 font-semibold text-black">
@@ -3021,90 +2854,30 @@ export function VoiceLessonClient({
               </div>
             </div>
           )}
-          <p className="min-w-0 break-words text-zinc-600">
-            Vị trí chèn: <span className="font-semibold text-black">{cursorPositionLabel(insertCursor)}</span>
-          </p>
-          {lastFeedback && <p className="min-w-0 break-words font-semibold text-black">{lastFeedback}</p>}
-          {runResult && (
-            <div className="rounded border-2 border-black bg-[#fffdf3] px-2 py-1 font-mono">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả</p>
-              {runResult.success ? (
-                runResult.output.length === 0 ? (
-                  <p className="text-zinc-500">(không có đầu ra)</p>
-                ) : (
-                  <ul className="list-none">
-                    {runResult.output.map((line, i) => (
-                      <li key={i} className="text-black">
-                        {line}
-                      </li>
-                    ))}
-                  </ul>
-                )
-              ) : (
-                <ul className="list-none text-red-600">
-                  {runResult.errors.length > 0 ? (
-                    runResult.errors.map((err, i) => <li key={i}>{err}</li>)
-                  ) : (
-                    <li>Chương trình lỗi không xác định.</li>
-                  )}
-                </ul>
-              )}
-            </div>
-          )}
-          {!lastFeedback && !runResult && !speech.errorMessage && voiceLog.length > 0 && (
-            <p className="min-w-0 break-words text-zinc-500">Đã nói: {voiceLog.slice(-3).join(" · ")}</p>
-          )}
         </div>
       </div>
-      <aside className="flex min-h-0 flex-col gap-3 overflow-hidden">
-        <div className="flex min-h-0 flex-1 flex-col rounded-[1.4rem] border-4 border-black bg-[#fffdf3] shadow-[8px_8px_0_#121212]">
-          <div className="border-b-4 border-black px-4 py-2">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Các bước</p>
-          </div>
-          <ol className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-3 py-2 text-sm">
-            {lesson.steps.map((step, i) => (
-              <li key={step.id}>
-                <button
-                  aria-current={i === currentStepIndex ? "step" : undefined}
-                  onClick={() => requestStepNavigation(i, "sidebar")}
-                  className={`w-full rounded border-2 border-black px-2 py-1 text-left text-xs transition ${
-                    i === currentStepIndex ? "bg-[#a8e6ff] font-black" : "bg-white hover:bg-[#fff6fb]"
-                  }`}
-                >
-                  {i + 1}. {step.title}
-                </button>
-              </li>
-            ))}
-          </ol>
+      <aside aria-label="Bước hiện tại" className="order-1 min-w-0 rounded-2xl border-2 border-black bg-[#fffdf3] p-3 shadow-[3px_3px_0_#121212] lg:overflow-y-auto lg:p-4">
+        <button aria-controls="lesson-step-details" aria-expanded={stepPanelOpen} className="flex min-h-11 w-full items-center justify-between gap-2 text-left font-bold text-black lg:hidden" onClick={() => setStepPanelOpen((open) => !open)} type="button"><span>Bước {currentStepIndex + 1}/{lesson.steps.length} · {currentStep.title}</span><span aria-hidden="true">{stepPanelOpen ? "▴" : "▾"}</span></button>
+        <div className={stepPanelOpen ? "block" : "hidden lg:block"} id="lesson-step-details">
+        <p className="hidden text-sm font-black uppercase tracking-wide text-zinc-700 lg:block">Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}</p>
+        <progress aria-label="Tiến độ bài học" className="mt-2 h-2 w-full accent-[#0052cc]" max={lesson.steps.length} value={currentStepIndex + 1} />
+        <h2 className="mt-3 text-xl font-bold leading-tight text-black">{currentStep.title}</h2>
+        <p className="mt-3 text-xs font-bold uppercase tracking-wide text-zinc-600">Bạn cần làm</p>
+        <p className="mt-1 text-sm leading-relaxed text-zinc-800">{splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-bold text-black">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}</p>
+        {sampleUtterance && <p className="mt-3 break-words rounded-xl bg-white p-3 text-sm text-zinc-800">Thử nói hoặc nhập: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>}
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button size="sm" type="button" variant="outline" onClick={requestHintFromButton} disabled={currentStep.hints.length === 0}><Lightbulb className="mr-1 h-4 w-4" />Gợi ý</Button>
+          <Button size="sm" type="button" variant="ghost" onClick={() => setShowPrimer(true)}>Xem kiến thức</Button>
         </div>
-        <div className="flex flex-col gap-2 rounded-[1.4rem] border-4 border-black bg-[#fff6fb] px-3 py-2 shadow-[8px_8px_0_#121212]">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1 text-[10px] font-black uppercase tracking-[0.18em] text-black">
-              <Lightbulb className="h-3.5 w-3.5" />
-              Gợi ý
-            </p>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={requestHintFromButton}
-              disabled={currentStep.hints.length === 0}
-            >
-              Đổi
-            </Button>
-          </div>
-          <p className="text-xs text-zinc-800">{activeHint ?? "Chưa có gợi ý cho bước này."}</p>
+        {hintIndex > 0 && <p className="mt-2 text-sm text-zinc-700">{activeHint}</p>}
+        <details className="mt-4 border-t border-zinc-300 pt-3 text-sm">
+          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem các bước</summary>
+          <ol className="mt-2 space-y-1">{lesson.steps.map((step, i) => <li key={step.id}><button aria-current={i === currentStepIndex ? "step" : undefined} className={`min-h-11 w-full rounded-lg px-2 text-left text-sm ${i === currentStepIndex ? "bg-[#e2f1ff] font-bold" : "hover:bg-white"}`} onClick={() => requestStepNavigation(i, "sidebar")} type="button">{i + 1}. {step.title}</button></li>)}</ol>
+        </details>
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-300 pt-3">
+          <Button size="sm" variant="ghost" onClick={prevStep} disabled={currentStepIndex === 0}>← Trước</Button>
+          <Button size="sm" variant="ghost" onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Sau →</Button>
         </div>
-        <div className="flex max-h-40 flex-col gap-1 overflow-y-auto rounded-[1.4rem] border-4 border-black bg-white px-3 py-2 shadow-[8px_8px_0_#121212]">
-          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">ID khối</p>
-          {voiceCursorItems.length === 0 ? (
-            <p className="text-xs text-zinc-600">Chưa có khối nào trong workspace.</p>
-          ) : (
-            voiceCursorItems.map((item) => (
-              <p key={item.blockId} className="text-xs text-zinc-800">
-                <span className="font-mono font-black text-black">[{item.displayId}]</span> {item.label}
-              </p>
-            ))
-          )}
         </div>
       </aside>
     </section>

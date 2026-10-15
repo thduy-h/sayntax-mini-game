@@ -60,6 +60,12 @@ body {
   font-family: var(--font-body);
 }
 
+body:has(.scc-lesson-page) .scc-site-footer { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
 @media (max-height: 500px) {
   .scc-lesson-voice-strip {
     padding-bottom: calc(3.75rem + env(safe-area-inset-bottom)) !important;
@@ -122,25 +128,19 @@ textarea:focus-visible {
   z-index: 1;
 }
 
-.blocklyToolboxDiv,
-.blocklyFlyout,
+.blocklyToolbox,
 .blocklyWidgetDiv .blocklyMenu {
   scrollbar-color: #121212 #fffdf3;
   scrollbar-width: thin;
-  scrollbar-gutter: stable;
 }
 
-.blocklyToolboxDiv {
+.blocklyToolbox {
   box-sizing: border-box;
-  max-width: min(36vw, 260px);
   overflow-y: auto;
-  padding-right: 10px;
   z-index: var(--z-blockly-toolbox) !important;
 }
 
 .blocklyFlyout {
-  overflow: auto;
-  scrollbar-gutter: stable;
   z-index: var(--z-blockly-flyout) !important;
 }
 
@@ -157,12 +157,6 @@ textarea:focus-visible {
   color: #ffffff !important;
 }
 
-.scc-toolbox-collapsed .blocklyToolboxDiv,
-.scc-toolbox-collapsed .blocklyFlyout {
-  display: none !important;
-  pointer-events: none !important;
-}
-
 .scc-voice-debug-panel,
 .scc-voice-debug-panel * {
   max-width: 100%;
@@ -176,23 +170,20 @@ textarea:focus-visible {
   word-break: break-all;
 }
 
-.blocklyToolboxDiv::-webkit-scrollbar,
-.blocklyFlyout::-webkit-scrollbar,
+.blocklyToolbox::-webkit-scrollbar,
 .blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-.blocklyToolboxDiv::-webkit-scrollbar-thumb,
-.blocklyFlyout::-webkit-scrollbar-thumb,
+.blocklyToolbox::-webkit-scrollbar-thumb,
 .blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar-thumb {
   background: #121212;
   border: 2px solid #fffdf3;
   border-radius: 999px;
 }
 
-.blocklyToolboxDiv::-webkit-scrollbar-track,
-.blocklyFlyout::-webkit-scrollbar-track,
+.blocklyToolbox::-webkit-scrollbar-track,
 .blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar-track {
   background: #fffdf3;
 }

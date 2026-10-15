@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex min-h-12 items-center justify-center rounded-[1rem] border-4 border-black text-sm font-extrabold uppercase tracking-[0.08em] transition duration-150 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#ff5f87] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex min-h-11 items-center justify-center rounded-xl border-2 border-black text-sm font-bold transition duration-150 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc] disabled:pointer-events-none disabled:opacity-50 motion-reduce:transition-none",
   {
     defaultVariants: {
       size: "default",
@@ -13,13 +13,13 @@ const buttonVariants = cva(
       size: {
         default: "px-5 py-3",
         lg: "px-6 py-3.5 text-base",
-        sm: "min-h-10 rounded-[0.85rem] px-4 py-2 text-xs",
+        sm: "min-h-11 rounded-lg px-3 py-2 text-xs",
       },
       variant: {
-        default: "bg-[#ff5f87] text-black shadow-[6px_6px_0_#121212] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_#121212]",
-        ghost: "bg-[#fffdf3] text-black shadow-[6px_6px_0_#121212] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_#121212]",
-        outline: "bg-[#7df2c3] text-black shadow-[6px_6px_0_#121212] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_#121212]",
-        secondary: "bg-[#ffb84d] text-black shadow-[6px_6px_0_#121212] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0_#121212]",
+        default: "bg-[#ff5f87] text-black shadow-[3px_3px_0_#121212] hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#121212]",
+        ghost: "bg-white text-black hover:bg-zinc-100",
+        outline: "bg-white text-black hover:bg-[#e7fff3]",
+        secondary: "bg-[#ffb84d] text-black shadow-[2px_2px_0_#121212] hover:translate-x-px hover:translate-y-px hover:shadow-[1px_1px_0_#121212]",
       },
     },
   },

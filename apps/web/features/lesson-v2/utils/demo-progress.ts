@@ -28,10 +28,9 @@ export function readDemoProgressFromStorage(
   storage: Pick<Storage, "getItem">,
   lessonSlug: string,
 ): DemoProgressState {
-  const raw = storage.getItem(storageKey(lessonSlug));
-  if (!raw) return createEmptyDemoProgress();
-
   try {
+    const raw = storage.getItem(storageKey(lessonSlug));
+    if (!raw) return createEmptyDemoProgress();
     const parsed = JSON.parse(raw) as Partial<DemoProgressState>;
     return {
       completedStepIds: Array.isArray(parsed.completedStepIds)
@@ -53,7 +52,12 @@ export function writeDemoProgressToStorage(
   lessonSlug: string,
   progress: DemoProgressState,
 ) {
-  storage.setItem(storageKey(lessonSlug), JSON.stringify(progress));
+  try {
+    storage.setItem(storageKey(lessonSlug), JSON.stringify(progress));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function markDemoStepCompleted(
@@ -70,17 +74,19 @@ export function markDemoStepCompleted(
 }
 
 export function resetDemoProgressInStorage(storage: Pick<Storage, "removeItem">, lessonSlug?: string) {
-  if (lessonSlug) {
-    storage.removeItem(storageKey(lessonSlug));
-    return;
-  }
-
-  const localStorageLike = storage as Storage;
-  for (let index = localStorageLike.length - 1; index >= 0; index -= 1) {
-    const key = localStorageLike.key(index);
-    if (key?.startsWith(STORAGE_PREFIX)) {
-      localStorageLike.removeItem(key);
+  try {
+    if (lessonSlug) {
+      storage.removeItem(storageKey(lessonSlug));
+      return true;
     }
+    const localStorageLike = storage as Storage;
+    for (let index = localStorageLike.length - 1; index >= 0; index -= 1) {
+      const key = localStorageLike.key(index);
+      if (key?.startsWith(STORAGE_PREFIX)) localStorageLike.removeItem(key);
+    }
+    return true;
+  } catch {
+    return false;
   }
 }
 

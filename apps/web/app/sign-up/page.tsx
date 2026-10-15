@@ -29,28 +29,30 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
 
   return (
     <AuthShell
-      description="Tạo tài khoản học sinh để bắt đầu bài học có hướng dẫn, hoặc dùng email được cho phép để vào vai trò quản trị."
+      description="Lưu tiến độ và tiếp tục học bất cứ lúc nào."
       eyebrow="Tài khoản mới"
       title="Tạo tài khoản SAYNTAX"
     >
       <CardHeader>
-        <CardTitle>Bắt đầu học với sự hỗ trợ phù hợp</CardTitle>
+        <CardTitle>Bắt đầu hành trình của bạn</CardTitle>
         <CardDescription>
-          Phiên bản đầu tiên hỗ trợ đăng ký bằng email và mật khẩu, kèm chọn vai trò và onboarding đơn giản.
+          Lưu tiến độ học của bạn bằng tài khoản email và mật khẩu.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <AuthMessage message={params.error} tone="error" />
-        {!authConfigured && (
-          <AuthMessage
-            message="Đăng ký chưa sẵn sàng vì Supabase chưa được cấu hình. Bạn vẫn có thể vào chế độ demo công khai."
-            tone="error"
-          />
-        )}
+        <div className="min-h-12 space-y-2">
+          <AuthMessage message={params.error} tone="error" />
+          {!authConfigured && (
+            <AuthMessage
+              message="Đăng ký tạm thời chưa sẵn sàng. Bạn vẫn có thể học thử mà không cần tài khoản."
+              tone="error"
+            />
+          )}
+        </div>
         <form action={signUpAction} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input autoComplete="email" id="email" name="email" placeholder="ban@example.com" required type="email" />
+            <Input autoCapitalize="none" spellCheck={false} autoComplete="email" id="email" name="email" placeholder="ban@example.com" required type="email" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mật khẩu</Label>
@@ -62,23 +64,25 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
               placeholder="Chọn mật khẩu an toàn"
               required
               type="password"
+              aria-describedby="password-help"
             />
+            <p className="text-sm text-slate-600" id="password-help">Mật khẩu có ít nhất 8 ký tự.</p>
           </div>
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-slate-800">Vai trò</legend>
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-[#fffdf8] p-4">
-              <input defaultChecked name="role" type="radio" value="student" />
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:ring-2 focus-within:ring-black">
+              <input defaultChecked className="mt-1 h-5 w-5 shrink-0 accent-black" name="role" type="radio" value="student" />
               <span>
                 <span className="block font-semibold text-slate-900">Học sinh</span>
                 <span className="block text-sm leading-6 text-slate-600">Bài học có hướng dẫn, theo dõi tiến độ và tự đánh giá mức tự tin.</span>
               </span>
             </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-[#fffdf8] p-4">
-              <input name="role" type="radio" value="admin" />
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:ring-2 focus-within:ring-black">
+              <input className="mt-1 h-5 w-5 shrink-0 accent-black" name="role" type="radio" value="admin" />
               <span>
                 <span className="block font-semibold text-slate-900">Quản trị viên / Người hướng dẫn</span>
                 <span className="block text-sm leading-6 text-slate-600">
-                  Email nằm trong danh sách cho phép có thể quản lý bài học, nội dung truyền cảm hứng và hoạt động của học sinh.
+                  Dành cho email được cho phép xem chỉ số học tập tổng hợp.
                 </span>
               </span>
             </label>
@@ -87,8 +91,8 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
             Tạo tài khoản
           </FormSubmitButton>
         </form>
-        <Link className="inline-flex font-semibold text-accent underline-offset-4 hover:underline" href="/demo">
-          Trải nghiệm demo không cần đăng nhập
+        <Link className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-4 hover:underline" href="/demo">
+          Học thử không cần tài khoản
         </Link>
         <p className="text-sm text-slate-600">
           Đã có tài khoản?{" "}

@@ -29,7 +29,7 @@ export function SwitchField({
           type="checkbox"
           value={value}
         />
-        <span className="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-teal-700" />
+        <span className="absolute inset-0 rounded-full bg-slate-300 transition peer-checked:bg-teal-700 peer-focus-visible:outline peer-focus-visible:outline-4 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-black" />
         <span
           className={cn(
             "absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition peer-checked:translate-x-5",

@@ -86,7 +86,7 @@ export function GlobalVoiceControl() {
   const hiddenForWorkspace = isWorkspaceVoiceRoute(pathname);
 
   useEffect(() => {
-    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage));
+    try { setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage)); } catch { setVoicePrivacyAcknowledged(false); }
   }, []);
 
   const announce = useCallback((message: string | null, repeatEvent = false) => {
@@ -287,7 +287,7 @@ export function GlobalVoiceControl() {
               <Button
                 className="mt-2"
                 onClick={() => {
-                  acknowledgeVoiceProcessing(window.localStorage);
+                  try { acknowledgeVoiceProcessing(window.localStorage); } catch { /* Consent remains active for this session. */ }
                   setVoicePrivacyAcknowledged(true);
                   setEnabled(true);
                   void speech.startListening();
@@ -354,8 +354,6 @@ export function GlobalVoiceControl() {
           <div className="mt-3 min-w-0 space-y-1 text-xs">
             {speech.interimTranscript && <p className="min-w-0 break-words">Đang nghe: “{speech.interimTranscript}”</p>}
             {speech.transcript && <p className="min-w-0 break-words">Đã nghe: “{speech.transcript}”</p>}
-            {lastCommand && <p className="min-w-0 break-words">Mình hiểu là: {lastCommand.kind}</p>}
-            <p className="min-w-0 break-words">Đang dùng: <span className="font-semibold">{speech.engineLabel}</span></p>
             {speech.asrState === "processing" && <p className="min-w-0 break-words text-zinc-600">Đang xử lý giọng nói...</p>}
             <p className="min-w-0 break-words font-semibold text-black">{feedback}</p>
             {!speech.isSupportKnown && <p className="min-w-0 break-words text-zinc-600">Đang kết nối nhận dạng giọng nói...</p>}

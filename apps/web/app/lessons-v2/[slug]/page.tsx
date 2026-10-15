@@ -39,7 +39,7 @@ export default async function LessonV2DetailPage({ params }: LessonV2DetailPageP
     .maybeSingle();
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6 lg:h-[calc(100dvh-var(--global-command-bar-height,0px))]">
+    <main className="scc-lesson-page mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6">
       <div className="hidden lg:block"><AppNav /></div>
       <header className="flex flex-wrap items-baseline justify-between gap-3">
         <div className="flex min-w-0 flex-wrap items-baseline gap-3">

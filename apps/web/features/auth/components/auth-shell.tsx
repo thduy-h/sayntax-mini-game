@@ -12,26 +12,20 @@ interface AuthShellProps {
 
 export function AuthShell({ children, description, eyebrow, title }: AuthShellProps) {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col justify-center gap-6 px-6 py-10 lg:grid lg:grid-cols-[1fr_1fr] lg:items-center lg:px-10">
-      <section className="grid-sheen rounded-[2rem] border-4 border-black bg-[#ffefb8] p-8 shadow-[10px_10px_0_#121212] sm:p-10">
-        <BrandLogo className="mb-7 w-full max-w-[300px]" priority />
-        <p className="mb-6 text-sm font-black uppercase tracking-[0.2em] text-black">Công nghệ không rào cản</p>
-        <p className="text-sm font-black uppercase tracking-[0.26em] text-black">{eyebrow}</p>
-        <h1 className="font-heading mt-5 text-5xl leading-none text-black sm:text-6xl">{title}</h1>
-        <p className="mt-5 max-w-xl text-base font-semibold leading-8 text-zinc-800">{description}</p>
-        <div className="mt-8 rounded-[1.4rem] border-4 border-black bg-white p-5 shadow-[6px_6px_0_#121212]">
-          <p className="text-sm font-black uppercase tracking-[0.18em] text-black">Vì sao sản phẩm này tồn tại</p>
-          <p className="mt-3 text-sm font-medium leading-7 text-zinc-700">
-            SAYNTAX giảm rào cản thao tác vật lý, đồng thời khẳng định rằng nữ sinh và phụ nữ trẻ có khuyết tật
-            hoàn toàn có chỗ đứng trong công nghệ.
-          </p>
-        </div>
-        <Link className="mt-8 inline-flex text-sm font-black uppercase text-black underline decoration-4 underline-offset-4" href="/">
-          Quay lại trang giới thiệu
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-4 py-8 sm:px-6 lg:grid lg:grid-cols-[0.9fr_1fr] lg:items-center lg:gap-14 lg:py-12">
+      <section className="min-w-0 lg:py-8">
+        <Link aria-label="SAYNTAX — Trang chủ" className="inline-flex rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-black" href="/">
+          <BrandLogo className="w-44 sm:w-52" priority />
         </Link>
+        <p className="mt-4 text-sm font-semibold text-zinc-600">Công nghệ không rào cản</p>
+        <p className="mt-8 text-xs font-bold uppercase tracking-[0.16em] text-zinc-600">{eyebrow}</p>
+        <h1 className="font-heading mt-3 text-3xl leading-tight text-black sm:text-4xl">{title}</h1>
+        <p className="mt-4 max-w-md text-base leading-7 text-zinc-700">{description}</p>
+        <p className="mt-6 hidden max-w-md text-sm leading-7 text-zinc-600 lg:block">
+          Học lập trình từng bước bằng giọng nói, nhập lệnh hoặc kéo thả khối.
+        </p>
       </section>
-
-      <Card className="bg-[#fffdf3] p-8 sm:p-10">{children}</Card>
+      <Card className="w-full min-w-0 bg-white p-5 sm:p-8">{children}</Card>
     </main>
   );
 }

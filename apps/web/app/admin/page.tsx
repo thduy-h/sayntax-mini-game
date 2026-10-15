@@ -20,6 +20,7 @@ async function getAdminSnapshot() {
     ]);
 
     return {
+      available: ![runsCount, studentsCount, completedCount, voiceCount, unsupportedCount].some((result) => result.error),
       metrics: {
         completedSteps: completedCount.error ? 0 : completedCount.count ?? 0,
         programRuns: runsCount.error ? 0 : runsCount.count ?? 0,
@@ -29,7 +30,7 @@ async function getAdminSnapshot() {
       },
     };
   } catch {
-    return { metrics: { completedSteps: 0, programRuns: 0, students: 0, unsupportedCommands: 0, voiceCommands: 0 } };
+    return { available: false, metrics: { completedSteps: 0, programRuns: 0, students: 0, unsupportedCommands: 0, voiceCommands: 0 } };
   }
 }
 
@@ -71,24 +72,20 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-6 py-8 sm:px-10">
       <AppNav />
+      {!snapshot.available ? <p role="alert" className="rounded-2xl bg-amber-100 p-4 text-amber-950">Chưa thể tải đầy đủ chỉ số. Vui lòng tải lại trang sau ít phút.</p> : null}
       <Card className="border-0 bg-[linear-gradient(155deg,#52304f,#374d69)] text-white">
         <CardHeader>
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-100">Theo dõi pilot</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-rose-100">Quản trị SAYNTAX</p>
           <CardTitle className="text-white">Tình hình học tập và lệnh giọng nói</CardTitle>
           <CardDescription className="text-slate-200">
-            Các chỉ số tổng hợp bên dưới đọc từ progress, program runs và voice command logs khi tài khoản quản trị có quyền xem dữ liệu.
+            Theo dõi các chỉ số tổng hợp về học tập và lệnh giọng nói.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-4">
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm">Bài học đang đọc từ lesson engine nội bộ</div>
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm">Program runs và progress đã có API bảo vệ session</div>
-          <div className="rounded-2xl bg-white/10 px-4 py-3 text-sm">Voice command logs đã có API ghi log cho học viên</div>
-        </CardContent>
       </Card>
 
       <section className="grid gap-4 md:grid-cols-2" aria-label="Các khu vực quản trị">
         {[
-          ["programs", "Lộ trình tiếp theo", "Biên tập bài học trong giao diện quản trị sẽ được ưu tiên sau pilot đầu tiên."],
+          ["programs", "Bài học", "Theo dõi hoạt động học tập qua các chỉ số bên dưới."],
           ["program-runs-overview", "Lượt học", "Theo dõi tổng số lần chạy chương trình."],
           ["progress-overview", "Tiến độ người học", "Theo dõi tổng số bước đã hoàn thành."],
           ["voice-logs-overview", "Lệnh giọng nói", "Theo dõi tổng số lệnh và lệnh chưa hiểu mà không hiển thị bản chép lệnh."],
@@ -103,7 +100,7 @@ export default async function AdminPage() {
         ))}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Chỉ số pilot">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Chỉ số học tập">
         {[
           ["Học viên", snapshot.metrics.students],
           ["Bước đã hoàn thành", snapshot.metrics.completedSteps],
@@ -114,7 +111,7 @@ export default async function AdminPage() {
           <Card className="bg-white" key={label}>
             <CardHeader className="pb-2">
               <CardDescription>{label}</CardDescription>
-              <CardTitle className="text-3xl">{value}</CardTitle>
+              <CardTitle className="text-3xl">{snapshot.available ? value : "—"}</CardTitle>
             </CardHeader>
           </Card>
         ))}

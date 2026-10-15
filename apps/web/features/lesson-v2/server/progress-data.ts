@@ -54,14 +54,14 @@ export async function getLessonV2Progress(lessonSlug: string): Promise<LessonV2P
  * resilience guarantee: failures (no auth, missing table, RLS) return an
  * empty map so the list page still renders.
  */
-export async function getLessonV2CompletionCounts(): Promise<LessonV2CompletionCounts> {
+export async function getLessonV2CompletionSummary(): Promise<{ counts: LessonV2CompletionCounts; available: boolean }> {
   try {
     const supabase = await createServerSupabaseClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) return {};
+    if (!user) return { counts: {}, available: false };
 
     const { data, error } = await supabase
       .from("lesson_v2_progress")
@@ -70,14 +70,18 @@ export async function getLessonV2CompletionCounts(): Promise<LessonV2CompletionC
       .eq("status", "completed")
       .returns<LessonV2SummaryRow[]>();
 
-    if (error || !data) return {};
+    if (error || !data) return { counts: {}, available: false };
 
     const counts: LessonV2CompletionCounts = {};
     for (const row of data) {
       counts[row.lesson_slug] = (counts[row.lesson_slug] ?? 0) + 1;
     }
-    return counts;
+    return { counts, available: true };
   } catch {
-    return {};
+    return { counts: {}, available: false };
   }
+}
+
+export async function getLessonV2CompletionCounts(): Promise<LessonV2CompletionCounts> {
+  return (await getLessonV2CompletionSummary()).counts;
 }

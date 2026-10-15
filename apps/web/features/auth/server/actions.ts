@@ -24,7 +24,7 @@ function safeCallbackPath(value: string) {
 
 export async function signInAction(formData: FormData) {
   if (!isSupabaseConfigured()) {
-    redirectWithMessage("/sign-in", "error", "Supabase chưa được cấu hình. Hãy dùng chế độ demo hoặc thiết lập biến môi trường trước khi đăng nhập.");
+    redirectWithMessage("/sign-in", "error", "Đăng nhập tạm thời chưa sẵn sàng. Bạn vẫn có thể học thử.");
   }
 
   const parsed = signInSchema.safeParse({
@@ -42,7 +42,7 @@ export async function signInAction(formData: FormData) {
   const { error } = await supabase.auth.signInWithPassword(credentials);
 
   if (error) {
-    redirectWithMessage("/sign-in", "error", error.message);
+    redirectWithMessage("/sign-in", "error", error.code === "invalid_credentials" ? "Email hoặc mật khẩu chưa đúng. Vui lòng kiểm tra lại." : error.code === "email_not_confirmed" ? "Bạn cần xác nhận email trước khi đăng nhập. Hãy kiểm tra hộp thư của bạn." : "Không thể đăng nhập lúc này. Vui lòng thử lại sau.");
   }
 
   const user = await getCurrentAppUser();
@@ -63,7 +63,7 @@ export async function signInAction(formData: FormData) {
 
 export async function signUpAction(formData: FormData) {
   if (!isSupabaseConfigured()) {
-    redirectWithMessage("/sign-up", "error", "Supabase chưa được cấu hình. Hãy dùng chế độ demo hoặc thiết lập biến môi trường trước khi đăng ký.");
+    redirectWithMessage("/sign-up", "error", "Đăng ký tạm thời chưa sẵn sàng. Bạn vẫn có thể học thử.");
   }
 
   const parsed = signUpSchema.safeParse({
@@ -99,7 +99,7 @@ export async function signUpAction(formData: FormData) {
   });
 
   if (error) {
-    redirectWithMessage("/sign-up", "error", error.message);
+    redirectWithMessage("/sign-up", "error", "Không thể tạo tài khoản lúc này. Vui lòng kiểm tra thông tin hoặc thử lại sau.");
   }
 
   if (payload.role === "admin" && data.user?.id) {
@@ -127,6 +127,6 @@ export async function signOutAction() {
   }
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase.auth.signOut();
-  if (error) logOperation("auth_failure", { phase: "session" });
+  if (error) redirectWithMessage("/dashboard", "error", "Chưa thể đăng xuất. Vui lòng thử lại.");
   redirect("/sign-in");
 }

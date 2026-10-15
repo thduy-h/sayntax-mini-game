@@ -51,7 +51,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
         <CardContent className="space-y-6">
           <AuthMessage message={params.error} tone="error" />
           <form action={completeOnboardingAction} className="space-y-8">
-            <section className="space-y-5">
+            {appUser.role === "student" ? <section className="space-y-5">
               <div>
                 <h2 className="font-heading text-2xl text-slate-900">Hồ sơ</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -97,7 +97,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
                   </div>
                 </>
               ) : null}
-            </section>
+            </section> : null}
 
             <section className="space-y-5">
               <div>
@@ -152,7 +152,7 @@ export default async function OnboardingPage({ searchParams }: OnboardingPagePro
             </section>
 
             <p className="text-sm leading-6 text-slate-600">
-              Trong pilot, nếu muốn nhận bản sao hoặc yêu cầu xóa dữ liệu tài khoản, hãy liên hệ người phụ trách chương trình của bạn.
+              Nếu muốn nhận bản sao hoặc yêu cầu xóa dữ liệu tài khoản, hãy liên hệ người phụ trách chương trình của bạn.
             </p>
 
             <FormSubmitButton pendingLabel="Đang lưu thiết lập..." size="lg">

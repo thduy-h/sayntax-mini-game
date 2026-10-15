@@ -15,10 +15,12 @@ export default async function DemoLessonPage({ params }: DemoLessonPageProps) {
   if (!lesson) notFound();
 
   return (
-    <main className="mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6 lg:h-[calc(100dvh-var(--global-command-bar-height,0px))]">
-      <nav className="flex flex-wrap items-center justify-between gap-2 rounded-[1.2rem] border-4 border-black bg-white px-3 py-2 shadow-[6px_6px_0_#121212] sm:px-4 sm:py-3">
+    <main className="scc-lesson-page mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6">
+      <nav className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border-2 border-black bg-white px-3 py-2 shadow-[3px_3px_0_#121212] sm:px-4">
         <div className="flex min-w-0 flex-wrap items-baseline gap-3">
-          <BrandLogo className="w-[120px]" />
+          <Link aria-label="SAYNTAX - về trang chủ" className="inline-flex min-h-11 items-center" href="/">
+            <BrandLogo className="w-[120px]" />
+          </Link>
           <Link className="inline-flex min-h-11 items-center text-xs font-black uppercase text-black underline decoration-2 underline-offset-4" href="/demo">
             ← Danh sách demo
           </Link>

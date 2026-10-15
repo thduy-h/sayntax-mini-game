@@ -18,13 +18,13 @@ export async function completeOnboardingAction(formData: FormData) {
   const user = await getCurrentAppUser();
 
   if (!user) {
-    redirect("/sign-in?error=Please%20sign%20in%20again.");
+    redirect("/sign-in?error=Vui%20lòng%20đăng%20nhập%20lại.");
   }
 
   const parsed = onboardingSchema.safeParse({
     ageRange: getString(formData, "ageRange"),
     audioInstructions: getBoolean(formData, "audioInstructions"),
-    displayName: getString(formData, "displayName"),
+    displayName: user.role === "admin" ? "Quản trị viên" : getString(formData, "displayName"),
     fontScale: getString(formData, "fontScale"),
     goals: getString(formData, "goals"),
     gradeLevel: getString(formData, "gradeLevel"),
@@ -37,7 +37,7 @@ export async function completeOnboardingAction(formData: FormData) {
 
   if (!parsed.success) {
     logOperation("onboarding_failure", { phase: "validation" });
-    redirect(`/onboarding?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Invalid onboarding details.")}`);
+    redirect(`/onboarding?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Vui lòng kiểm tra lại thông tin thiết lập.")}`);
   }
 
   const supabase = await createServerSupabaseClient();
@@ -54,7 +54,7 @@ export async function completeOnboardingAction(formData: FormData) {
 
   if (accessibilityError) {
     logOperation("onboarding_failure", { phase: "persistence" });
-    redirect(`/onboarding?error=${encodeURIComponent(accessibilityError.message)}`);
+    redirect(`/onboarding?error=${encodeURIComponent("Chưa thể lưu thiết lập. Vui lòng thử lại; thông tin đã nhập chưa được lưu đầy đủ.")}`);
   }
 
   if (user.role === "student") {
@@ -62,7 +62,7 @@ export async function completeOnboardingAction(formData: FormData) {
 
     if (profileError) {
       logOperation("onboarding_failure", { phase: "persistence" });
-      redirect(`/onboarding?error=${encodeURIComponent(profileError.message)}`);
+      redirect(`/onboarding?error=${encodeURIComponent("Chưa thể lưu thiết lập. Vui lòng thử lại; thông tin đã nhập chưa được lưu đầy đủ.")}`);
     }
   }
 
@@ -73,7 +73,7 @@ export async function completeOnboardingAction(formData: FormData) {
 
   if (userError) {
     logOperation("onboarding_failure", { phase: "persistence" });
-    redirect(`/onboarding?error=${encodeURIComponent(userError.message)}`);
+    redirect(`/onboarding?error=${encodeURIComponent("Chưa thể lưu thiết lập. Vui lòng thử lại; thông tin đã nhập chưa được lưu đầy đủ.")}`);
   }
 
   redirect(user.role === "admin" ? "/admin" : "/dashboard");

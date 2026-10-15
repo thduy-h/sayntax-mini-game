@@ -23,8 +23,6 @@ export function GlobalCommandBar() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wasWorkspaceRef = useRef(false);
   const hiddenForModal = workspace?.modalOpen === true;
-  const contextLabel = workspace ? `Điều khiển bài học: ${workspace.lessonTitle}` : "Điều khiển website";
-  const sampleUtterance = workspace?.sampleUtterance ?? null;
 
   useEffect(() => {
     if (hiddenForModal) {
@@ -69,7 +67,7 @@ export function GlobalCommandBar() {
   useEffect(() => {
     const inWorkspace = Boolean(workspace);
     if (inWorkspace && !wasWorkspaceRef.current) {
-      window.queueMicrotask(() => setCollapsed(true));
+      window.queueMicrotask(() => setCollapsed(false));
     }
     wasWorkspaceRef.current = inWorkspace;
   }, [workspace]);
@@ -108,17 +106,14 @@ export function GlobalCommandBar() {
   return (
     <div
       ref={barRef}
-      className="fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3"
+      className="fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-3"
     >
       <section
         aria-label="Thanh nhập lệnh toàn cục"
-        className="scc-voice-debug-panel max-h-[65dvh] w-full max-w-4xl overflow-y-auto rounded-[1rem] border-4 border-black bg-white p-3 text-black shadow-[8px_8px_0_#121212]"
+        className="scc-voice-debug-panel max-h-[45dvh] w-full max-w-4xl overflow-y-auto rounded-xl border-2 border-black bg-white p-2 text-black shadow-[3px_3px_0_#121212] sm:p-3"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black">{contextLabel}</p>
-            <p className="text-xs text-zinc-600">Nhấn Alt+G để focus thanh lệnh.</p>
-          </div>
+        {!workspace && <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-bold text-black">{workspace ? "Nói hoặc nhập lệnh cho bài học" : "Nhập lệnh điều khiển"}</p>
           <Button
             aria-expanded="true"
             aria-label="Thu gọn thanh nhập lệnh toàn cục"
@@ -130,43 +125,32 @@ export function GlobalCommandBar() {
             <PanelTopClose className="mr-2 h-4 w-4" />
             Thu gọn
           </Button>
-        </div>
+        </div>}
 
         <form
-          className="mt-2 flex flex-wrap items-end gap-2"
+          className="mt-1 flex items-end gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             sendCommand(command);
           }}
         >
-          <label className="min-w-0 basis-full flex-1 text-xs font-black uppercase tracking-[0.12em] text-black sm:basis-[220px]" htmlFor="globalCommandInput">
-            Nhập lệnh
+          <label className="min-w-0 flex-1 text-xs font-black uppercase tracking-[0.12em] text-black" htmlFor="globalCommandInput">
+            <span className="sr-only">Nhập lệnh</span>
             <Input
               ref={inputRef}
               aria-describedby="globalCommandHelp"
-              className="mt-1 font-mono normal-case tracking-normal"
+              className="font-mono normal-case tracking-normal"
               id="globalCommandInput"
               onChange={(event) => setCommand(event.target.value)}
-              placeholder={workspace ? "Ví dụ: thêm khối bắt đầu, chèn sau khối 1" : "Ví dụ: trải nghiệm ngay, cuộn xuống, bấm Đăng nhập"}
+              placeholder={workspace ? "Nhập lệnh, ví dụ: thêm khối In" : "Nhập lệnh..."}
               value={command}
             />
           </label>
           <Button disabled={!command.trim()} type="submit" variant="secondary">
             <Command className="mr-2 h-4 w-4" />
-            Thực hiện
+            Gửi
           </Button>
-          {sampleUtterance && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setCommand(sampleUtterance);
-                window.setTimeout(() => inputRef.current?.focus(), 0);
-              }}
-            >
-              Điền câu mẫu vào ô
-            </Button>
-          )}
+          {workspace && <Button aria-label="Thu gọn thanh nhập lệnh" onClick={() => setCollapsed(true)} size="sm" type="button" variant="ghost"><PanelTopClose className="h-4 w-4" /></Button>}
           {workspace?.pendingPreview && (
             <>
               <Button type="button" variant="secondary" onClick={() => sendCommand("đúng rồi")}>
@@ -179,24 +163,8 @@ export function GlobalCommandBar() {
           )}
         </form>
 
-        <div className="mt-2 min-w-0 space-y-1 text-xs" id="globalCommandFeedback">
-          <p className="text-zinc-600" id="globalCommandHelp">
-            {workspace
-              ? workspace.workspaceReady
-                ? "Lệnh sẽ điều khiển Blockly của bài học hiện tại."
-                : "Workspace đang khởi tạo; có thể nhập lại sau giây lát."
-              : "Lệnh sẽ điều khiển trang web hiện tại."}
-          </p>
-          {lastResult?.command && (
-            <p className="min-w-0 break-words text-zinc-600">
-              Hệ thống đã nhận: <span className="font-mono">“{lastResult.command}”</span>
-            </p>
-          )}
-          {lastResult?.understoodAs && (
-            <p className="min-w-0 break-words text-zinc-600">
-              Mình hiểu là: <span className="font-semibold text-black">{lastResult.understoodAs}</span>
-            </p>
-          )}
+        <div className="mt-1 min-w-0 text-xs" id="globalCommandFeedback">
+          <p className="sr-only" id="globalCommandHelp">{workspace ? "Lệnh điều khiển vùng khối của bài học." : "Lệnh điều khiển trang web."}</p>
           {lastResult?.feedback && (
             <p className={`min-w-0 break-words font-semibold ${lastResult.handled ? "text-black" : "text-red-700"}`}>
               {lastResult.feedback}

@@ -18,10 +18,10 @@ export function lessonVoicePresentation(input: {
 }): LessonVoicePresentation {
   if (!input.privacyAcknowledged) return { label: "Đọc thông tin micro để bật giọng nói", tone: "warning" };
   if (!input.isSupportKnown || input.asrState === "checking") return { label: "Đang kiểm tra giọng nói", tone: "working" };
-  if (!input.isSupported || input.errorMessage) return { label: "Giọng nói chưa sẵn sàng — có thể nhập lệnh", tone: "warning" };
-  if (input.asrState === "processing") return { label: "Đang xử lý lời nói", tone: "working" };
+  if (!input.isSupported || input.errorMessage) return { label: "Không thể nhận dạng giọng nói", tone: "warning" };
+  if (input.asrState === "processing") return { label: "Đang xử lý", tone: "working" };
   if (input.asrState === "starting") return { label: "Đang mở micro", tone: "working" };
-  if (input.asrState === "listening") return { label: "Micro đang nghe", tone: "active" };
+  if (input.asrState === "listening") return { label: "Đang nghe", tone: "active" };
   if (input.outcome === "pending") return { label: "Đang chờ xác nhận", tone: "warning" };
   if (input.outcome === "applied") return { label: "Lệnh đã thực hiện", tone: "success" };
   if (input.outcome === "not_applied" || input.outcome === "unsupported") {

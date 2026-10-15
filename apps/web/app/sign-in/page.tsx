@@ -31,28 +31,30 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
 
   return (
     <AuthShell
-      description="Dùng tài khoản của bạn để tiếp tục bài học, theo dõi tiến độ và truy cập nội dung phù hợp với vai trò."
+      description="Tiếp tục bài học và theo dõi tiến độ của bạn."
       eyebrow="Truy cập tài khoản"
       title="Đăng nhập vào SAYNTAX"
     >
       <CardHeader>
         <CardTitle>Chào mừng bạn quay lại</CardTitle>
-        <CardDescription>Học sinh sẽ quay về bảng học tập, còn quản trị viên quay về khu vực quản lý nội dung.</CardDescription>
+        <CardDescription>Nhập email và mật khẩu để tiếp tục học.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <AuthMessage message={params.message} />
-        <AuthMessage message={params.error} tone="error" />
-        {!authConfigured && (
-          <AuthMessage
-            message="Đăng nhập chưa sẵn sàng vì Supabase chưa được cấu hình. Bạn vẫn có thể vào chế độ demo công khai."
-            tone="error"
-          />
-        )}
+        <div className="min-h-12 space-y-2">
+          <AuthMessage message={params.message} />
+          <AuthMessage message={params.error} tone="error" />
+          {!authConfigured && (
+            <AuthMessage
+              message="Đăng nhập tạm thời chưa sẵn sàng. Bạn vẫn có thể học thử mà không cần tài khoản."
+              tone="error"
+            />
+          )}
+        </div>
         <form action={signInAction} className="space-y-5">
           {params.callbackUrl ? <input name="callbackUrl" type="hidden" value={params.callbackUrl} /> : null}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input autoComplete="email" id="email" name="email" placeholder="hocvien@example.com" required type="email" />
+            <Input autoCapitalize="none" spellCheck={false} autoComplete="email" id="email" name="email" placeholder="hocvien@example.com" required type="email" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Mật khẩu</Label>
@@ -60,7 +62,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
               autoComplete="current-password"
               id="password"
               name="password"
-              placeholder="Tối thiểu 8 ký tự"
+              placeholder="Nhập mật khẩu của bạn"
               required
               type="password"
             />
@@ -69,8 +71,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             Đăng nhập
           </FormSubmitButton>
         </form>
-        <Link className="inline-flex font-semibold text-accent underline-offset-4 hover:underline" href="/demo">
-          Trải nghiệm demo không cần đăng nhập
+        <Link className="inline-flex min-h-11 items-center font-semibold text-accent underline-offset-4 hover:underline" href="/demo">
+          Học thử không cần tài khoản
         </Link>
         <p className="text-sm text-slate-600">
           Chưa có tài khoản?{" "}

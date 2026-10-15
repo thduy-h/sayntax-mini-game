@@ -3,11 +3,29 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { HybridASRManager } from "../asr/hybrid-manager";
 import type { ASREngineType, ASRState } from "../asr/types";
+import type { ASRError } from "../asr/types";
 
 type MicrophoneStatus = "unknown" | "checking" | "ready" | "blocked" | "missing" | "busy";
 const START_EVENT = "scc-voice-recognition-starting";
 const MICROPHONE_STORAGE_KEY = "scc_selected_microphone_id";
 const DUPLICATE_FINAL_WINDOW_MS = 1200;
+
+function voiceErrorMessage(error: ASRError) {
+  if (error.code === "no_speech") return "Không nghe rõ, thử lại. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
+  if (error.code === "permission_denied") return "Micro chưa được cấp quyền. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
+  return "Không thể nhận dạng giọng nói. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
+}
+
+function storedMicrophone() {
+  try { return window.localStorage.getItem(MICROPHONE_STORAGE_KEY) ?? ""; } catch { return ""; }
+}
+
+function saveMicrophone(deviceId: string) {
+  try {
+    if (deviceId) window.localStorage.setItem(MICROPHONE_STORAGE_KEY, deviceId);
+    else window.localStorage.removeItem(MICROPHONE_STORAGE_KEY);
+  } catch { /* Browser storage is optional for microphone selection. */ }
+}
 
 export interface AudioInputOption {
   deviceId: string;
@@ -46,7 +64,7 @@ export function useSpeechRecognition() {
       setAudioInputs([]);
       return [];
     }
-    const devices = await navigator.mediaDevices.enumerateDevices();
+    const devices = await navigator.mediaDevices.enumerateDevices().catch(() => [] as MediaDeviceInfo[]);
     const inputs = devices
       .filter((device) => device.kind === "audioinput")
       .map((device, index) => ({
@@ -62,13 +80,13 @@ export function useSpeechRecognition() {
     ) {
       selectedMicrophoneIdRef.current = "";
       setSelectedMicrophoneId("");
-      window.localStorage.removeItem(MICROPHONE_STORAGE_KEY);
+      saveMicrophone("");
     }
     return inputs;
   }
 
   useEffect(() => {
-    const saved = window.localStorage.getItem(MICROPHONE_STORAGE_KEY) ?? "";
+    const saved = storedMicrophone();
     selectedMicrophoneIdRef.current = saved;
     window.queueMicrotask(() => {
       setSelectedMicrophoneId(saved);
@@ -90,7 +108,7 @@ export function useSpeechRecognition() {
           setEngineLabel(label);
         },
         onError: (error) => {
-          setErrorMessage(error.message);
+          setErrorMessage(voiceErrorMessage(error));
           setMicrophoneStatus(
             error.code === "permission_denied"
               ? "blocked"
@@ -144,8 +162,7 @@ export function useSpeechRecognition() {
   function selectMicrophone(deviceId: string) {
     selectedMicrophoneIdRef.current = deviceId;
     setSelectedMicrophoneId(deviceId);
-    if (deviceId) window.localStorage.setItem(MICROPHONE_STORAGE_KEY, deviceId);
-    else window.localStorage.removeItem(MICROPHONE_STORAGE_KEY);
+    saveMicrophone(deviceId);
     setErrorMessage(null);
     if (asrState === "listening" || asrState === "starting" || asrState === "processing") {
       void stopListening();

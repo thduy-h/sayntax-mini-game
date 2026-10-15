@@ -28,7 +28,7 @@ export default function DemoLessonsPage() {
           <p className="text-sm font-black uppercase tracking-[0.22em] text-black">Chế độ demo</p>
           <h1 className="font-heading max-w-3xl text-3xl leading-tight sm:text-4xl">Chọn bài học thử</h1>
           <CardDescription>
-            Không cần tài khoản. Học bằng giọng nói, nhập lệnh hoặc kéo thả Blockly. Tiến độ học thử lưu trên thiết bị này.
+            Không cần tài khoản. Học bằng giọng nói, nhập lệnh hoặc kéo thả khối. Tiến độ học thử lưu trên thiết bị này.
           </CardDescription>
         </CardHeader>
       </Card>

@@ -37,7 +37,7 @@
   --z-global-command: 850;
   --z-global-voice: 900;
   --z-completion-modal: 1000;
-  --global-command-bar-height: 8rem;
+  --global-command-bar-height: 4.5rem;
 }
 
 * {
@@ -61,6 +61,12 @@ body {
 }
 
 body:has(.scc-lesson-page) .scc-site-footer { display: none; }
+
+@media (min-width: 640px) {
+  .scc-global-voice-collapsed {
+    bottom: calc(var(--global-command-bar-height, 0px) + 0.75rem) !important;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
@@ -136,7 +142,7 @@ textarea:focus-visible {
 
 .blocklyToolbox {
   box-sizing: border-box;
-  overflow-y: auto;
+  /* Let Blockly own toolbox overflow as its viewport and category state change. */
   z-index: var(--z-blockly-toolbox) !important;
 }
 
@@ -189,15 +195,14 @@ textarea:focus-visible {
 }
 
 .blocklyScrollbarBackground {
-  fill: #fff6fb !important;
-  stroke: #121212 !important;
-  stroke-width: 1px !important;
+  fill: #e9e7e0 !important;
+  stroke: none !important;
 }
 
 .blocklyScrollbarHandle {
-  fill: #121212 !important;
+  fill: #7f837f !important;
 }
 
 .blocklyScrollbarKnob {
-  fill: #ff5f87 !important;
+  fill: #5f665f !important;
 }

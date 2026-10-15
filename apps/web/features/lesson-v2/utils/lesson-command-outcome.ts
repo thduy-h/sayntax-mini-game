@@ -8,12 +8,12 @@ export function unknownCommandRecovery(input: {
   selectableBlockCount: number;
 }) {
   if (input.selectableBlockCount > 0) {
-    return `Mình chưa hiểu câu lệnh này. Vị trí chèn vẫn là ${input.cursorLabel}. Em có thể nói: chọn khối 2, chèn sau khối 2, hoặc gợi ý.`;
+    return `Mình chưa hiểu câu lệnh này. Vị trí chèn vẫn là ${input.cursorLabel}. Bạn có thể nói: chọn khối 2, chèn sau khối 2, hoặc gợi ý.`;
   }
   const sample = input.sampleUtterance?.trim();
   return sample
-    ? `Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Em có thể nói: “${sample}”, hoặc “gợi ý”.`
-    : "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Hãy thêm khối phù hợp với yêu cầu hiện tại hoặc nói “gợi ý”.";
+    ? `Mình chưa hiểu câu lệnh này. Vùng xếp khối còn trống. Bạn có thể nói: “${sample}”, hoặc “gợi ý”.`
+    : "Mình chưa hiểu câu lệnh này. Vùng xếp khối còn trống. Hãy thêm khối phù hợp với bước hiện tại hoặc nói “gợi ý”.";
 }
 
 export function nextLessonHint(hints: readonly string[], currentIndex: number) {
@@ -46,7 +46,7 @@ export function resolveLessonCommandOutcome({
 }: LessonCommandOutcomeInput) {
   if (intentKind === "unknown") {
     return {
-      feedback: actionFeedback ?? "Mình chưa hiểu câu lệnh này. Em có thể nói lại hoặc dùng câu mẫu.",
+      feedback: actionFeedback ?? "Mình chưa hiểu câu lệnh này. Bạn có thể nói lại hoặc dùng câu mẫu.",
       handled: false,
       outcome: "unsupported" as const,
     };

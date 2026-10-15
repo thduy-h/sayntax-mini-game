@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Speech and route events are synchronized with browser state here. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Mic, MicOff, Volume2, X } from "lucide-react";
@@ -244,19 +246,19 @@ export function GlobalVoiceControl() {
 
   return (
     <div
-      className="fixed right-4 z-[var(--z-global-voice)] w-[min(22rem,calc(100vw-2rem))]"
-      style={{ bottom: "calc(var(--global-command-bar-height, 0px) + 1rem)" }}
+      className={`fixed right-3 z-[var(--z-global-voice)] ${expanded ? "w-[min(22rem,calc(100vw-1.5rem))]" : "scc-global-voice-collapsed w-auto"}`}
+      style={{ bottom: expanded ? "calc(var(--global-command-bar-height, 0px) + 1rem)" : "max(0.75rem, env(safe-area-inset-bottom))" }}
     >
       <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
       {!expanded ? (
         <Button
           aria-label="Bật điều khiển web bằng giọng nói"
-          className="w-full justify-center"
+          className="min-h-11 justify-center border-2 bg-white px-3 text-xs shadow-[3px_3px_0_#121212] sm:px-4"
           onClick={start}
           type="button"
         >
           <Volume2 className="mr-2 h-4 w-4" />
-          Điều khiển web bằng giọng nói
+          <span className="sm:hidden">Điều khiển giọng nói</span><span className="hidden sm:inline">Điều khiển bằng giọng nói</span>
         </Button>
       ) : (
         <section

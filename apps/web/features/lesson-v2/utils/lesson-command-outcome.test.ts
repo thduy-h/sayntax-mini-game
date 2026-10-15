@@ -16,11 +16,11 @@ assert.deepEqual(
 
 assert.equal(
   unknownCommandRecovery({ cursorLabel: "cuối chương trình", sampleUtterance: "thêm khối bắt đầu", selectableBlockCount: 0 }),
-  "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Em có thể nói: “thêm khối bắt đầu”, hoặc “gợi ý”.",
+  "Mình chưa hiểu câu lệnh này. Vùng xếp khối còn trống. Bạn có thể nói: “thêm khối bắt đầu”, hoặc “gợi ý”.",
 );
 assert.equal(
   unknownCommandRecovery({ cursorLabel: "cuối chương trình", sampleUtterance: null, selectableBlockCount: 0 }),
-  "Mình chưa hiểu câu lệnh này. Workspace chưa có khối để chọn. Hãy thêm khối phù hợp với yêu cầu hiện tại hoặc nói “gợi ý”.",
+  "Mình chưa hiểu câu lệnh này. Vùng xếp khối còn trống. Hãy thêm khối phù hợp với bước hiện tại hoặc nói “gợi ý”.",
 );
 assert.match(
   unknownCommandRecovery({ cursorLabel: "sau khối 1", sampleUtterance: "thêm khối in", selectableBlockCount: 2 }),
@@ -166,7 +166,7 @@ assert.match(client, /previousValue === value/);
 assert.match(client, /String\(target\.getFieldValue\(fieldName\) \?\? ""\) === previousValue/);
 assert.match(client, /if \(!target\) \{\s*setLastFeedback\(intent\.kind === "set_text"/);
 assert.match(client, /return \{ applied: !alreadyAtEnd, changed: false, shouldEvaluate: false \}/);
-assert.match(client, /Workspace đã ở mép này/);
+assert.match(client, /Đã đến mép vùng khối/);
 assert.match(client, /const applied = outcome\.applied \?\? outcome\.changed/);
 assert.match(client, /commandFeedbackAnnouncement\(lastCommandResult\)/);
 assert.match(client, /const feedback = advanceHint\(\);\s*if \(!feedback\)/);

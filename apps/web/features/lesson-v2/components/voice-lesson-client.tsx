@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- This client bridges Blockly, speech, storage, and responsive browser state through effects. */
+
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -217,7 +219,7 @@ function ensureBlocks() {
   Blockly.defineBlocksWithJsonArray([
     { type: "scc_start", message0: "bắt đầu", nextStatement: null, style: "logic_blocks" },
     { type: "scc_print", message0: "in %1", args0: [{ type: "input_value", name: "TEXT", check: ["String", "Number", "Boolean"] }], previousStatement: null, nextStatement: null, style: "text_blocks" },
-    { type: "scc_repeat", message0: "lặp %1 lần", args0: [{ type: "field_number", name: "TIMES", value: 3, min: 0, precision: 1 }], message1: "thực hiện %1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null, style: "loop_blocks" },
+    { type: "scc_repeat", message0: "lặp %1 lần", args0: [{ type: "field_number", name: "TIMES", value: 2, min: 0, precision: 1 }], message1: "thực hiện %1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null, style: "loop_blocks" },
     { type: "scc_if", message0: "nếu %1", args0: [{ type: "input_value", name: "CONDITION", check: "Boolean" }], message1: "thì %1", args1: [{ type: "input_statement", name: "DO" }], previousStatement: null, nextStatement: null, style: "logic_blocks" },
     { type: "scc_variable", message0: "đặt biến %1 thành %2", args0: [{ type: "field_input", name: "NAME", text: "score" }, { type: "field_input", name: "VALUE", text: "5" }], previousStatement: null, nextStatement: null, style: "variable_blocks" },
     { type: "scc_text_literal", message0: "%1", args0: [{ type: "field_input", name: "VALUE", text: "Xin chào" }], output: "String", style: "text_blocks" },
@@ -533,7 +535,7 @@ export function VoiceLessonClient({
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const textCommandHandlerRef = useRef<(command: string) => GlobalCommandExecutionResult>((command) => ({
     command,
-    feedback: "Workspace đang khởi tạo. Vui lòng thử lại sau giây lát.",
+    feedback: "Vùng xếp khối đang mở. Hãy thử lại sau giây lát.",
     handled: false,
     target: "workspace",
   }));
@@ -572,7 +574,7 @@ export function VoiceLessonClient({
   const [workspaceRetryKey, setWorkspaceRetryKey] = useState(0);
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const [toolboxOpen, setToolboxOpen] = useState(true);
-  const [stepPanelOpen, setStepPanelOpen] = useState(false);
+  const [stepPanelOpen, setStepPanelOpen] = useState(true);
   const [showPrimer, setShowPrimer] = useState(false);
   const prevStepIndexRef = useRef(currentStepIndex);
   const speech = useSpeechRecognition();
@@ -622,8 +624,8 @@ export function VoiceLessonClient({
       isSupported: speech.isSupported,
     };
     const fallback = lessonComplete
-      ? "Em có thể nhập lệnh trong hộp thoại hoàn thành."
-      : "Em có thể dùng thanh Nhập lệnh ở cuối màn hình.";
+      ? "Bạn có thể nhập lệnh trong hộp thoại hoàn thành."
+      : "Bạn có thể dùng thanh Nhập lệnh ở cuối màn hình.";
     announce(speechStatusAnnouncement(previousSpeechStatusRef.current, current, fallback));
     previousSpeechStatusRef.current = current;
   }, [announce, lessonComplete, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
@@ -778,7 +780,7 @@ export function VoiceLessonClient({
     const hasBlocks = Boolean(workspaceRef.current?.getAllBlocks(false).length);
     const replacesWorkspace = willReplaceWorkspace(currentStepIndex, targetIndex, hasBlocks);
     const feedback = `Đã chuyển đến bước ${targetIndex + 1}: ${target.title}. ${replacesWorkspace
-      ? "Workspace đã nạp nội dung bắt đầu của bước này."
+      ? "Đã mở sẵn các khối cho bước này."
       : "Các khối hiện tại được giữ lại."}`;
     setPendingAction(null);
     setPreviousStepResult(null);
@@ -817,7 +819,7 @@ export function VoiceLessonClient({
     );
     if (plan.status !== "navigate") {
       const feedback = plan.status === "same"
-        ? `Em đang ở bước ${currentStepIndex + 1}.`
+        ? `Bạn đang ở bước ${currentStepIndex + 1}.`
         : "Không tìm thấy bước học được yêu cầu.";
       setLastFeedback(feedback);
       return makeWorkspaceCommandResult(command, feedback, false, undefined, null, "not_applied");
@@ -911,7 +913,7 @@ export function VoiceLessonClient({
     setVoiceCursorItems(index.items);
     const selectedId = selectedBlockForDisplay(workspace)?.id ?? null;
     const selectedItem = index.items.find((item) => item.blockId === selectedId);
-    setSelectedBlockSummary(selectedItem ? `Khối ${selectedItem.displayId}: ${selectedItem.label}` : null);
+    setSelectedBlockSummary(selectedItem ? selectedItem.label : null);
     updateBlocklyVoiceBadges(workspace, index.items, selectedId, insertCursor.targetBlockId);
   }
 
@@ -1040,7 +1042,7 @@ export function VoiceLessonClient({
   function applyWorkspaceViewportAction(intent: Extract<VoiceIntent, { kind: "pan_workspace" | "center_workspace" | "zoom_workspace" }>) {
     const workspace = workspaceRef.current;
     if (!workspace) {
-      setLastFeedback("Workspace chưa sẵn sàng.");
+      setLastFeedback("Vùng xếp khối chưa sẵn sàng.");
       return { applied: false, changed: false, shouldEvaluate: false };
     }
     if (intent.kind === "pan_workspace") {
@@ -1050,15 +1052,15 @@ export function VoiceLessonClient({
       const after = workspace.getMetricsManager().getMetrics();
       const moved = Math.abs(after.viewLeft - metrics.viewLeft) > 0.5 || Math.abs(after.viewTop - metrics.viewTop) > 0.5;
       if (!moved) {
-        setLastFeedback("Workspace đã ở mép này. Em có thể cuộn theo hướng khác hoặc nói: vừa màn hình.");
+        setLastFeedback("Đã đến mép vùng khối. Bạn có thể cuộn hướng khác hoặc chọn Vừa màn hình.");
         return { applied: false, changed: false, shouldEvaluate: false };
       }
       setLastFeedback(
         {
-          down: "Đã cuộn workspace xuống.",
-          left: "Đã cuộn workspace sang trái.",
-          right: "Đã cuộn workspace sang phải.",
-          up: "Đã cuộn workspace lên.",
+          down: "Đã cuộn vùng khối xuống.",
+          left: "Đã cuộn vùng khối sang trái.",
+          right: "Đã cuộn vùng khối sang phải.",
+          up: "Đã cuộn vùng khối lên.",
         }[intent.direction],
       );
       return { applied: true, changed: false, shouldEvaluate: false };
@@ -1093,7 +1095,7 @@ export function VoiceLessonClient({
       workspace.setScale(0.85);
       const start = (workspace.getTopBlocks(true) as Blockly.BlockSvg[]).find((candidate) => candidate.type === "scc_start") ?? null;
       if (start) workspace.centerOnBlock(start.id);
-      setLastFeedback(wasDefaultScale && !start ? "Zoom đã ở mức mặc định." : "Đã đặt lại zoom workspace.");
+      setLastFeedback(wasDefaultScale && !start ? "Kích thước đã ở mức mặc định." : "Đã đặt lại kích thước vùng khối.");
       return { applied: !wasDefaultScale || Boolean(start), changed: false, shouldEvaluate: false };
     }
     const nextScale = clampWorkspaceScale(workspace.scale * (intent.level === "in" ? 1.15 : 0.87));
@@ -1103,7 +1105,7 @@ export function VoiceLessonClient({
     }
     workspace.setScale(nextScale);
     Blockly.svgResize(workspace);
-    setLastFeedback(intent.level === "in" ? "Đã phóng to workspace." : "Đã thu nhỏ workspace.");
+    setLastFeedback(intent.level === "in" ? "Đã phóng to vùng khối." : "Đã thu nhỏ vùng khối.");
     return { applied: true, changed: false, shouldEvaluate: false };
   }
 
@@ -1443,7 +1445,7 @@ export function VoiceLessonClient({
       }
       let textLiteral = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
       if (textLiteral?.type === "scc_text_literal" && String(textLiteral.getFieldValue("VALUE") ?? "") === value) {
-        setLastFeedback(`Khối in đã có nội dung “${value}”. Em có thể chọn khối khác hoặc tiếp tục.`);
+        setLastFeedback(`Khối in đã có nội dung “${value}”. Bạn có thể chọn khối khác hoặc tiếp tục.`);
         return false;
       }
       if (!textLiteral || textLiteral.type !== "scc_text_literal") {
@@ -1479,7 +1481,7 @@ export function VoiceLessonClient({
     }
     const previousValue = String(target.getFieldValue(fieldName) ?? "");
     if (previousValue === value) {
-      setLastFeedback(`Giá trị đã là “${value}”. Em có thể chọn khối khác hoặc tiếp tục.`);
+      setLastFeedback(`Giá trị đã là “${value}”. Bạn có thể chọn khối khác hoặc tiếp tục.`);
       return false;
     }
     target.setFieldValue(value, fieldName);
@@ -1510,7 +1512,7 @@ export function VoiceLessonClient({
     }
     const currentInput = target.getInputTargetBlock("TEXT") as Blockly.BlockSvg | null;
     if (currentInput?.type === "scc_variable_get" && String(currentInput.getFieldValue("NAME") ?? "") === intent.name) {
-      setLastFeedback(`Khối in đã dùng biến ${intent.name}. Em có thể tiếp tục.`);
+      setLastFeedback(`Khối in đã dùng biến ${intent.name}. Bạn có thể tiếp tục.`);
       return false;
     }
     if (!target.getInput("TEXT")?.connection) {
@@ -1666,7 +1668,7 @@ export function VoiceLessonClient({
         ? resolveBlockFromIntentTarget(workspace, "last")
         : resolveBlockFromIntentTarget(workspace, intent.target, intent.displayId);
     if (!victim) {
-      setLastFeedback("Chưa tìm thấy khối có thể xoá. Em có thể nói: chọn khối 2, rồi xóa khối đang chọn.");
+      setLastFeedback("Chưa tìm thấy khối có thể xoá. Bạn có thể nói: chọn khối 2, rồi xóa khối đang chọn.");
       return false;
     }
     const displayId = displayIdForBlock(victim);
@@ -1803,7 +1805,7 @@ export function VoiceLessonClient({
           block = getBlockByDisplayId(workspace, intent.displayId);
         }
         if (!block) {
-          setLastFeedback("Chưa tìm thấy khối đó. Hãy xem ID khối rồi thử: chọn khối 1, hoặc chọn khối in thứ hai.");
+          setLastFeedback("Chưa tìm thấy khối đó. Hãy thử: chọn khối 1, hoặc chọn khối in thứ hai.");
           return { changed: false, shouldEvaluate: false };
         }
         block.select();
@@ -1830,7 +1832,7 @@ export function VoiceLessonClient({
         }
         if (intent.position === "inside" && !target.getInput("DO")?.connection) {
           const displayId = displayIdForBlock(target) ?? intent.displayId ?? "";
-          setLastFeedback(`Khối ${displayId || "này"} không hỗ trợ chèn vào trong. Em có thể chèn trước hoặc chèn sau khối này.`);
+          setLastFeedback(`Khối ${displayId || "này"} không hỗ trợ chèn vào trong. Bạn có thể chèn trước hoặc chèn sau khối này.`);
           return { changed: false, shouldEvaluate: false };
         }
         const alreadyThere = insertCursor.position === intent.position && insertCursor.targetBlockId === target.id;
@@ -1853,7 +1855,7 @@ export function VoiceLessonClient({
         const selected = getSelectedBlock() ?? getLastAffectedBlock(workspace);
         setLastFeedback(
           selected
-            ? `Em đang chọn ${describeBlock(selected)}. Vị trí chèn là ${cursorPositionLabel(insertCursor)}.`
+            ? `Bạn đang chọn ${describeBlock(selected)}. Vị trí chèn là ${cursorPositionLabel(insertCursor)}.`
             : `Chưa chọn khối nào. Vị trí chèn là ${cursorPositionLabel(insertCursor)}.`,
         );
         return { applied: true, changed: false, shouldEvaluate: false };
@@ -1884,7 +1886,7 @@ export function VoiceLessonClient({
       case "add_block": {
         const blocklyType = typeMap[intent.blockType];
         if (!blocklyType) {
-          setLastFeedback("Khối này chưa có trong workspace. Em có thể chọn khối trong danh sách hiện có.");
+          setLastFeedback("Khối này chưa có trong bài. Bạn có thể chọn khối trong danh sách bên trái.");
           return { changed: false, shouldEvaluate: false };
         }
         const block = workspace.newBlock(blocklyType) as Blockly.BlockSvg;
@@ -1967,7 +1969,7 @@ export function VoiceLessonClient({
       case "ask_hint": {
         const feedback = advanceHint();
         if (!feedback) {
-          setLastFeedback("Bước này chưa có gợi ý để xem. Em có thể xem lại yêu cầu hiện tại.");
+          setLastFeedback("Bước này chưa có gợi ý để xem. Bạn có thể xem lại yêu cầu hiện tại.");
           return { applied: false, changed: false, shouldEvaluate: false };
         }
         commandFeedbackRef.current = feedback;
@@ -2032,7 +2034,7 @@ export function VoiceLessonClient({
 
   function cancelPendingAction(transcript?: string) {
     setPendingAction(null);
-    setLastFeedback("Đã hủy thao tác. Em có thể nói: chọn khối 2, chèn sau, hoặc gợi ý.");
+    setLastFeedback("Đã hủy thao tác. Bạn có thể nói: chọn khối 2, chèn sau, hoặc gợi ý.");
     if (transcript) persistVoiceCommandLog(transcript, { kind: "cancel" }, { changed: false, shouldEvaluate: false });
   }
 
@@ -2120,8 +2122,8 @@ export function VoiceLessonClient({
         cancelPendingAction(transcript);
         return makeWorkspaceCommandResult(transcript, "Đã hủy thao tác.", true, understoodAs, null, "applied");
       }
-      setLastFeedback("Em hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.");
-      return makeWorkspaceCommandResult(transcript, "Em hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.", false, understoodAs, pendingAction.preview, "pending");
+      setLastFeedback("Bạn hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.");
+      return makeWorkspaceCommandResult(transcript, "Bạn hãy nói 'đúng rồi' để thực hiện, hoặc 'hủy' để bỏ thao tác này.", false, understoodAs, pendingAction.preview, "pending");
     }
     if (intent.kind !== "navigate_step") setStepNavigationNotice(null);
     if (intent.kind === "confirm") {
@@ -2195,7 +2197,7 @@ export function VoiceLessonClient({
     }
 
     if (ranking.status === "reject") {
-      const feedback = `Đã nghe: “${heardTranscript}”. Mình chưa đủ chắc để thực hiện lệnh này. Em có thể nói lại chậm hơn hoặc nhập câu lệnh mẫu.`;
+      const feedback = `Đã nghe: “${heardTranscript}”. Mình chưa đủ chắc để thực hiện lệnh này. Bạn có thể nói lại chậm hơn hoặc nhập câu lệnh mẫu.`;
       setRecognizedCommand(heardTranscript);
       setLastIntent(best.intent);
       setVoiceLog((items) => [...items, heardTranscript].slice(-5));
@@ -2209,7 +2211,7 @@ export function VoiceLessonClient({
       const closeCandidates =
         second && best.score - second.score < SPEECH_RANKING_THRESHOLDS.ambiguousDelta;
       if (closeCandidates) {
-        const feedback = `Hệ thống nghe chưa chắc. Có thể là: ${formatSpeechRankingCandidates(ranking.candidates)}. Vị trí chèn chưa thay đổi; em hãy nói lại rõ hơn hoặc dùng thanh Nhập lệnh.`;
+        const feedback = `Hệ thống nghe chưa chắc. Có thể là: ${formatSpeechRankingCandidates(ranking.candidates)}. Vị trí chèn chưa thay đổi; bạn hãy nói lại rõ hơn hoặc dùng thanh Nhập lệnh.`;
         setRecognizedCommand(heardTranscript);
         setLastIntent(best.intent);
         setVoiceLog((items) => [...items, heardTranscript].slice(-5));
@@ -2276,14 +2278,24 @@ export function VoiceLessonClient({
     const element = containerRef.current;
     if (!element) return;
     let frame = 0;
-    const observer = new ResizeObserver(() => {
+    const scheduleResize = () => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
         if (workspaceRef.current) Blockly.svgResize(workspaceRef.current);
       });
-    });
+    };
+    const observer = new ResizeObserver(scheduleResize);
     observer.observe(element);
-    return () => { observer.disconnect(); window.cancelAnimationFrame(frame); };
+    if (element.parentElement) observer.observe(element.parentElement);
+    window.addEventListener("resize", scheduleResize);
+    window.visualViewport?.addEventListener("resize", scheduleResize);
+    scheduleResize();
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", scheduleResize);
+      window.visualViewport?.removeEventListener("resize", scheduleResize);
+      window.cancelAnimationFrame(frame);
+    };
   }, [workspaceReady]);
 
   // Inject Blockly ONCE on mount. Don't dispose on step change — only clear
@@ -2415,7 +2427,8 @@ export function VoiceLessonClient({
     if (!workspace || typeof document === "undefined") return;
     workspace.getToolbox()?.setVisible(toolboxOpen);
     if (!toolboxOpen) workspace.getToolbox()?.setSelectedItem(null);
-    Blockly.svgResize(workspace);
+    const frame = window.requestAnimationFrame(() => Blockly.svgResize(workspace));
+    return () => window.cancelAnimationFrame(frame);
   }, [toolboxOpen]);
 
   useEffect(() => {
@@ -2483,7 +2496,7 @@ export function VoiceLessonClient({
     return (
       <section className="rounded-[1.4rem] border-4 border-black bg-[#fffdf3] p-6 shadow-[8px_8px_0_#121212]">
         <p className="text-sm font-black uppercase tracking-[0.2em] text-black">Bài học chưa sẵn sàng</p>
-        <p className="mt-3 text-base text-black">Không tìm thấy bước hiện tại để hiển thị workspace.</p>
+        <p className="mt-3 text-base text-black">Không tìm thấy bước hiện tại để mở bài học.</p>
       </section>
     );
   }
@@ -2638,7 +2651,7 @@ export function VoiceLessonClient({
 
   return (
     <section
-      className={`relative grid min-h-0 min-w-0 gap-3 lg:min-h-[calc(100dvh-var(--global-command-bar-height,0px)-7rem)] lg:grid-cols-[minmax(250px,0.85fr)_minmax(0,2.7fr)] ${accessibilityClass}`}
+      className={`scc-lesson-layout relative grid min-h-0 min-w-0 gap-3 lg:min-h-[calc(100dvh-var(--global-command-bar-height,0px)-7rem)] lg:grid-cols-[minmax(270px,0.72fr)_minmax(0,2.8fr)] ${accessibilityClass}`}
       style={{ fontSize }}
     >
       <style>{`
@@ -2656,23 +2669,24 @@ export function VoiceLessonClient({
       {completionModal}
       {showPrimer && primer && !lessonComplete && (
         <div className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/45 p-4" role="presentation">
-          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-black bg-white p-5 text-black shadow-xl sm:p-7" role="dialog" tabIndex={-1}>
-            <p className="text-xs font-black uppercase tracking-wide text-[#0052cc]">Kiến thức nhanh · {lesson.title}</p>
-            <h2 className="mt-2 text-2xl font-bold" id="lesson-primer-title">Trước khi bắt đầu</h2>
-            <dl className="mt-4 space-y-3 text-sm leading-relaxed">
-              <div><dt className="font-bold">Khái niệm</dt><dd>{primer.concept}</dd></div>
-              <div><dt className="font-bold">Dùng để làm gì?</dt><dd>{primer.purpose}</dd></div>
-              <div><dt className="font-bold">Ví dụ</dt><dd className="rounded-lg bg-[#f3f7ff] px-3 py-2 font-mono">{primer.example}</dd></div>
-              <div><dt className="font-bold">Trong bài này</dt><dd>{primer.goal}</dd></div>
-            </dl>
+          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-black bg-[#fffdf3] p-5 text-black shadow-[7px_7px_0_#121212] sm:p-7" role="dialog" tabIndex={-1}>
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[#a1284b]">Kiến thức nhanh · {lesson.title}</p>
+            <h2 className="mt-3 text-3xl font-black leading-tight" id="lesson-primer-title">Một ý trước khi bắt đầu</h2>
+            <p className="mt-4 text-base font-semibold leading-7">{primer.concept}</p>
+            <p className="mt-2 text-sm leading-6 text-zinc-700">{primer.purpose}</p>
+            <div className="mt-5 border-l-4 border-black bg-[#e7fff3] px-4 py-3">
+              <p className="text-xs font-black uppercase tracking-widest">Ví dụ gần gũi</p>
+              <p className="mt-1 text-base font-bold">{primer.example}</p>
+            </div>
+            <p className="mt-4 text-sm font-semibold">{primer.goal}</p>
             <Button className="mt-5 w-full" onClick={closePrimer} type="button">Bắt đầu bài học</Button>
           </div>
         </div>
       )}
       {!lessonComplete && <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>}
-      <div className="order-2 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0_#121212]">
+      <div className="order-2 flex min-h-0 min-w-0 flex-col rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0_#121212] lg:overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-300 px-3 py-2 text-sm">
-          <p className="font-bold text-black">Vùng xếp khối <span className="font-normal text-zinc-600">· {selectedBlockSummary ?? "Chưa chọn khối"}</span></p>
+          <p className="font-black text-black">Vùng xếp khối <span className="ml-1 font-medium text-zinc-600">· {selectedBlockSummary ? `Bạn đang chỉnh: ${selectedBlockSummary}` : "Chạm khối để chỉnh"}</span></p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
@@ -2685,18 +2699,25 @@ export function VoiceLessonClient({
               {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
               {speech.isListening ? "Dừng nghe" : "Mic"}
             </Button>
-            <button className="min-h-11 text-sm font-semibold text-black underline underline-offset-2" onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))} type="button">Nhập lệnh</button>
-            <span id="lesson-voice-status" className={`rounded-lg px-2 py-1 text-xs font-semibold text-black ${voiceToneClass}`}>{voicePresentation.label}</span>
+            <button className="hidden min-h-11 text-sm font-semibold text-black underline underline-offset-2 sm:inline-flex sm:items-center" onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))} type="button">Nhập lệnh</button>
+            <span id="lesson-voice-status" className={`hidden rounded-lg px-2 py-1 text-xs font-semibold text-black sm:inline-flex ${voiceToneClass}`}>{voicePresentation.label}</span>
           </div>
           {!voicePrivacyAcknowledged && (
-            <p className="basis-full text-xs text-zinc-700" id="lesson-voice-privacy">
-              Có thể nhập lệnh mà không cần micro. <button className="min-h-11 font-bold underline underline-offset-2" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2" href="/privacy">Quyền riêng tư</Link>
-            </p>
+            <details className="basis-full text-xs text-zinc-700" id="lesson-voice-privacy">
+              <summary className="inline-flex min-h-9 cursor-pointer items-center font-bold underline underline-offset-2">Bật micro để nói lệnh</summary>
+              <p className="mt-1 leading-5">{VOICE_PROCESSING_DISCLOSURE} <Link className="underline underline-offset-2" href="/privacy">Quyền riêng tư</Link></p>
+              <button className="mt-2 min-h-11 rounded-lg border-2 border-black bg-[#e7fff3] px-3 font-bold" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button>
+            </details>
           )}
           {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline">Thử lại giọng nói</Button>}
         </div>
-        <div className="relative min-h-[480px] w-full flex-1 border-b border-zinc-300 lg:min-h-[320px]">
-          <div ref={containerRef} className="h-full min-h-[480px] w-full lg:min-h-[320px]" />
+        <div className="relative h-[min(56dvh,520px)] min-h-[350px] w-full flex-1 border-b border-zinc-300 lg:h-auto lg:min-h-[280px]">
+          <div ref={containerRef} className="absolute inset-0 h-full w-full" />
+          {workspaceReady && voiceCursorItems.length === 0 && (
+            <div className="pointer-events-none absolute right-3 top-3 z-10 max-w-[145px] rounded-lg border border-black bg-white/95 px-3 py-2 text-xs font-semibold leading-5 shadow-[2px_2px_0_#121212] sm:max-w-[13rem]">
+              <span className="sm:hidden">Kéo khối từ trái vào đây.</span><span className="hidden sm:inline">Bắt đầu ở đây: mở nhóm khối bên trái, kéo một khối vào vùng trống hoặc nhập câu mẫu.</span>
+            </div>
+          )}
           {!workspaceReady && !workspaceError && (
             <div className="absolute inset-0 flex items-center justify-center bg-white/80 text-sm font-black text-black">
               Đang mở vùng khối...
@@ -2748,7 +2769,9 @@ export function VoiceLessonClient({
           </details>
           {showSkip && <Button size="sm" variant="secondary" onClick={() => { if (nextStep().outcome === "applied") { setFailCount(0); setShowSkip(false); } }}>Bỏ qua</Button>}
         </div>
-        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[74px] max-h-[132px] min-w-0 max-w-full flex-none flex-col gap-1 overflow-y-auto px-3 py-2 text-sm" role="region" tabIndex={0}>
+        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[76px] max-h-[180px] min-w-0 max-w-full flex-none flex-col gap-1 overflow-y-auto bg-[#f4fff9] px-3 py-2 text-sm" role="region" tabIndex={0}>
+          <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#245d4b]">Phản hồi · Kết quả</p>
+          {!lastFeedback && !runResult && !visiblePreviousStepResult && <p className="text-zinc-700">Làm theo bước bên cạnh. Kết quả và gợi ý tiếp theo sẽ hiện ở đây.</p>}
           {isDemoMode && (
             <p className="rounded border border-zinc-400 bg-[#e7fff3] px-2 py-1 font-semibold text-black sm:hidden">
               Chế độ demo — tiến độ chỉ được lưu trên thiết bị này.
@@ -2816,7 +2839,7 @@ export function VoiceLessonClient({
           )}
           {speech.isSupportKnown && !speech.isSupported && (
             <p className="text-red-600">
-              Trình duyệt này chưa hỗ trợ nhận dạng giọng nói và dịch vụ nhận dạng đang không khả dụng. Em vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
+              Trình duyệt này chưa hỗ trợ nhận dạng giọng nói và dịch vụ nhận dạng đang không khả dụng. Bạn vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
             </p>
           )}
           {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
@@ -2860,21 +2883,22 @@ export function VoiceLessonClient({
         <button aria-controls="lesson-step-details" aria-expanded={stepPanelOpen} className="flex min-h-11 w-full items-center justify-between gap-2 text-left font-bold text-black lg:hidden" onClick={() => setStepPanelOpen((open) => !open)} type="button"><span>Bước {currentStepIndex + 1}/{lesson.steps.length} · {currentStep.title}</span><span aria-hidden="true">{stepPanelOpen ? "▴" : "▾"}</span></button>
         <div className={stepPanelOpen ? "block" : "hidden lg:block"} id="lesson-step-details">
         <p className="hidden text-sm font-black uppercase tracking-wide text-zinc-700 lg:block">Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}</p>
-        <progress aria-label="Tiến độ bài học" className="mt-2 h-2 w-full accent-[#0052cc]" max={lesson.steps.length} value={currentStepIndex + 1} />
-        <h2 className="mt-3 text-xl font-bold leading-tight text-black">{currentStep.title}</h2>
-        <p className="mt-3 text-xs font-bold uppercase tracking-wide text-zinc-600">Bạn cần làm</p>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-800">{splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-bold text-black">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}</p>
-        {sampleUtterance && <p className="mt-3 break-words rounded-xl bg-white p-3 text-sm text-zinc-800">Thử nói hoặc nhập: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>}
-        <div className="mt-4 flex flex-wrap gap-2">
+        <progress aria-label="Tiến độ bài học" className="mt-2 hidden h-2 w-full accent-[#0052cc] lg:block" max={lesson.steps.length} value={currentStepIndex + 1} />
+        <h2 className="mt-3 hidden text-xl font-bold leading-tight text-black lg:block">{currentStep.title}</h2>
+        <p className="mt-1 text-xs font-black uppercase tracking-[0.15em] text-[#9f2348] lg:mt-3">Việc cần làm ngay</p>
+        <p className={`mt-1 text-sm leading-relaxed text-zinc-800 ${sampleUtterance ? "hidden lg:block" : ""}`}>{splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-bold text-black">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}</p>
+        {sampleUtterance && <button className="mt-3 min-h-11 w-full break-words rounded-lg border border-black bg-[#e7fff3] p-3 text-left text-sm text-zinc-800 transition hover:bg-[#c9f6e1]" onClick={() => window.dispatchEvent(new CustomEvent("scc:prefill-command", { detail: sampleUtterance }))} type="button"><span className="block text-xs font-black uppercase tracking-wider">Thử câu này · chạm để nhập</span><strong className="mt-1 block text-black">“{sampleUtterance}”</strong></button>}
+        <div className="mt-2 flex flex-wrap gap-2 lg:mt-4">
           <Button size="sm" type="button" variant="outline" onClick={requestHintFromButton} disabled={currentStep.hints.length === 0}><Lightbulb className="mr-1 h-4 w-4" />Gợi ý</Button>
           <Button size="sm" type="button" variant="ghost" onClick={() => setShowPrimer(true)}>Xem kiến thức</Button>
         </div>
         {hintIndex > 0 && <p className="mt-2 text-sm text-zinc-700">{activeHint}</p>}
-        <details className="mt-4 border-t border-zinc-300 pt-3 text-sm">
-          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem các bước</summary>
+        <details className="mt-2 border-t border-zinc-300 pt-1 text-sm lg:mt-4 lg:pt-3">
+          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">Các bước và điều hướng</summary>
           <ol className="mt-2 space-y-1">{lesson.steps.map((step, i) => <li key={step.id}><button aria-current={i === currentStepIndex ? "step" : undefined} className={`min-h-11 w-full rounded-lg px-2 text-left text-sm ${i === currentStepIndex ? "bg-[#e2f1ff] font-bold" : "hover:bg-white"}`} onClick={() => requestStepNavigation(i, "sidebar")} type="button">{i + 1}. {step.title}</button></li>)}</ol>
+          <div className="mt-2 flex gap-2 border-t border-zinc-300 pt-2 lg:hidden"><Button size="sm" variant="ghost" onClick={prevStep} disabled={currentStepIndex === 0}>← Trước</Button><Button size="sm" variant="ghost" onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Sau →</Button></div>
         </details>
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-300 pt-3">
+        <div className="mt-3 hidden flex-wrap gap-2 border-t border-zinc-300 pt-3 lg:flex">
           <Button size="sm" variant="ghost" onClick={prevStep} disabled={currentStepIndex === 0}>← Trước</Button>
           <Button size="sm" variant="ghost" onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Sau →</Button>
         </div>

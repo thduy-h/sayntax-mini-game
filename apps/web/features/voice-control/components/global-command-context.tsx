@@ -218,7 +218,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     } else if (target === "workspace_not_ready") {
       result = {
         command: trimmed,
-        feedback: "Workspace đang khởi tạo. Vui lòng thử lại sau giây lát.",
+        feedback: "Vùng xếp khối đang mở. Hãy thử lại sau giây lát.",
         handled: false,
         target,
       };

@@ -18,7 +18,7 @@ function isTypingTarget(target: EventTarget | null) {
 export function GlobalCommandBar() {
   const { lastResult, lastResultId, setCommandBarHeight, submitCommand, workspace } = useGlobalCommand();
   const [command, setCommand] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const barRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wasWorkspaceRef = useRef(false);
@@ -65,6 +65,18 @@ export function GlobalCommandBar() {
   }, []);
 
   useEffect(() => {
+    const prefillCommand = (event: Event) => {
+      const command = (event as CustomEvent<string>).detail;
+      if (typeof command !== "string") return;
+      setCommand(command);
+      setCollapsed(false);
+      window.setTimeout(() => inputRef.current?.focus(), 0);
+    };
+    window.addEventListener("scc:prefill-command", prefillCommand);
+    return () => window.removeEventListener("scc:prefill-command", prefillCommand);
+  }, []);
+
+  useEffect(() => {
     const inWorkspace = Boolean(workspace);
     if (inWorkspace && !wasWorkspaceRef.current) {
       window.queueMicrotask(() => setCollapsed(false));
@@ -84,12 +96,12 @@ export function GlobalCommandBar() {
     return (
       <div
         ref={barRef}
-        className="scc-global-command-collapsed fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3"
+        className="scc-global-command-collapsed fixed bottom-0 left-3 z-[var(--z-global-command)] flex justify-center pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:left-auto sm:right-3"
       >
         <Button
           aria-expanded="false"
           aria-label="Mở thanh nhập lệnh toàn cục"
-          className="min-h-11 border-4 border-black bg-[#a8e6ff] shadow-[4px_4px_0_#121212]"
+          className="min-h-11 border-2 border-black bg-[#a8e6ff] shadow-[3px_3px_0_#121212]"
           onClick={() => {
             setCollapsed(false);
             window.setTimeout(() => inputRef.current?.focus(), 0);

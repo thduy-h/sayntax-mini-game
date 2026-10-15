@@ -137,6 +137,7 @@ textarea:focus-visible {
 .blocklyToolbox {
   box-sizing: border-box;
   overflow-y: auto;
+  overflow-x: hidden;
   z-index: var(--z-blockly-toolbox) !important;
 }
 
@@ -147,6 +148,13 @@ textarea:focus-visible {
 .blocklyScrollbarHorizontal,
 .blocklyScrollbarVertical {
   z-index: var(--z-blockly-toolbox) !important;
+}
+
+/* Ensure orphaned flyout scrollbars never appear at (0,0) when flyout is closed */
+.blocklyFlyoutScrollbar[display="none"],
+svg.blocklyFlyout[style*="display: none"] ~ svg.blocklyFlyoutScrollbar,
+svg.blocklyFlyout[display="none"] ~ svg.blocklyFlyoutScrollbar {
+  display: none !important;
 }
 
 .blocklyTreeSelected {
@@ -172,8 +180,8 @@ textarea:focus-visible {
 
 .blocklyToolbox::-webkit-scrollbar,
 .blocklyWidgetDiv .blocklyMenu::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 .blocklyToolbox::-webkit-scrollbar-thumb,
@@ -189,15 +197,46 @@ textarea:focus-visible {
 }
 
 .blocklyScrollbarBackground {
-  fill: #fff6fb !important;
+  fill: #fffdf3 !important;
   stroke: #121212 !important;
-  stroke-width: 1px !important;
+  stroke-width: 1.5px !important;
+  rx: 6px;
 }
 
 .blocklyScrollbarHandle {
   fill: #121212 !important;
+  rx: 5px;
 }
 
 .blocklyScrollbarKnob {
   fill: #ff5f87 !important;
+}
+
+/* Brutalist utility accents */
+.neo-box {
+  border: 2px solid #121212;
+  box-shadow: 4px 4px 0 #121212;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.neo-box-sm {
+  border: 2px solid #121212;
+  box-shadow: 2px 2px 0 #121212;
+}
+
+.neo-box-lg {
+  border: 3px solid #121212;
+  box-shadow: 6px 6px 0 #121212;
+}
+
+.neo-btn-interactive {
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.neo-btn-interactive:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 5px 5px 0 #121212;
+}
+.neo-btn-interactive:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #121212;
 }

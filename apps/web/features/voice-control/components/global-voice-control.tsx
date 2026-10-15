@@ -244,29 +244,30 @@ export function GlobalVoiceControl() {
 
   return (
     <div
-      className="fixed right-4 z-[var(--z-global-voice)] w-[min(22rem,calc(100vw-2rem))]"
-      style={{ bottom: "calc(var(--global-command-bar-height, 0px) + 1rem)" }}
+      className={`fixed right-3 sm:right-4 z-[var(--z-global-voice)] ${expanded ? "w-[min(22rem,calc(100vw-2rem))]" : "w-auto max-w-[calc(100vw-1.5rem)]"}`}
+      style={{ bottom: "calc(var(--global-command-bar-height, 0px) + 0.75rem)" }}
     >
       <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
       {!expanded ? (
         <Button
           aria-label="Bật điều khiển web bằng giọng nói"
-          className="w-full justify-center"
+          className="inline-flex items-center justify-center border-2 border-black bg-[#ff5f87] text-black font-black uppercase text-[11px] sm:text-xs tracking-wider shadow-[3px_3px_0_#121212] hover:shadow-[1px_1px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl px-3.5 py-2 transition-transform"
           onClick={start}
           type="button"
         >
-          <Volume2 className="mr-2 h-4 w-4" />
-          Điều khiển web bằng giọng nói
+          <Volume2 className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+          <span className="hidden xs:inline">Điều khiển web</span>
+          <span className="xs:hidden">Nói</span>
         </Button>
       ) : (
         <section
           aria-label="Điều khiển web bằng giọng nói"
-          className="scc-voice-debug-panel min-w-0 max-w-full overflow-hidden rounded-[1rem] border-4 border-black bg-white p-3 text-black shadow-[8px_8px_0_#121212]"
+          className="scc-voice-debug-panel min-w-0 max-w-full overflow-hidden rounded-2xl border-2 sm:border-[2.5px] border-black bg-white p-3.5 text-black shadow-[6px_6px_0_#121212]"
         >
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start justify-between gap-2 border-b border-black/10 pb-2">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black">Điều khiển bằng giọng nói</p>
-              <p className="mt-1 text-xs text-zinc-700">Trang hiện tại: {pathname}</p>
+              <p className="mt-0.5 text-xs font-mono text-zinc-600">Trang: {pathname}</p>
             </div>
             <button
               aria-label="Đóng điều khiển web bằng giọng nói"

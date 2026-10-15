@@ -18,7 +18,7 @@ function isTypingTarget(target: EventTarget | null) {
 export function GlobalCommandBar() {
   const { lastResult, lastResultId, setCommandBarHeight, submitCommand, workspace } = useGlobalCommand();
   const [command, setCommand] = useState("");
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const barRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wasWorkspaceRef = useRef(false);
@@ -84,12 +84,12 @@ export function GlobalCommandBar() {
     return (
       <div
         ref={barRef}
-        className="scc-global-command-collapsed fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3"
+        className="scc-global-command-collapsed fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3 pointer-events-none"
       >
         <Button
           aria-expanded="false"
           aria-label="Mở thanh nhập lệnh toàn cục"
-          className="min-h-11 border-4 border-black bg-[#a8e6ff] shadow-[4px_4px_0_#121212]"
+          className="pointer-events-auto min-h-11 border-2 sm:border-[2.5px] border-black bg-[#a8e6ff] text-black font-black uppercase text-xs tracking-wider shadow-[3px_3px_0_#121212] hover:shadow-[1px_1px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform rounded-xl px-4 py-2"
           onClick={() => {
             setCollapsed(false);
             window.setTimeout(() => inputRef.current?.focus(), 0);
@@ -98,6 +98,7 @@ export function GlobalCommandBar() {
         >
           <PanelTopOpen className="mr-2 h-4 w-4" />
           Nhập lệnh
+          <span className="ml-2 rounded border border-black/30 bg-white/60 px-1.5 py-0.5 text-[10px] font-mono">Alt+G</span>
         </Button>
       </div>
     );
@@ -110,10 +111,13 @@ export function GlobalCommandBar() {
     >
       <section
         aria-label="Thanh nhập lệnh toàn cục"
-        className="scc-voice-debug-panel max-h-[45dvh] w-full max-w-4xl overflow-y-auto rounded-xl border-2 border-black bg-white p-2 text-black shadow-[3px_3px_0_#121212] sm:p-3"
+        className="scc-voice-debug-panel max-h-[45dvh] w-full max-w-3xl overflow-y-auto rounded-2xl border-2 sm:border-[2.5px] border-black bg-white p-2.5 text-black shadow-[4px_4px_0_#121212] sm:p-3.5"
       >
-        {!workspace && <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-bold text-black">{workspace ? "Nói hoặc nhập lệnh cho bài học" : "Nhập lệnh điều khiển"}</p>
+        {!workspace && <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-black/10">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-[#ff5f87]" />
+            <p className="text-xs font-black uppercase tracking-wider text-black">{workspace ? "Nói hoặc nhập lệnh cho bài học" : "Nhập lệnh điều khiển"}</p>
+          </div>
           <Button
             aria-expanded="true"
             aria-label="Thu gọn thanh nhập lệnh toàn cục"
@@ -121,14 +125,15 @@ export function GlobalCommandBar() {
             size="sm"
             type="button"
             variant="outline"
+            className="border-2 border-black text-xs font-bold shadow-[2px_2px_0_#121212] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5"
           >
-            <PanelTopClose className="mr-2 h-4 w-4" />
+            <PanelTopClose className="mr-1.5 h-3.5 w-3.5" />
             Thu gọn
           </Button>
         </div>}
 
         <form
-          className="mt-1 flex items-end gap-2"
+          className="mt-2 flex items-center gap-2"
           onSubmit={(event) => {
             event.preventDefault();
             sendCommand(command);
@@ -139,31 +144,42 @@ export function GlobalCommandBar() {
             <Input
               ref={inputRef}
               aria-describedby="globalCommandHelp"
-              className="font-mono normal-case tracking-normal"
+              className="font-mono normal-case tracking-normal border-2 border-black bg-[#fffdf3] text-sm focus-visible:outline-black"
               id="globalCommandInput"
               onChange={(event) => setCommand(event.target.value)}
               placeholder={workspace ? "Nhập lệnh, ví dụ: thêm khối In" : "Nhập lệnh..."}
               value={command}
             />
           </label>
-          <Button disabled={!command.trim()} type="submit" variant="secondary">
-            <Command className="mr-2 h-4 w-4" />
+          <Button disabled={!command.trim()} type="submit" variant="secondary" className="border-2 border-black font-bold shadow-[2px_2px_0_#121212] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5">
+            <Command className="mr-1.5 h-4 w-4" />
             Gửi
           </Button>
-          {workspace && <Button aria-label="Thu gọn thanh nhập lệnh" onClick={() => setCollapsed(true)} size="sm" type="button" variant="ghost"><PanelTopClose className="h-4 w-4" /></Button>}
+          {workspace && (
+            <Button
+              aria-label="Thu gọn thanh nhập lệnh"
+              onClick={() => setCollapsed(true)}
+              size="sm"
+              type="button"
+              variant="outline"
+              className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]"
+            >
+              <PanelTopClose className="h-4 w-4" />
+            </Button>
+          )}
           {workspace?.pendingPreview && (
             <>
-              <Button type="button" variant="secondary" onClick={() => sendCommand("đúng rồi")}>
+              <Button type="button" variant="secondary" onClick={() => sendCommand("đúng rồi")} className="border-2 border-black font-bold">
                 Xác nhận
               </Button>
-              <Button type="button" variant="outline" onClick={() => sendCommand("hủy")}>
+              <Button type="button" variant="outline" onClick={() => sendCommand("hủy")} className="border-2 border-black font-bold">
                 Hủy
               </Button>
             </>
           )}
         </form>
 
-        <div className="mt-1 min-w-0 text-xs" id="globalCommandFeedback">
+        <div className="mt-1.5 min-w-0 text-xs" id="globalCommandFeedback">
           <p className="sr-only" id="globalCommandHelp">{workspace ? "Lệnh điều khiển vùng khối của bài học." : "Lệnh điều khiển trang web."}</p>
           {lastResult?.feedback && (
             <p className={`min-w-0 break-words font-semibold ${lastResult.handled ? "text-black" : "text-red-700"}`}>
@@ -171,7 +187,7 @@ export function GlobalCommandBar() {
             </p>
           )}
           {workspace?.pendingPreview && (
-            <p className="min-w-0 break-words rounded border-2 border-black bg-[#fff6a8] px-2 py-1 font-semibold text-black">
+            <p className="min-w-0 break-words rounded-lg border-2 border-black bg-[#fff6a8] px-2.5 py-1.5 font-bold text-black shadow-[2px_2px_0_#121212]">
               {workspace.pendingPreview}
             </p>
           )}

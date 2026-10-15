@@ -30,14 +30,14 @@ export async function AppNav() {
   return (
     <nav
       aria-label={user?.role === "admin" ? "Điều hướng quản trị" : "Điều hướng học viên"}
-      className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 rounded-2xl border border-black/15 bg-white px-4 py-3 shadow-sm"
+      className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white px-5 py-3 shadow-[4px_4px_0_#121212]"
     >
       <Link
         aria-label="SAYNTAX - về trang chính"
         className="flex min-h-12 shrink-0 items-center"
         href="/"
       >
-        <BrandLogo className="w-[148px] sm:w-[170px]" />
+        <BrandLogo className="w-[148px] sm:w-[170px]" priority />
       </Link>
       <AppNavLinks links={links} />
     </nav>

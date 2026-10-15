@@ -69,20 +69,20 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
             <p className="text-sm text-slate-600" id="password-help">Mật khẩu có ít nhất 8 ký tự.</p>
           </div>
           <fieldset className="space-y-3">
-            <legend className="text-sm font-semibold text-slate-800">Vai trò</legend>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:ring-2 focus-within:ring-black">
-              <input defaultChecked className="mt-1 h-5 w-5 shrink-0 accent-black" name="role" type="radio" value="student" />
+            <legend className="text-sm font-bold text-zinc-900">Chọn vai trò</legend>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-black/20 p-3.5 transition-all has-[:checked]:border-black has-[:checked]:bg-[#fffdf3] has-[:checked]:shadow-[2px_2px_0_#121212]">
+              <input defaultChecked className="mt-1 h-4 w-4 shrink-0 accent-black" name="role" type="radio" value="student" />
               <span>
-                <span className="block font-semibold text-slate-900">Học sinh</span>
-                <span className="block text-sm leading-6 text-slate-600">Bài học có hướng dẫn, theo dõi tiến độ và tự đánh giá mức tự tin.</span>
+                <span className="block font-black text-black">Học sinh / Người học</span>
+                <span className="block text-xs font-medium leading-relaxed text-zinc-600">Bài học có hướng dẫn, lưu tiến độ và xem lại bất cứ lúc nào.</span>
               </span>
             </label>
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 focus-within:ring-2 focus-within:ring-black">
-              <input className="mt-1 h-5 w-5 shrink-0 accent-black" name="role" type="radio" value="admin" />
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-black/20 p-3.5 transition-all has-[:checked]:border-black has-[:checked]:bg-[#fffdf3] has-[:checked]:shadow-[2px_2px_0_#121212]">
+              <input className="mt-1 h-4 w-4 shrink-0 accent-black" name="role" type="radio" value="admin" />
               <span>
-                <span className="block font-semibold text-slate-900">Quản trị viên / Người hướng dẫn</span>
-                <span className="block text-sm leading-6 text-slate-600">
-                  Dành cho email được cho phép xem chỉ số học tập tổng hợp.
+                <span className="block font-black text-black">Quản trị viên / Người hướng dẫn</span>
+                <span className="block text-xs font-medium leading-relaxed text-zinc-600">
+                  Dành cho tài khoản được cấp quyền xem báo cáo và quản lý tổng hợp.
                 </span>
               </span>
             </label>

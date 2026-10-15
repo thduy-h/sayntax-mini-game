@@ -2279,7 +2279,17 @@ export function VoiceLessonClient({
     const observer = new ResizeObserver(() => {
       window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        if (workspaceRef.current) Blockly.svgResize(workspaceRef.current);
+        if (workspaceRef.current) {
+          Blockly.svgResize(workspaceRef.current);
+          const flyout = workspaceRef.current.getToolbox()?.getFlyout();
+          if (flyout) {
+            if (flyout.isVisible()) {
+              flyout.position();
+            } else {
+              (flyout.getWorkspace() as Blockly.WorkspaceSvg)?.scrollbar?.setContainerVisible(false);
+            }
+          }
+        }
       });
     });
     observer.observe(element);
@@ -2303,6 +2313,17 @@ export function VoiceLessonClient({
         zoom: { controls: true, maxScale: 1.4, minScale: 0.7, startScale: 0.92, wheel: true },
       });
       workspaceRef.current = workspace;
+      const flyout = workspace.getToolbox()?.getFlyout();
+      if (flyout) {
+        flyout.setVisible(false);
+        (flyout.getWorkspace() as Blockly.WorkspaceSvg)?.scrollbar?.setContainerVisible(false);
+      }
+      const trashFlyout = (workspace.trashcan as unknown as { getFlyout?: () => Blockly.IFlyout | null })?.getFlyout?.();
+      if (trashFlyout) {
+        trashFlyout.setVisible(false);
+        (trashFlyout.getWorkspace() as Blockly.WorkspaceSvg)?.scrollbar?.setContainerVisible(false);
+      }
+      Blockly.svgResize(workspace);
       setWorkspaceReady(true);
     } catch {
       setWorkspaceReady(false);
@@ -2655,24 +2676,44 @@ export function VoiceLessonClient({
       `}</style>
       {completionModal}
       {showPrimer && primer && !lessonComplete && (
-        <div className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/45 p-4" role="presentation">
-          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl border-2 border-black bg-white p-5 text-black shadow-xl sm:p-7" role="dialog" tabIndex={-1}>
-            <p className="text-xs font-black uppercase tracking-wide text-[#0052cc]">Kiến thức nhanh · {lesson.title}</p>
-            <h2 className="mt-2 text-2xl font-bold" id="lesson-primer-title">Trước khi bắt đầu</h2>
-            <dl className="mt-4 space-y-3 text-sm leading-relaxed">
-              <div><dt className="font-bold">Khái niệm</dt><dd>{primer.concept}</dd></div>
-              <div><dt className="font-bold">Dùng để làm gì?</dt><dd>{primer.purpose}</dd></div>
-              <div><dt className="font-bold">Ví dụ</dt><dd className="rounded-lg bg-[#f3f7ff] px-3 py-2 font-mono">{primer.example}</dd></div>
-              <div><dt className="font-bold">Trong bài này</dt><dd>{primer.goal}</dd></div>
-            </dl>
-            <Button className="mt-5 w-full" onClick={closePrimer} type="button">Bắt đầu bài học</Button>
+        <div className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" role="presentation">
+          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border-3 border-black bg-[#fffdf3] p-5 text-black shadow-[8px_8px_0_#121212] sm:p-7" role="dialog" tabIndex={-1}>
+            <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-3">
+              <span className="rounded-md border-2 border-black bg-[#ff5f87] px-2.5 py-0.5 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">Kiến thức nhanh</span>
+              <span className="text-xs font-black uppercase text-zinc-600 truncate">{lesson.title}</span>
+            </div>
+            <h2 className="mt-3 text-2xl sm:text-3xl font-black uppercase tracking-tight text-black" id="lesson-primer-title">Trước khi bắt đầu</h2>
+            <div className="mt-4 space-y-3 text-sm leading-relaxed">
+              <div className="rounded-xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
+                <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Khái niệm</dt>
+                <dd className="mt-1 font-semibold text-black">{primer.concept}</dd>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
+                <dt className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Dùng để làm gì?</dt>
+                <dd className="mt-1 font-semibold text-black">{primer.purpose}</dd>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
+                <dt className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Ví dụ</dt>
+                <dd className="mt-1.5 rounded-lg border border-black/20 bg-white px-2.5 py-1.5 font-mono text-xs font-bold text-black">{primer.example}</dd>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-[#fff0a8] p-3 shadow-[2px_2px_0_#121212]">
+                <dt className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Trong bài này</dt>
+                <dd className="mt-1 font-semibold text-black">{primer.goal}</dd>
+              </div>
+            </div>
+            <Button className="mt-5 w-full border-2 border-black bg-[#ff5f87] text-black font-black uppercase tracking-wider text-sm py-3.5 shadow-[4px_4px_0_#121212] hover:shadow-[2px_2px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl transition-transform" onClick={closePrimer} type="button">
+              Bắt đầu bài học →
+            </Button>
           </div>
         </div>
       )}
       {!lessonComplete && <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>}
-      <div className="order-2 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0_#121212]">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-300 px-3 py-2 text-sm">
-          <p className="font-bold text-black">Vùng xếp khối <span className="font-normal text-zinc-600">· {selectedBlockSummary ?? "Chưa chọn khối"}</span></p>
+      <div className="order-2 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border-2 sm:border-[2.5px] border-black bg-white shadow-[4px_4px_0_#121212]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black bg-[#fffdf3] px-3.5 py-2.5 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f87]" />
+            <p className="font-extrabold text-black">Vùng xếp khối <span className="font-medium text-zinc-600">· {selectedBlockSummary ?? "Chưa chọn khối"}</span></p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
@@ -2680,26 +2721,38 @@ export function VoiceLessonClient({
               aria-pressed={speech.asrState === "listening"}
               disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
               onClick={() => { if (speech.isListening) void speech.stopListening(); else void speech.startListening(); }}
-              size="sm" type="button" variant="outline"
+              size="sm"
+              type="button"
+              className={`border-2 border-black font-bold shadow-[2px_2px_0_#121212] transition-transform ${speech.isListening ? "bg-[#7df2c3] text-black animate-pulse" : "bg-white text-black hover:bg-[#fff0a8]"}`}
             >
-              {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-              {speech.isListening ? "Dừng nghe" : "Mic"}
+              {speech.isListening ? <MicOff className="mr-1.5 h-4 w-4" /> : <Mic className="mr-1.5 h-4 w-4" />}
+              {speech.isListening ? "Đang nghe..." : "Mic"}
             </Button>
-            <button className="min-h-11 text-sm font-semibold text-black underline underline-offset-2" onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))} type="button">Nhập lệnh</button>
-            <span id="lesson-voice-status" className={`rounded-lg px-2 py-1 text-xs font-semibold text-black ${voiceToneClass}`}>{voicePresentation.label}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-2 border-black bg-white font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-[#a8e6ff]"
+              onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))}
+              type="button"
+            >
+              Nhập lệnh
+            </Button>
+            <span id="lesson-voice-status" className={`rounded-lg border border-black/20 px-2.5 py-1 text-xs font-bold text-black ${voiceToneClass}`}>{voicePresentation.label}</span>
           </div>
           {!voicePrivacyAcknowledged && (
-            <p className="basis-full text-xs text-zinc-700" id="lesson-voice-privacy">
-              Có thể nhập lệnh mà không cần micro. <button className="min-h-11 font-bold underline underline-offset-2" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2" href="/privacy">Quyền riêng tư</Link>
+            <p className="basis-full text-xs text-zinc-700 bg-[#fff6a8] p-2 rounded-lg border border-black/20" id="lesson-voice-privacy">
+              Có thể nhập lệnh mà không cần micro. <button className="min-h-11 font-bold underline underline-offset-2 text-black" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2 font-bold" href="/privacy">Quyền riêng tư</Link>
             </p>
           )}
-          {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline">Thử lại giọng nói</Button>}
+          {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline" className="border-2 border-black font-bold">Thử lại giọng nói</Button>}
         </div>
-        <div className="relative min-h-[480px] w-full flex-1 border-b border-zinc-300 lg:min-h-[320px]">
+        <div className="relative min-h-[480px] w-full flex-1 border-b-2 border-black lg:min-h-[320px]">
           <div ref={containerRef} className="h-full min-h-[480px] w-full lg:min-h-[320px]" />
           {!workspaceReady && !workspaceError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-white/80 text-sm font-black text-black">
-              Đang mở vùng khối...
+            <div className="absolute inset-0 flex items-center justify-center bg-white/90 text-sm font-black text-black">
+              <div className="rounded-xl border-2 border-black bg-[#fff6a8] px-4 py-2 shadow-[3px_3px_0_#121212]">
+                Đang mở vùng khối...
+              </div>
             </div>
           )}
           {workspaceError && (
@@ -2709,6 +2762,7 @@ export function VoiceLessonClient({
               <Button
                 type="button"
                 variant="outline"
+                className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]"
                 onClick={() => {
                   setWorkspaceError(null);
                   setWorkspaceRetryKey((key) => key + 1);
@@ -2719,62 +2773,75 @@ export function VoiceLessonClient({
             </div>
           )}
         </div>
-        <div className="relative z-[var(--z-app-controls)] flex flex-wrap items-center gap-2 border-b border-zinc-300 bg-white px-3 py-2">
-          <Button size="sm" onClick={runProgramFromButton} type="button" variant="secondary"><Play className="mr-2 h-4 w-4" />Chạy</Button>
-          <Button size="sm" type="button" variant="outline" onClick={restoreUndoSnapshot} disabled={!undoSnapshot}>Hoàn tác</Button>
-          <Button aria-label={toolboxOpen ? "Thu gọn danh sách khối" : "Mở danh sách khối"} size="sm" type="button" variant="outline" onClick={() => setBlocklyToolboxOpen(!toolboxOpen)}>
-            {toolboxOpen ? <PanelLeftClose className="mr-2 h-4 w-4" /> : <PanelLeftOpen className="mr-2 h-4 w-4" />}{toolboxOpen ? "Ẩn khối" : "Hiện khối"}
+        <div className="relative z-[var(--z-app-controls)] flex flex-wrap items-center gap-2 border-b-2 border-black bg-[#fffdf3] px-3.5 py-2.5">
+          <Button
+            size="default"
+            onClick={runProgramFromButton}
+            type="button"
+            className="min-h-11 border-2 border-black bg-[#7df2c3] text-black font-black uppercase text-xs sm:text-sm tracking-wider shadow-[3px_3px_0_#121212] hover:shadow-[1px_1px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl px-4 py-2 transition-transform"
+          >
+            <Play className="mr-1.5 h-4 w-4 fill-black stroke-black" />
+            Chạy
+          </Button>
+          <Button size="sm" type="button" variant="outline" onClick={restoreUndoSnapshot} disabled={!undoSnapshot} className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]">
+            Hoàn tác
+          </Button>
+          <Button aria-label={toolboxOpen ? "Thu gọn danh sách khối" : "Mở danh sách khối"} size="sm" type="button" variant="outline" onClick={() => setBlocklyToolboxOpen(!toolboxOpen)} className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]">
+            {toolboxOpen ? <PanelLeftClose className="mr-1.5 h-4 w-4" /> : <PanelLeftOpen className="mr-1.5 h-4 w-4" />}{toolboxOpen ? "Ẩn khối" : "Hiện khối"}
           </Button>
           <details className="relative text-sm">
-            <summary className="flex min-h-11 cursor-pointer items-center rounded-lg border border-zinc-500 bg-white px-3 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">⋯ Công cụ</summary>
-            <div className="absolute bottom-full left-0 z-50 mb-2 flex max-h-[55dvh] w-[min(90vw,330px)] flex-wrap gap-2 overflow-y-auto rounded-xl border-2 border-black bg-white p-3 shadow-lg">
-              <label className="w-full text-xs font-bold text-black">Micro
-                <select aria-label="Chọn micro" className="mt-1 block min-h-11 w-full rounded-lg border border-zinc-500 bg-white px-2 text-sm" disabled={speech.isListening || speech.isStarting} onChange={(event) => speech.selectMicrophone(event.target.value)} onFocus={() => { void speech.refreshMicrophones(); }} value={speech.selectedMicrophoneId}>
+            <summary className="flex min-h-11 cursor-pointer items-center rounded-xl border-2 border-black bg-white px-3 font-bold text-black shadow-[2px_2px_0_#121212] focus-visible:outline-4 focus-visible:outline-[#0052cc]">⋯ Công cụ</summary>
+            <div className="absolute bottom-full left-0 z-50 mb-2 flex max-h-[55dvh] w-[min(90vw,330px)] flex-wrap gap-2 overflow-y-auto rounded-2xl border-2 border-black bg-white p-3.5 shadow-[6px_6px_0_#121212]">
+              <label className="w-full text-xs font-black uppercase text-black">Micro
+                <select aria-label="Chọn micro" className="mt-1 block min-h-11 w-full rounded-lg border-2 border-black bg-white px-2.5 text-sm font-semibold" disabled={speech.isListening || speech.isStarting} onChange={(event) => speech.selectMicrophone(event.target.value)} onFocus={() => { void speech.refreshMicrophones(); }} value={speech.selectedMicrophoneId}>
                   <option value="">Micro mặc định</option>{speech.audioInputs.map((input) => <option key={input.deviceId || input.label} value={input.deviceId}>{input.label}</option>)}
                 </select>
               </label>
-              <div aria-label="Điều hướng vùng khối" className="flex flex-wrap gap-2" role="group">
-                {(["up", "down", "left", "right"] as const).map((direction) => <Button key={direction} size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction })}>{{ up: "Lên", down: "Xuống", left: "Trái", right: "Phải" }[direction]}</Button>)}
-                <Button size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "center_workspace", target: "workspace" })}>Về giữa</Button>
-                {(["fit", "in", "out", "reset"] as const).map((level) => <Button key={level} size="sm" type="button" variant="outline" onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level })}>{{ fit: "Vừa màn hình", in: "Phóng to", out: "Thu nhỏ", reset: "Reset zoom" }[level]}</Button>)}
+              <div aria-label="Điều hướng vùng khối" className="flex flex-wrap gap-2 pt-2 border-t border-black/10 w-full" role="group">
+                {(["up", "down", "left", "right"] as const).map((direction) => <Button key={direction} size="sm" type="button" variant="outline" className="border-2 border-black font-bold" onClick={() => applyWorkspaceViewportAction({ kind: "pan_workspace", direction })}>{{ up: "Lên", down: "Xuống", left: "Trái", right: "Phải" }[direction]}</Button>)}
+                <Button size="sm" type="button" variant="outline" className="border-2 border-black font-bold" onClick={() => applyWorkspaceViewportAction({ kind: "center_workspace", target: "workspace" })}>Về giữa</Button>
+                {(["fit", "in", "out", "reset"] as const).map((level) => <Button key={level} size="sm" type="button" variant="outline" className="border-2 border-black font-bold" onClick={() => applyWorkspaceViewportAction({ kind: "zoom_workspace", level })}>{{ fit: "Vừa màn hình", in: "Phóng to", out: "Thu nhỏ", reset: "Reset zoom" }[level]}</Button>)}
               </div>
-              {voicePrivacyAcknowledged && <Button aria-pressed={voiceLoggingEnabled} size="sm" type="button" variant="outline" onClick={() => setVoiceLoggingEnabled((enabled) => !enabled)}>{voiceLoggingEnabled ? "Tắt lưu câu lệnh" : "Bật lưu câu lệnh"}</Button>}
-              {isDemoMode && <Button size="sm" type="button" variant="outline" onClick={() => {
+              {voicePrivacyAcknowledged && <Button aria-pressed={voiceLoggingEnabled} size="sm" type="button" variant="outline" className="border-2 border-black font-bold w-full mt-2" onClick={() => setVoiceLoggingEnabled((enabled) => !enabled)}>{voiceLoggingEnabled ? "Tắt lưu câu lệnh" : "Bật lưu câu lệnh"}</Button>}
+              {isDemoMode && <Button size="sm" type="button" variant="outline" className="border-2 border-black font-bold w-full" onClick={() => {
                 if (!window.confirm("Đặt lại toàn bộ tiến độ demo trên thiết bị này?")) return;
                 if (!resetDemoProgressInStorage(lessonBrowserStorage)) setProgressSaveWarning(DEMO_SAVE_WARNING);
                 setCurrentStepIndex(0); setLessonComplete(false); setPreviousStepResult(null); setStepNavigationNotice(null); setRunResult(null); setLastFeedback("Đã đặt lại bản demo.");
               }}>Đặt lại bản demo</Button>}
             </div>
           </details>
-          {showSkip && <Button size="sm" variant="secondary" onClick={() => { if (nextStep().outcome === "applied") { setFailCount(0); setShowSkip(false); } }}>Bỏ qua</Button>}
+          {showSkip && <Button size="sm" variant="secondary" className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]" onClick={() => { if (nextStep().outcome === "applied") { setFailCount(0); setShowSkip(false); } }}>Bỏ qua</Button>}
         </div>
-        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[74px] max-h-[132px] min-w-0 max-w-full flex-none flex-col gap-1 overflow-y-auto px-3 py-2 text-sm" role="region" tabIndex={0}>
+        <div aria-label="Phản hồi và kết quả bài học" className="scc-voice-debug-panel flex min-h-[74px] max-h-[140px] min-w-0 max-w-full flex-none flex-col gap-1.5 overflow-y-auto px-3.5 py-2.5 text-sm bg-white" role="region" tabIndex={0}>
           {isDemoMode && (
-            <p className="rounded border border-zinc-400 bg-[#e7fff3] px-2 py-1 font-semibold text-black sm:hidden">
+            <p className="rounded border border-black/20 bg-[#e7fff3] px-2 py-1 font-bold text-xs text-black sm:hidden">
               Chế độ demo — tiến độ chỉ được lưu trên thiết bị này.
             </p>
           )}
-          {progressSaveWarning && <p className="rounded border-2 border-black bg-[#fff6a8] px-2 py-1 font-semibold text-black" role="status">{progressSaveWarning}</p>}
+          {progressSaveWarning && <p className="rounded-lg border-2 border-black bg-[#fff6a8] px-2.5 py-1 font-bold text-black" role="status">{progressSaveWarning}</p>}
           {lastFeedback && <p className="min-w-0 break-words font-semibold text-black">{lastFeedback}</p>}
           {runResult && (
-            <div className="rounded border-2 border-black bg-[#fffdf3] px-2 py-1 font-mono">
-              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả</p>
+            <div className="rounded-xl border-2 border-black bg-[#fffdf3] p-2.5 font-mono shadow-[2px_2px_0_#121212]">
+              <div className="flex items-center gap-1.5 border-b border-black/10 pb-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black">Kết quả chạy chương trình</p>
+              </div>
               {runResult.success ? (
                 runResult.output.length === 0 ? (
-                  <p className="text-zinc-500">(không có đầu ra)</p>
+                  <p className="mt-1 text-zinc-500 text-xs italic">(không có đầu ra hiển thị)</p>
                 ) : (
-                  <ul className="list-none">
+                  <ul className="mt-1 list-none space-y-0.5 text-xs">
                     {runResult.output.map((line, i) => (
-                      <li key={i} className="text-black">
-                        {line}
+                      <li key={i} className="text-black font-bold">
+                        &gt; {line}
                       </li>
                     ))}
                   </ul>
                 )
               ) : (
-                <ul className="list-none text-red-600">
+                <ul className="mt-1 list-none text-red-600 text-xs">
                   {runResult.errors.length > 0 ? (
-                    runResult.errors.map((err, i) => <li key={i}>{err}</li>)
+                    runResult.errors.map((err, i) => <li key={i}>&gt; {err}</li>)
                   ) : (
                     <li>Chương trình lỗi không xác định.</li>
                   )}
@@ -2783,26 +2850,26 @@ export function VoiceLessonClient({
             </div>
           )}
           {visibleStepNavigationNotice && (
-            <p className="min-w-0 break-words rounded border-2 border-black bg-[#e7f5ff] px-2 py-1 font-semibold text-black">
+            <p className="min-w-0 break-words rounded-lg border-2 border-black bg-[#e7f5ff] px-2.5 py-1.5 font-bold text-black shadow-[2px_2px_0_#121212]">
               {visibleStepNavigationNotice.feedback}
             </p>
           )}
           {visiblePreviousStepResult && (
-            <div className="min-w-0 rounded border-2 border-zinc-400 bg-zinc-50 px-2 py-1 text-zinc-700">
-              <p className="font-bold">Vừa hoàn thành bước {visiblePreviousStepResult.fromStepIndex + 1}: {visiblePreviousStepResult.stepTitle}</p>
-              <p className="break-words">{visiblePreviousStepResult.feedback}</p>
+            <div className="min-w-0 rounded-xl border-2 border-zinc-400 bg-zinc-50 p-2.5 text-zinc-800">
+              <p className="font-extrabold text-xs uppercase text-[#0e6245]">✓ Vừa hoàn thành bước {visiblePreviousStepResult.fromStepIndex + 1}: {visiblePreviousStepResult.stepTitle}</p>
+              <p className="break-words font-semibold mt-0.5 text-xs">{visiblePreviousStepResult.feedback}</p>
               {visiblePreviousStepResult.runResult && (
-                <div className="mt-1 font-mono">
-                  <p className="font-bold">Đầu ra của bước vừa xong</p>
+                <div className="mt-1.5 font-mono text-xs">
+                  <p className="font-bold text-[10px] uppercase text-zinc-500">Đầu ra của bước vừa xong</p>
                   {visiblePreviousStepResult.runResult.success ? (
                     visiblePreviousStepResult.runResult.output.length > 0 ? (
                       <ul className="list-none">
-                        {visiblePreviousStepResult.runResult.output.map((line, i) => <li key={i} className="break-words">{line}</li>)}
+                        {visiblePreviousStepResult.runResult.output.map((line, i) => <li key={i} className="break-words">&gt; {line}</li>)}
                       </ul>
-                    ) : <p>(không có đầu ra)</p>
+                    ) : <p className="italic text-zinc-500">(không có đầu ra)</p>
                   ) : (
                     <ul className="list-none text-red-700">
-                      {visiblePreviousStepResult.runResult.errors.map((error, i) => <li key={i} className="break-words">{error}</li>)}
+                      {visiblePreviousStepResult.runResult.errors.map((error, i) => <li key={i} className="break-words">&gt; {error}</li>)}
                     </ul>
                   )}
                 </div>
@@ -2810,35 +2877,36 @@ export function VoiceLessonClient({
             </div>
           )}
           {!speech.isSupportKnown && (
-            <p className="text-zinc-500">
+            <p className="text-zinc-500 text-xs font-semibold">
               Đang kết nối nhận dạng giọng nói...
             </p>
           )}
           {speech.isSupportKnown && !speech.isSupported && (
-            <p className="text-red-600">
-              Trình duyệt này chưa hỗ trợ nhận dạng giọng nói và dịch vụ nhận dạng đang không khả dụng. Em vẫn có thể dùng thanh “Nhập lệnh” ở cuối màn hình.
+            <p className="text-zinc-700 text-xs font-medium">
+              Chưa bật nhận dạng giọng nói trên trình duyệt này. Em vẫn có thể bấm nút “Nhập lệnh” để học rất tốt nhé!
             </p>
           )}
-          {speech.errorMessage && <p className="text-red-600">{speech.errorMessage}</p>}
-          {speech.isStarting && <p className="text-zinc-500">Micro đang khởi tạo...</p>}
-          {speech.asrState === "processing" && <p className="text-zinc-500">Đang xử lý giọng nói...</p>}
-          {speech.microphoneStatus === "checking" && <p className="text-zinc-500">Đang kiểm tra quyền micro...</p>}
+          {speech.errorMessage && <p className="text-red-600 text-xs font-semibold">{speech.errorMessage}</p>}
+          {speech.isStarting && <p className="text-zinc-500 text-xs font-semibold">Micro đang khởi tạo...</p>}
+          {speech.asrState === "processing" && <p className="text-zinc-500 text-xs font-semibold">Đang xử lý giọng nói...</p>}
+          {speech.microphoneStatus === "checking" && <p className="text-zinc-500 text-xs font-semibold">Đang kiểm tra quyền micro...</p>}
           {speech.isListening && speech.interimTranscript && (
-            <p className="min-w-0 break-words text-zinc-500">
-              Đang nghe: <span className="font-mono break-words">“{speech.interimTranscript}”</span>
+            <p className="min-w-0 break-words text-zinc-700 text-xs font-semibold">
+              Đang nghe: <span className="font-mono font-bold text-black">“{speech.interimTranscript}”</span>
             </p>
           )}
           {speech.isListening && !speech.interimTranscript && (
-            <p className="text-zinc-500">Đang nghe...</p>
+            <p className="text-emerald-700 text-xs font-bold">Đang lắng nghe giọng nói của bạn...</p>
           )}
           {pendingAction && (
-            <div className="min-w-0 rounded border-2 border-black bg-[#fff6a8] px-2 py-1 font-semibold text-black">
+            <div className="min-w-0 rounded-xl border-2 border-black bg-[#fff6a8] p-2.5 font-bold text-black shadow-[2px_2px_0_#121212]">
               <p className="break-words">{pendingAction.preview}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   type="button"
                   variant="secondary"
+                  className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]"
                   onClick={() => executePendingAction("xác nhận bằng nút")}
                 >
                   Xác nhận
@@ -2847,6 +2915,7 @@ export function VoiceLessonClient({
                   size="sm"
                   type="button"
                   variant="outline"
+                  className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]"
                   onClick={() => cancelPendingAction("hủy bằng nút")}
                 >
                   Hủy
@@ -2856,28 +2925,75 @@ export function VoiceLessonClient({
           )}
         </div>
       </div>
-      <aside aria-label="Bước hiện tại" className="order-1 min-w-0 rounded-2xl border-2 border-black bg-[#fffdf3] p-3 shadow-[3px_3px_0_#121212] lg:overflow-y-auto lg:p-4">
+      <aside aria-label="Bước hiện tại" className="order-1 min-w-0 rounded-2xl border-2 sm:border-[2.5px] border-black bg-[#fffdf3] p-3.5 shadow-[4px_4px_0_#121212] lg:overflow-y-auto lg:p-4.5">
         <button aria-controls="lesson-step-details" aria-expanded={stepPanelOpen} className="flex min-h-11 w-full items-center justify-between gap-2 text-left font-bold text-black lg:hidden" onClick={() => setStepPanelOpen((open) => !open)} type="button"><span>Bước {currentStepIndex + 1}/{lesson.steps.length} · {currentStep.title}</span><span aria-hidden="true">{stepPanelOpen ? "▴" : "▾"}</span></button>
         <div className={stepPanelOpen ? "block" : "hidden lg:block"} id="lesson-step-details">
-        <p className="hidden text-sm font-black uppercase tracking-wide text-zinc-700 lg:block">Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}</p>
-        <progress aria-label="Tiến độ bài học" className="mt-2 h-2 w-full accent-[#0052cc]" max={lesson.steps.length} value={currentStepIndex + 1} />
-        <h2 className="mt-3 text-xl font-bold leading-tight text-black">{currentStep.title}</h2>
-        <p className="mt-3 text-xs font-bold uppercase tracking-wide text-zinc-600">Bạn cần làm</p>
-        <p className="mt-1 text-sm leading-relaxed text-zinc-800">{splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-bold text-black">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}</p>
-        {sampleUtterance && <p className="mt-3 break-words rounded-xl bg-white p-3 text-sm text-zinc-800">Thử nói hoặc nhập: <strong className="font-mono text-black">“{sampleUtterance}”</strong></p>}
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button size="sm" type="button" variant="outline" onClick={requestHintFromButton} disabled={currentStep.hints.length === 0}><Lightbulb className="mr-1 h-4 w-4" />Gợi ý</Button>
-          <Button size="sm" type="button" variant="ghost" onClick={() => setShowPrimer(true)}>Xem kiến thức</Button>
-        </div>
-        {hintIndex > 0 && <p className="mt-2 text-sm text-zinc-700">{activeHint}</p>}
-        <details className="mt-4 border-t border-zinc-300 pt-3 text-sm">
-          <summary className="min-h-11 cursor-pointer py-2 font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem các bước</summary>
-          <ol className="mt-2 space-y-1">{lesson.steps.map((step, i) => <li key={step.id}><button aria-current={i === currentStepIndex ? "step" : undefined} className={`min-h-11 w-full rounded-lg px-2 text-left text-sm ${i === currentStepIndex ? "bg-[#e2f1ff] font-bold" : "hover:bg-white"}`} onClick={() => requestStepNavigation(i, "sidebar")} type="button">{i + 1}. {step.title}</button></li>)}</ol>
-        </details>
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-zinc-300 pt-3">
-          <Button size="sm" variant="ghost" onClick={prevStep} disabled={currentStepIndex === 0}>← Trước</Button>
-          <Button size="sm" variant="ghost" onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1}>Sau →</Button>
-        </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="rounded-lg border-2 border-black bg-[#fff6a8] px-2.5 py-1 text-xs font-black uppercase text-black shadow-[2px_2px_0_#121212]">
+              Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}
+            </span>
+            <Button size="sm" type="button" variant="outline" onClick={() => setShowPrimer(true)} className="border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]">
+              Xem kiến thức
+            </Button>
+          </div>
+          <div className="mt-3 h-2.5 w-full rounded-full border-2 border-black bg-white p-0.5 shadow-[2px_2px_0_#121212]">
+            <div className="h-full rounded-full bg-[#ff5f87] transition-all duration-300" style={{ width: `${((currentStepIndex + 1) / lesson.steps.length) * 100}%` }} />
+          </div>
+          <progress aria-label="Tiến độ bài học" className="sr-only" max={lesson.steps.length} value={currentStepIndex + 1} />
+          <h2 className="mt-3.5 text-xl font-black leading-tight text-black sm:text-2xl">{currentStep.title}</h2>
+          
+          <div className="mt-3 rounded-xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
+            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Nhiệm vụ của bạn</p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-800 font-medium">
+              {splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-extrabold text-black bg-[#ffe0eb] px-1 py-0.5 rounded border border-black/20">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}
+            </p>
+          </div>
+
+          {sampleUtterance && (
+            <div className="mt-3 rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#0052cc]">Thử nói hoặc nhập:</p>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleTranscriptCommand(sampleUtterance, "text");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8] hover:translate-x-0.5 hover:translate-y-0.5 transition-all text-left"
+                >
+                  🎙️ “{sampleUtterance}”
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-3 rounded-xl border-2 border-black bg-[#fffdf3] p-2.5 text-xs font-bold text-black shadow-[2px_2px_0_#121212]">
+            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 block">Đang thao tác</span>
+            <span className="mt-0.5 block truncate">🎯 {selectedBlockSummary ?? "Chưa chọn khối nào (bấm vào khối để chọn)"}</span>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button size="sm" type="button" variant="outline" onClick={requestHintFromButton} disabled={currentStep.hints.length === 0} className="border-2 border-black bg-white font-bold shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]">
+              <Lightbulb className="mr-1 h-4 w-4" />
+              Gợi ý {currentStep.hints.length > 0 ? `(${currentStep.hints.length})` : ""}
+            </Button>
+          </div>
+          {hintIndex > 0 && (
+            <div className="mt-2.5 rounded-xl border-2 border-black bg-[#fff6a8] p-3 text-xs font-bold text-black shadow-[2px_2px_0_#121212]">
+              💡 {activeHint}
+            </div>
+          )}
+          <details className="mt-4 border-t-2 border-black/10 pt-3 text-sm">
+            <summary className="min-h-11 cursor-pointer py-1.5 font-bold text-black hover:text-[#0052cc] focus-visible:outline-4 focus-visible:outline-[#0052cc]">Xem danh sách các bước</summary>
+            <ol className="mt-2 space-y-1.5">{lesson.steps.map((step, i) => <li key={step.id}><button aria-current={i === currentStepIndex ? "step" : undefined} className={`min-h-10 w-full rounded-lg border-2 border-black px-2.5 py-1.5 text-left text-xs font-bold transition-all ${i === currentStepIndex ? "bg-[#a8e6ff] text-black shadow-[2px_2px_0_#121212]" : "bg-white text-zinc-700 hover:bg-[#fffdf3]"}`} onClick={() => requestStepNavigation(i, "sidebar")} type="button">{i + 1}. {step.title}</button></li>)}</ol>
+          </details>
+          <div className="mt-4 flex items-center justify-between border-t-2 border-black/10 pt-3">
+            <Button size="sm" variant="outline" onClick={prevStep} disabled={currentStepIndex === 0} className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]">
+              ← Trước
+            </Button>
+            <Button size="sm" variant="outline" onClick={nextStep} disabled={currentStepIndex >= lesson.steps.length - 1} className="border-2 border-black font-bold shadow-[2px_2px_0_#121212]">
+              Sau →
+            </Button>
+          </div>
         </div>
       </aside>
     </section>

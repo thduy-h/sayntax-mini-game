@@ -41,19 +41,31 @@ export default async function LessonV2DetailPage({ params }: LessonV2DetailPageP
   return (
     <main className="scc-lesson-page mx-auto flex min-h-[calc(100dvh-var(--global-command-bar-height,0px))] w-full max-w-[1600px] min-w-0 flex-col gap-3 px-3 py-3 sm:px-6">
       <div className="hidden lg:block"><AppNav /></div>
-      <header className="flex flex-wrap items-baseline justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-baseline gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black/10 pb-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link
-            className="text-xs font-black uppercase text-black underline decoration-2 underline-offset-4"
+            className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-bold text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0"
             href="/lessons-v2"
           >
-            ← Quay lại
+            ← Danh sách
           </Link>
-          <h1 className="font-heading min-w-0 break-words text-2xl text-black sm:text-3xl">{lesson.title}</h1>
+          <div className="flex items-center gap-2">
+            <span className="rounded-md border border-black bg-[#ffce47] px-2 py-0.5 text-[11px] font-black uppercase tracking-wider text-black">
+              Bài {lesson.orderIndex}
+            </span>
+            <h1 className="font-heading min-w-0 break-words text-lg sm:text-xl font-black text-black">
+              {lesson.title}
+            </h1>
+          </div>
         </div>
-        <p className="text-xs font-semibold text-zinc-700">
-          {lesson.stepCount} bước · ~{lesson.estimatedMinutes} phút · {lesson.learningGoals[0]}
-        </p>
+        <div className="flex items-center gap-2 text-xs font-bold text-zinc-700">
+          <span className="hidden sm:inline-block rounded-md border border-black/20 bg-zinc-100 px-2 py-0.5 text-[11px]">
+            {lesson.stepCount} bước · ~{lesson.estimatedMinutes} phút
+          </span>
+          <span className="rounded-md border-2 border-black bg-[#ff8a65] px-2 py-0.5 text-[11px] font-black uppercase tracking-wide text-black shadow-[1.5px_1.5px_0_#121212]">
+            Đang học
+          </span>
+        </div>
       </header>
       <div className="min-h-0 min-w-0 flex-1">
         <VoiceLessonClient

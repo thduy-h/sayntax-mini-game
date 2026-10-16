@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { useGlobalCommand } from "./global-command-context";
 import { conciseAnnouncement } from "../utils/accessible-announcements";
 
+const IS_DEV = process.env.NODE_ENV === "development";
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   return target instanceof HTMLInputElement ||
@@ -15,7 +17,7 @@ function isTypingTarget(target: EventTarget | null) {
     target.isContentEditable;
 }
 
-export function GlobalCommandBar() {
+function GlobalCommandBarInner() {
   const { lastResult, lastResultId, setCommandBarHeight, submitCommand, workspace } = useGlobalCommand();
   const [command, setCommand] = useState("");
   const [collapsed, setCollapsed] = useState(true);
@@ -97,7 +99,7 @@ export function GlobalCommandBar() {
           type="button"
         >
           <PanelTopOpen className="mr-2 h-4 w-4" />
-          Nhập lệnh
+          [DEV] Nhập lệnh
           <span className="ml-2 rounded border border-black/30 bg-white/60 px-1.5 py-0.5 text-[10px] font-mono">Alt+G</span>
         </Button>
       </div>
@@ -116,7 +118,7 @@ export function GlobalCommandBar() {
         {!workspace && <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-black/10">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#ff5f87]" />
-            <p className="text-xs font-black uppercase tracking-wider text-black">{workspace ? "Nói hoặc nhập lệnh cho bài học" : "Nhập lệnh điều khiển"}</p>
+            <p className="text-xs font-black uppercase tracking-wider text-black">{workspace ? "Nói hoặc nhập lệnh cho bài học" : "[DEV] Nhập lệnh"}</p>
           </div>
           <Button
             aria-expanded="true"
@@ -200,4 +202,9 @@ export function GlobalCommandBar() {
       </section>
     </div>
   );
+}
+
+export function GlobalCommandBar() {
+  if (!IS_DEV) return null;
+  return <GlobalCommandBarInner />;
 }

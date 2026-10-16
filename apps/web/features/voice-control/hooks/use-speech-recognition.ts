@@ -11,9 +11,9 @@ const MICROPHONE_STORAGE_KEY = "scc_selected_microphone_id";
 const DUPLICATE_FINAL_WINDOW_MS = 1200;
 
 function voiceErrorMessage(error: ASRError) {
-  if (error.code === "no_speech") return "Không nghe rõ, thử lại. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
-  if (error.code === "permission_denied") return "Micro chưa được cấp quyền. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
-  return "Không thể nhận dạng giọng nói. Bạn vẫn có thể nhập lệnh bằng bàn phím.";
+  if (error.code === "no_speech") return "Không nghe rõ, thử lại. Bạn vẫn có thể kéo thả khối.";
+  if (error.code === "permission_denied") return "Micro chưa được cấp quyền. Bạn vẫn có thể kéo thả khối.";
+  return "Không thể nhận dạng giọng nói. Bạn vẫn có thể kéo thả khối.";
 }
 
 function storedMicrophone() {

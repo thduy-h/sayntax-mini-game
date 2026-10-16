@@ -19,8 +19,8 @@ const DEMO_LESSON_ROUTES = [
 ] as const;
 
 const ROUTES: ReadonlyArray<readonly [string, string, readonly string[]]> = [
-  ["/", "trang chủ", ["trang chu", "home", "man hinh chinh"]],
-  ["/demo", "demo", ["demo", "trai nghiem", "trai nghiem ngay", "hoc thu", "bai hoc demo"]],
+  ["/", "trang chủ", ["trang chu", "ve trang chu", "home", "man hinh chinh"]],
+  ["/demo", "demo", ["demo", "trai nghiem", "trai nghiem ngay", "hoc thu", "bai hoc demo", "danh sach bai hoc", "danh sach bai"]],
   ["/sign-in", "đăng nhập", ["dang nhap", "login"]],
   ["/sign-up", "đăng ký", ["dang ky", "tao tai khoan", "register"]],
   ["/dashboard", "dashboard", ["dashboard", "bang dieu khien", "tong quan hoc vien"]],
@@ -68,7 +68,7 @@ function parseLessonNumber(value: string) {
 
 function demoLessonRouteFor(payload: string) {
   const normalized = normalizeVoiceText(payload);
-  const match = normalized.match(/^(?:bai|bai hoc|lesson)\s*(?:so|thu)?\s*(.+)$/);
+  const match = normalized.match(/^(?:mo|vao|hoc|chon|bat dau|xem)?\s*(?:bai|bai hoc|lesson)\s*(?:so|thu)?\s*(.+)$/);
   const lessonNumber = parseLessonNumber(match?.[1]?.trim() ?? normalized);
   if (!lessonNumber) return null;
   const href = DEMO_LESSON_ROUTES[lessonNumber - 1];
@@ -89,8 +89,11 @@ function commonClickTarget(normalized: string) {
     "buoc sau": "sau",
     "tiep theo": "sau",
     "sang buoc sau": "sau",
+    "tiep tuc": "sau",
+    "buoc tiep": "sau",
     "buoc truoc": "truoc",
     "quay ve buoc truoc": "truoc",
+    "quay lai buoc truoc": "truoc",
     "hoan tac": "hoan tac",
     "undo": "hoan tac",
     "dung cau mau": "dung cau mau",
@@ -104,6 +107,10 @@ function commonClickTarget(normalized: string) {
     "dat lai ban demo": "dat lai ban demo",
     "danh sach bai": "danh sach bai",
     "lam lai": "lam lai",
+    "bat dau bai hoc": "bat dau bai hoc",
+    "bat dau": "bat dau bai hoc",
+    "xem kien thuc": "xem kien thuc",
+    "kien thuc": "xem kien thuc",
   } satisfies Record<string, string>;
   return target[normalized as keyof typeof target];
 }
@@ -112,10 +119,10 @@ export function parseGlobalVoiceCommand(transcript: string): GlobalVoiceCommand 
   const normalized = stripPolitePrefix(normalizeVoiceText(transcript));
   if (!normalized) return { kind: "unknown", transcript };
 
-  if (/^(?:tro giup|lenh gi|co the noi gi|huong dan dieu khien)$/.test(normalized)) {
+  if (/^(?:tro giup|tro giup toi|lenh gi|co the noi gi|huong dan dieu khien|huong dan|giup do|help|xem huong dan|huong dan chi tiet|mo huong dan|bang huong dan)$/.test(normalized)) {
     return { kind: "help" };
   }
-  if (/^(?:tat dieu khien giong noi|dong dieu khien giong noi|dung nghe|ngung nghe)$/.test(normalized)) {
+  if (/^(?:tat dieu khien giong noi|dong dieu khien giong noi|dung nghe|ngung nghe|tat micro|dung micro|tat mic|dung mic|dung|ngung)$/.test(normalized)) {
     return { kind: "stop" };
   }
   if (/^(?:quay lai|tro lai|back)$/.test(normalized)) return { kind: "history", direction: "back" };
@@ -129,7 +136,7 @@ export function parseGlobalVoiceCommand(transcript: string): GlobalVoiceCommand 
   const commonTarget = commonClickTarget(normalized);
   if (commonTarget) return { kind: "click", label: commonTarget };
 
-  const navigateMatch = normalized.match(/^(?:mo|di den|toi|vao|chuyen den|truy cap)\s+(.+)$/);
+  const navigateMatch = normalized.match(/^(?:mo|di den|toi|vao|chuyen den|truy cap|ve|quay ve)\s+(.+)$/);
   if (navigateMatch?.[1]) {
     const demoLessonRoute = demoLessonRouteFor(navigateMatch[1]);
     if (demoLessonRoute) return { kind: "navigate", ...demoLessonRoute };
@@ -139,10 +146,8 @@ export function parseGlobalVoiceCommand(transcript: string): GlobalVoiceCommand 
   const demoLessonRoute = demoLessonRouteFor(normalized);
   if (demoLessonRoute) return { kind: "navigate", ...demoLessonRoute };
   const directRoute = routeFor(normalized);
-  if (
-    directRoute &&
-    /^(?:demo|trai nghiem|trai nghiem ngay|hoc thu|bai hoc demo|dang nhap|dang ky|dashboard|bai hoc|admin|trang chu|tro giup)$/.test(normalized)
-  ) {
+  const isDirectAlias = ROUTES.some(([, , aliases]) => aliases.some((alias) => normalized === alias));
+  if (directRoute && isDirectAlias) {
     return { kind: "navigate", ...directRoute };
   }
 

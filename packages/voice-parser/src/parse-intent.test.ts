@@ -359,6 +359,16 @@ assert.deepEqual(parseVoiceIntent("mở danh sách khối lặp"), { kind: "open
 assert.deepEqual(parseVoiceIntent("mở nhóm điều kiện"), { kind: "open_toolbox_category", category: "condition" });
 assert.deepEqual(parseVoiceIntent("mở nhóm giá trị"), { kind: "open_toolbox_category", category: "value" });
 assert.deepEqual(parseVoiceIntent("mở nhóm biến"), { kind: "open_toolbox_category", category: "variable" });
-assert.deepEqual(parseVoiceIntent("đóng nhóm khối"), { kind: "close_toolbox_category" });
+// --- Step navigation commands ---
+assert.deepEqual(parseVoiceIntent("bước sau"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("sang bước sau"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("tiếp tục"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("tiếp theo"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("bước tiếp"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("bước tiếp theo"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("sang bước tiếp theo"), { kind: "navigate_step", target: "next" });
+assert.deepEqual(parseVoiceIntent("bước trước"), { kind: "navigate_step", target: "previous" });
+assert.deepEqual(parseVoiceIntent("về bước trước"), { kind: "navigate_step", target: "previous" });
+assert.deepEqual(parseVoiceIntent("quay lại bước trước"), { kind: "navigate_step", target: "previous" });
 
 console.log("parse-intent tests passed");

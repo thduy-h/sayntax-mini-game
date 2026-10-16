@@ -58,7 +58,7 @@ export default function PrivacyPage() {
             3. Quyền lựa chọn của bạn
           </h2>
           <p className="text-sm font-medium leading-relaxed text-zinc-800">
-            Bạn luôn có thể nhập lệnh thay vì dùng micro. Bạn có thể đặt lại tiến độ demo trên thiết bị trong giao diện bài học. Với dữ liệu tài khoản, hãy liên hệ người phụ trách chương trình để yêu cầu bản sao hoặc xóa dữ liệu.
+            Bạn luôn có thể kéo thả khối thay vì dùng micro. Bạn có thể đặt lại tiến độ demo trên thiết bị trong giao diện bài học. Với dữ liệu tài khoản, hãy liên hệ người phụ trách chương trình để yêu cầu bản sao hoặc xóa dữ liệu.
           </p>
         </section>
       </article>

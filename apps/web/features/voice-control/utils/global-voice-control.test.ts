@@ -26,6 +26,16 @@ assert.deepEqual(parseGlobalVoiceCommand("lên đầu trang"), { kind: "scroll",
 assert.deepEqual(parseGlobalVoiceCommand("quay lại"), { kind: "history", direction: "back" });
 assert.deepEqual(parseGlobalVoiceCommand("trợ giúp"), { kind: "help" });
 assert.deepEqual(parseGlobalVoiceCommand("dừng nghe"), { kind: "stop" });
+assert.deepEqual(parseGlobalVoiceCommand("về trang chủ"), { kind: "navigate", href: "/", label: "trang chủ" });
+assert.deepEqual(parseGlobalVoiceCommand("danh sách bài học"), { kind: "navigate", href: "/demo", label: "demo" });
+assert.deepEqual(parseGlobalVoiceCommand("hướng dẫn"), { kind: "help" });
+assert.deepEqual(parseGlobalVoiceCommand("xem hướng dẫn"), { kind: "help" });
+assert.deepEqual(parseGlobalVoiceCommand("hướng dẫn chi tiết"), { kind: "help" });
+assert.deepEqual(parseGlobalVoiceCommand("tắt micro"), { kind: "stop" });
+assert.deepEqual(parseGlobalVoiceCommand("tiếp tục"), { kind: "click", label: "sau" });
+assert.deepEqual(parseGlobalVoiceCommand("bắt đầu bài học"), { kind: "click", label: "bat dau bai hoc" });
+assert.deepEqual(parseGlobalVoiceCommand("học bài 1"), { kind: "navigate", href: "/demo/start-and-sequence-v2", label: "bài 1" });
+assert.deepEqual(parseGlobalVoiceCommand("chọn bài 1"), { kind: "navigate", href: "/demo/start-and-sequence-v2", label: "bài 1" });
 assert.deepEqual(parseGlobalVoiceCommand("xyz abc"), { kind: "unknown", transcript: "xyz abc" });
 
 console.log("global-voice-control tests passed");

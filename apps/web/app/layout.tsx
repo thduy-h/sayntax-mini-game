@@ -12,10 +12,10 @@ export const metadata: Metadata = {
     default: "SAYNTAX - Công nghệ không rào cản",
     template: "%s | SAYNTAX",
   },
-  description: "SAYNTAX giúp người mới học lập trình bằng giọng nói tiếng Việt, nhập lệnh hoặc kéo thả khối. Công nghệ không rào cản.",
+  description: "SAYNTAX giúp người mới học lập trình bằng giọng nói tiếng Việt hoặc kéo thả khối lệnh Blockly. Công nghệ không rào cản.",
   openGraph: {
     title: "SAYNTAX - Công nghệ không rào cản",
-    description: "Học lập trình bằng giọng nói, nhập lệnh hoặc kéo thả khối, từng bước dễ theo.",
+    description: "Học lập trình bằng giọng nói hoặc kéo thả khối, từng bước dễ theo.",
     siteName: "SAYNTAX",
     type: "website",
     images: [{ url: "/brand/sayntax-v2-primary-horizontal.png", alt: "SAYNTAX - Công nghệ không rào cản" }],
@@ -62,6 +62,12 @@ export default function RootLayout({
         real app behavior during demos.
       */}
       <body suppressHydrationWarning className="antialiased">
+        <a
+          href="#voice-activation"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[9999] focus:rounded-xl focus:border-2 focus:border-black focus:bg-[#ff5f87] focus:px-4 focus:py-3 focus:text-sm focus:font-black focus:text-black focus:shadow-[4px_4px_0_#121212] focus:outline-none focus:ring-4 focus:ring-[#0052cc]"
+        >
+          Nhấn Enter để kích hoạt điều khiển bằng giọng nói
+        </a>
         <GlobalCommandProvider>
           {children}
           <footer className="scc-site-footer mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-sm font-semibold text-black sm:px-10">

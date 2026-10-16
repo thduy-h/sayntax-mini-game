@@ -28,7 +28,7 @@ export function speechStatusAnnouncement(
 export function conciseAnnouncement(message: string): string {
   const trimmed = message.trim();
   if (/^(Đã nghe:|Hệ thống nghe chưa chắc)/i.test(trimmed)) {
-    return "Hệ thống chưa chắc câu lệnh. Hãy nói lại hoặc nhập lệnh.";
+    return "Hệ thống chưa chắc câu lệnh. Hãy nói lại rõ hơn hoặc thử câu khác.";
   }
   return trimmed.length > 220 ? `${trimmed.slice(0, 217).trimEnd()}…` : trimmed;
 }

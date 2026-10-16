@@ -40,7 +40,7 @@ export default function DemoLessonsPage() {
           Chọn bài học thử nghiệm
         </h1>
         <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-zinc-800 sm:text-base">
-          Trải nghiệm đầy đủ học bằng giọng nói tiếng Việt, gõ phím hoặc kéo thả Blockly. Tiến độ học thử sẽ được lưu an toàn trực tiếp trên trình duyệt của bạn.
+          Trải nghiệm học lập trình bằng giọng nói tiếng Việt hoặc kéo thả Blockly. Tiến độ học thử sẽ được lưu an toàn trực tiếp trên trình duyệt của bạn.
         </p>
       </section>
 

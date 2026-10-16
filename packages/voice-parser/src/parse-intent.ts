@@ -542,8 +542,12 @@ export function parseVoiceIntent(transcript: string): VoiceIntent {
 
   if (matchPhrasePrefix(normalized, CONFIRM_PHRASES)) return { kind: "confirm" };
   if (matchPhrasePrefix(normalized, CANCEL_PHRASES)) return { kind: "cancel" };
-  if (normalized === "buoc truoc" || normalized === "ve buoc truoc") return { kind: "navigate_step", target: "previous" };
-  if (normalized === "buoc sau" || normalized === "sang buoc sau") return { kind: "navigate_step", target: "next" };
+  if (/^(?:buoc truoc|ve buoc truoc|quay ve buoc truoc|quay lai buoc truoc)$/.test(normalized)) {
+    return { kind: "navigate_step", target: "previous" };
+  }
+  if (/^(?:buoc sau|sang buoc sau|tiep tuc|tiep theo|buoc tiep|buoc tiep theo|sang buoc tiep|sang buoc tiep theo)$/.test(normalized)) {
+    return { kind: "navigate_step", target: "next" };
+  }
   const stepNavigation = normalized.match(/^(?:den|mo|chuyen den) buoc (.+)$/);
   if (stepNavigation) {
     const stepNumber = parseNumberPayload(stepNavigation[1]);

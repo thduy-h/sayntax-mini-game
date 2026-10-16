@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Mic, MicOff, Volume2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSpeechRecognition } from "../hooks/use-speech-recognition";
+import { useGlobalCommand } from "./global-command-context";
 import {
   normalizeVoiceText,
   parseGlobalVoiceCommand,
@@ -18,9 +18,7 @@ import {
   type SpeechAnnouncementState,
 } from "../utils/accessible-announcements";
 import {
-  acknowledgeVoiceProcessing,
   canStartVoiceRecognition,
-  hasAcknowledgedVoiceProcessing,
   VOICE_PROCESSING_DISCLOSURE,
 } from "../utils/voice-privacy";
 
@@ -71,11 +69,10 @@ function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: 
 export function GlobalVoiceControl() {
   const router = useRouter();
   const pathname = usePathname();
-  const speech = useSpeechRecognition();
+  const { speech, startVoice, stopVoice, voicePrivacyAcknowledged, acknowledgePrivacy } = useGlobalCommand();
   const lastFinalResultIdRef = useRef(0);
   const [expanded, setExpanded] = useState(false);
   const [enabled, setEnabled] = useState(false);
-  const [voicePrivacyAcknowledged, setVoicePrivacyAcknowledged] = useState(false);
   const [feedback, setFeedback] = useState("Nói: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, hoặc trợ giúp.");
   const [lastCommand, setLastCommand] = useState<GlobalVoiceCommand | null>(null);
   const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
@@ -84,10 +81,6 @@ export function GlobalVoiceControl() {
   const previousCommandRef = useRef<GlobalVoiceCommand | null>(null);
   const lastAnnouncementRef = useRef("");
   const hiddenForWorkspace = isWorkspaceVoiceRoute(pathname);
-
-  useEffect(() => {
-    try { setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(window.localStorage)); } catch { setVoicePrivacyAcknowledged(false); }
-  }, []);
 
   const announce = useCallback((message: string | null, repeatEvent = false) => {
     const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
@@ -110,11 +103,20 @@ export function GlobalVoiceControl() {
     const message = speechStatusAnnouncement(
       previousSpeechStatusRef.current,
       current,
-      "Em có thể dùng thanh Nhập lệnh ở cuối màn hình.",
+      "Bạn có thể kéo thả khối hoặc tải lại trang để thử lại microphone.",
     );
     announce(message);
     previousSpeechStatusRef.current = current;
   }, [announce, enabled, hiddenForWorkspace, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
+
+  useEffect(() => {
+    const handleOpen = () => {
+      start();
+    };
+    window.addEventListener("scc:open-global-voice", handleOpen);
+    return () => window.removeEventListener("scc:open-global-voice", handleOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hiddenForWorkspace, voicePrivacyAcknowledged, speech]);
 
   useEffect(() => {
     const commandChanged = lastCommand !== previousCommandRef.current;
@@ -134,16 +136,9 @@ export function GlobalVoiceControl() {
   }, [enabled, hiddenForWorkspace, speech.finalResultId, speech.transcript]);
 
   useEffect(() => {
-    if (!enabled && speech.isListening) speech.stopListening();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled]);
-
-  useEffect(() => {
     if (!hiddenForWorkspace) return;
-    if (speech.isListening) speech.stopListening();
     setEnabled(false);
     setExpanded(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hiddenForWorkspace]);
 
   function start() {
@@ -151,11 +146,11 @@ export function GlobalVoiceControl() {
     setExpanded(true);
     if (!voicePrivacyAcknowledged) return;
     setEnabled(true);
-    void speech.startListening();
+    void startVoice();
   }
 
   function stop() {
-    void speech.stopListening();
+    void stopVoice(true);
     setEnabled(false);
     setFeedback("Đã tắt điều khiển web bằng giọng nói.");
   }
@@ -240,7 +235,7 @@ export function GlobalVoiceControl() {
     }
   }
 
-  if (hiddenForWorkspace) return null;
+  if (hiddenForWorkspace || pathname === "/") return null;
 
   return (
     <div
@@ -250,12 +245,13 @@ export function GlobalVoiceControl() {
       <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
       {!expanded ? (
         <Button
+          id="voice-activation"
           aria-label="Bật điều khiển web bằng giọng nói"
-          className="inline-flex items-center justify-center border-2 border-black bg-[#ff5f87] text-black font-black uppercase text-[11px] sm:text-xs tracking-wider shadow-[3px_3px_0_#121212] hover:shadow-[1px_1px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl px-3.5 py-2 transition-transform"
+          className="inline-flex min-h-12 items-center justify-center border-2 border-black bg-[#ff5f87] text-black font-black uppercase text-xs tracking-wider shadow-[4px_4px_0_#121212] hover:shadow-[2px_2px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl px-4 py-2.5 transition-transform focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc]"
           onClick={start}
           type="button"
         >
-          <Volume2 className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+          <Volume2 className="mr-2 h-4 w-4 shrink-0" />
           <span className="hidden xs:inline">Điều khiển web</span>
           <span className="xs:hidden">Nói</span>
         </Button>
@@ -288,10 +284,9 @@ export function GlobalVoiceControl() {
               <Button
                 className="mt-2"
                 onClick={() => {
-                  try { acknowledgeVoiceProcessing(window.localStorage); } catch { /* Consent remains active for this session. */ }
-                  setVoicePrivacyAcknowledged(true);
+                  acknowledgePrivacy();
                   setEnabled(true);
-                  void speech.startListening();
+                  void startVoice();
                 }}
                 size="sm"
                 type="button"
@@ -307,8 +302,8 @@ export function GlobalVoiceControl() {
               disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged) || speech.isStarting}
               onClick={() => {
                 setEnabled(true);
-                if (speech.isListening) void speech.stopListening();
-                else void speech.startListening();
+                if (speech.isListening) void stopVoice(true);
+                else void startVoice();
               }}
               size="sm"
               type="button"

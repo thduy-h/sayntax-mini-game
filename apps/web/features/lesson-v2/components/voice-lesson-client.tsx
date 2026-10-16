@@ -19,7 +19,6 @@ import type {
 import { Mic, MicOff, Lightbulb, Play, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGlobalCommand } from "@/features/voice-control/components/global-command-context";
-import { useSpeechRecognition } from "@/features/voice-control/hooks/use-speech-recognition";
 import {
   acknowledgeVoiceProcessing,
   canStartVoiceRecognition,
@@ -85,6 +84,9 @@ const lessonBrowserStorage: Storage = {
   key: (index) => window.localStorage.key(index),
 };
 const DEMO_SAVE_WARNING = "Không thể lưu tiến độ demo trên thiết bị này. Bạn vẫn có thể tiếp tục học; tiến độ có thể mất khi tải lại trang.";
+/** Text command bar and shortcuts are developer-only; hidden in production builds. */
+const IS_DEV = process.env.NODE_ENV === "development";
+
 
 interface VoiceLessonClientProps {
   lesson: LessonV2WithSteps;
@@ -481,13 +483,34 @@ function updateBlocklyVoiceBadges(
     root.querySelector("[data-scc-voice-badge]")?.remove();
     const item = itemByBlockId.get(block.id);
     if (!item) continue;
+    const badgeWidth = Math.max(24, 12 + item.displayId.length * 8);
+    const badgeHeight = 20;
+    const badgeX = -badgeWidth - 6;
+    const badgeY = 6;
     const badge = Blockly.utils.dom.createSvgElement(
       "g",
-      { "data-scc-voice-badge": "true", class: "scc-voice-badge", transform: "translate(6,6)" },
+      {
+        "data-scc-voice-badge": "true",
+        class: "scc-voice-badge",
+        transform: `translate(${badgeX},${badgeY})`,
+      },
       root,
     );
-    Blockly.utils.dom.createSvgElement("rect", { width: Math.max(28, 12 + item.displayId.length * 8), height: 18, rx: 4, ry: 4 }, badge);
-    const text = Blockly.utils.dom.createSvgElement("text", { x: 6, y: 13 }, badge);
+    Blockly.utils.dom.createSvgElement(
+      "rect",
+      { width: badgeWidth, height: badgeHeight, rx: 5, ry: 5 },
+      badge,
+    );
+    const text = Blockly.utils.dom.createSvgElement(
+      "text",
+      {
+        x: badgeWidth / 2,
+        y: badgeHeight / 2 + 0.5,
+        "text-anchor": "middle",
+        "dominant-baseline": "central",
+      },
+      badge,
+    );
     text.textContent = item.displayId;
   }
 }
@@ -575,14 +598,22 @@ export function VoiceLessonClient({
   const [stepPanelOpen, setStepPanelOpen] = useState(false);
   const [showPrimer, setShowPrimer] = useState(false);
   const prevStepIndexRef = useRef(currentStepIndex);
-  const speech = useSpeechRecognition();
+  const {
+    commandBarHeight,
+    registerWorkspaceCommand,
+    speech,
+    startVoice,
+    stopVoice,
+    voicePrivacyAcknowledged: globalVoicePrivacyAcknowledged,
+    acknowledgePrivacy,
+  } = useGlobalCommand();
   const previousSpeechStatusRef = useRef<SpeechAnnouncementState | null>(null);
   const previousFeedbackRef = useRef<string | null>(null);
   const previousRunResultRef = useRef<ProgramExecutionResult | null>(null);
   const previousCommandResultRef = useRef<GlobalCommandExecutionResult | null>(null);
   const previousAnnouncedStepRef = useRef(currentStepIndex);
   const lastAnnouncementRef = useRef("");
-  const { commandBarHeight, registerWorkspaceCommand } = useGlobalCommand();
+  const autoStartedRef = useRef(false);
   const currentStep = lesson.steps[currentStepIndex];
   const isDemoMode = mode === "demo";
   const primer = LESSON_PRIMERS[lesson.slug];
@@ -622,8 +653,8 @@ export function VoiceLessonClient({
       isSupported: speech.isSupported,
     };
     const fallback = lessonComplete
-      ? "Em có thể nhập lệnh trong hộp thoại hoàn thành."
-      : "Em có thể dùng thanh Nhập lệnh ở cuối màn hình.";
+      ? "Bạn có thể kéo thả khối hoặc nói lệnh khi microphone sẵn sàng."
+      : "Bạn có thể kéo thả khối hoặc nói lại lệnh.";
     announce(speechStatusAnnouncement(previousSpeechStatusRef.current, current, fallback));
     previousSpeechStatusRef.current = current;
   }, [announce, lessonComplete, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
@@ -662,8 +693,34 @@ export function VoiceLessonClient({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setVoicePrivacyAcknowledged(hasAcknowledgedVoiceProcessing(lessonBrowserStorage));
-  }, []);
+    setVoicePrivacyAcknowledged(
+      globalVoicePrivacyAcknowledged || hasAcknowledgedVoiceProcessing(lessonBrowserStorage)
+    );
+  }, [globalVoicePrivacyAcknowledged]);
+
+  useEffect(() => {
+    if (autoStartedRef.current) return;
+    if (!voicePrivacyAcknowledged || !speech.isSupportKnown || !speech.isSupported) return;
+    if (speech.isListening || speech.isStarting) return;
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return;
+
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((status) => {
+        if (!cancelled && status.state === "granted" && !autoStartedRef.current) {
+          autoStartedRef.current = true;
+          void startVoice();
+        }
+      })
+      .catch(() => {
+        // Permissions query not supported or failed - ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [speech, speech.isListening, speech.isStarting, speech.isSupportKnown, speech.isSupported, startVoice, voicePrivacyAcknowledged]);
 
   useEffect(() => {
     if (!isDemoMode || typeof window === "undefined") return;
@@ -2078,6 +2135,24 @@ export function VoiceLessonClient({
   }
 
   function handleCompletionCommand(command: string): GlobalCommandExecutionResult {
+    const normalized = command
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .trim();
+    if (/^(?:dung nghe|tat micro|tat mic|ngung nghe)$/.test(normalized)) {
+      void stopVoice(true);
+      setLastFeedback("Đã tắt điều khiển bằng giọng nói.");
+      return { command, feedback: "Đã tắt điều khiển bằng giọng nói.", handled: true, outcome: "applied", target: "workspace", understoodAs: "Dừng nghe" };
+    }
+    if (/^(?:ve trang chu|trang chu|ve nha)$/.test(normalized)) {
+      router.push("/");
+      setLastFeedback("Đang quay về trang chủ.");
+      return { command, feedback: "Đang quay về trang chủ.", handled: true, outcome: "applied", target: "workspace", understoodAs: "Về trang chủ" };
+    }
+
     const action = runCompletionModalCommand(command, Boolean(nextLesson), {
       next: () => router.push(nextLessonHref),
       list: () => router.push(lessonsHref),
@@ -2097,6 +2172,49 @@ export function VoiceLessonClient({
 
   function handleTranscriptCommand(rawTranscript: string, source: VoiceCommandSource = "microphone"): GlobalCommandExecutionResult {
     if (lessonComplete) return handleCompletionCommand(rawTranscript);
+
+    const normalizedPrimerCmd = rawTranscript
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (showPrimer && /^(?:bat dau bai hoc|bat dau|dong|dong lai|dong kien thuc|tiep tuc)$/.test(normalizedPrimerCmd)) {
+      closePrimer();
+      setLastFeedback("Đã đóng kiến thức nhanh. Bắt đầu bài học!");
+      return makeWorkspaceCommandResult(rawTranscript, "Đã bắt đầu bài học.", true, "Bắt đầu bài học", null, "applied");
+    }
+    if (!showPrimer && /^(?:xem kien thuc|mo kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedPrimerCmd)) {
+      setShowPrimer(true);
+      setLastFeedback("Đã mở kiến thức nhanh của bài học.");
+      return makeWorkspaceCommandResult(rawTranscript, "Đã mở kiến thức nhanh của bài học.", true, "Xem kiến thức", null, "applied");
+    }
+    if (showPrimer) {
+      closePrimer();
+    }
+
+    if (/^(?:dung nghe|tat micro|tat mic|ngung nghe)$/.test(normalizedPrimerCmd)) {
+      void stopVoice(true);
+      setLastFeedback("Đã tắt điều khiển bằng giọng nói.");
+      return makeWorkspaceCommandResult(rawTranscript, "Đã tắt điều khiển bằng giọng nói.", true, "Dừng nghe", null, "applied");
+    }
+
+    if (/^(?:ve trang chu|trang chu|ve nha)$/.test(normalizedPrimerCmd)) {
+      router.push("/");
+      setLastFeedback("Đang quay về trang chủ.");
+      return makeWorkspaceCommandResult(rawTranscript, "Đang quay về trang chủ.", true, "Về trang chủ", null, "applied");
+    }
+
+    if (/^(?:danh sach bai hoc|danh sach bai|tat ca bai hoc|mo danh sach bai)$/.test(normalizedPrimerCmd)) {
+      router.push(lessonsHref);
+      setLastFeedback("Đang mở danh sách bài học.");
+      return makeWorkspaceCommandResult(rawTranscript, "Đang mở danh sách bài học.", true, "Danh sách bài", null, "applied");
+    }
+
     const parsed = parseVoiceCommandInput(source, rawTranscript);
     if (!parsed) return makeWorkspaceCommandResult(rawTranscript, "Hãy nhập một câu lệnh.", false, undefined, null, "not_applied");
     const { intent, transcript } = parsed;
@@ -2181,7 +2299,29 @@ export function VoiceLessonClient({
   function handleSpeechAlternatives(alternatives: readonly SpeechAlternativeInput[]): GlobalCommandExecutionResult {
     const heardTranscript = alternatives[0]?.transcript.trim() ?? "";
     if (lessonComplete) return handleCompletionCommand(heardTranscript);
-    if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false, undefined, null, "unsupported");
+    if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy nói lại rõ hơn hoặc thử câu khác.", false, undefined, null, "unsupported");
+
+    const normalizedHeard = heardTranscript
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    if (showPrimer && /^(?:bat dau bai hoc|bat dau|dong|dong lai|dong kien thuc|tiep tuc)$/.test(normalizedHeard)) {
+      closePrimer();
+      setLastFeedback("Đã đóng kiến thức nhanh. Bắt đầu bài học!");
+      return makeWorkspaceCommandResult(heardTranscript, "Đã bắt đầu bài học.", true, "Bắt đầu bài học", null, "applied");
+    }
+    if (!showPrimer && /^(?:xem kien thuc|mo kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedHeard)) {
+      setShowPrimer(true);
+      setLastFeedback("Đã mở kiến thức nhanh của bài học.");
+      return makeWorkspaceCommandResult(heardTranscript, "Đã mở kiến thức nhanh của bài học.", true, "Xem kiến thức", null, "applied");
+    }
+
     const ranking = rankVoiceCommandAlternatives(
       alternatives,
       createVoiceCommandRankingContext(currentStep?.action, sampleUtterance),
@@ -2190,12 +2330,12 @@ export function VoiceLessonClient({
     if (!best) {
       setRecognizedCommand(heardTranscript);
       setLastIntent({ kind: "unknown", reason: "empty" });
-      setLastFeedback("Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.");
-      return makeWorkspaceCommandResult(heardTranscript, "Không nghe rõ câu lệnh. Hãy thử lại hoặc dùng thanh Nhập lệnh.", false, "chưa hiểu câu lệnh", null, "unsupported");
+      setLastFeedback("Không nghe rõ câu lệnh. Hãy nói lại rõ hơn hoặc thử câu khác.");
+      return makeWorkspaceCommandResult(heardTranscript, "Không nghe rõ câu lệnh. Hãy nói lại rõ hơn hoặc thử câu khác.", false, "chưa hiểu câu lệnh", null, "unsupported");
     }
 
     if (ranking.status === "reject") {
-      const feedback = `Đã nghe: “${heardTranscript}”. Mình chưa đủ chắc để thực hiện lệnh này. Em có thể nói lại chậm hơn hoặc nhập câu lệnh mẫu.`;
+      const feedback = `Đã nghe: “${heardTranscript}”. Mình chưa đủ chắc để thực hiện lệnh này. Em có thể nói lại chậm hơn hoặc thử câu lệnh khác.`;
       setRecognizedCommand(heardTranscript);
       setLastIntent(best.intent);
       setVoiceLog((items) => [...items, heardTranscript].slice(-5));
@@ -2209,7 +2349,7 @@ export function VoiceLessonClient({
       const closeCandidates =
         second && best.score - second.score < SPEECH_RANKING_THRESHOLDS.ambiguousDelta;
       if (closeCandidates) {
-        const feedback = `Hệ thống nghe chưa chắc. Có thể là: ${formatSpeechRankingCandidates(ranking.candidates)}. Vị trí chèn chưa thay đổi; em hãy nói lại rõ hơn hoặc dùng thanh Nhập lệnh.`;
+        const feedback = `Hệ thống nghe chưa chắc. Có thể là: ${formatSpeechRankingCandidates(ranking.candidates)}. Vị trí chèn chưa thay đổi; em hãy nói lại rõ hơn hoặc thử câu khác.`;
         setRecognizedCommand(heardTranscript);
         setLastIntent(best.intent);
         setVoiceLog((items) => [...items, heardTranscript].slice(-5));
@@ -2593,30 +2733,34 @@ export function VoiceLessonClient({
                 Làm lại
               </Button>
             </div>
-            <form
-              className="mt-4 flex min-w-0 flex-wrap items-end gap-2"
-              onSubmit={(event) => {
-                event.preventDefault();
-                const result = textCommandHandlerRef.current(completionCommand);
-                if (result.handled) setCompletionCommand("");
-              }}
-            >
-              <label className="min-w-0 basis-full flex-1 text-sm font-semibold text-black sm:basis-[180px]" htmlFor="completion-command">
-                Nhập lệnh hoàn thành
-                <input
-                  className="mt-1 min-h-10 w-full rounded border-2 border-black bg-white px-3 py-2 text-black"
-                  id="completion-command"
-                  onChange={(event) => setCompletionCommand(event.target.value)}
-                  value={completionCommand}
-                />
-              </label>
-              <Button size="sm" type="submit">Thực hiện</Button>
+            <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
+              {IS_DEV && (
+                <form
+                  className="flex min-w-0 flex-wrap items-end gap-2 w-full"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const result = textCommandHandlerRef.current(completionCommand);
+                    if (result.handled) setCompletionCommand("");
+                  }}
+                >
+                  <label className="min-w-0 basis-full flex-1 text-sm font-semibold text-black sm:basis-[180px]" htmlFor="completion-command">
+                    [DEV] Nhập lệnh
+                    <input
+                      className="mt-1 min-h-10 w-full rounded border-2 border-black bg-white px-3 py-2 text-black"
+                      id="completion-command"
+                      onChange={(event) => setCompletionCommand(event.target.value)}
+                      value={completionCommand}
+                    />
+                  </label>
+                  <Button size="sm" type="submit">Thực hiện</Button>
+                </form>
+              )}
               <Button
                 aria-label={speech.isListening ? "Dừng nghe lệnh hoàn thành" : "Nói lệnh hoàn thành"}
                 disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
                 onClick={() => {
-                  if (speech.isListening) void speech.stopListening();
-                  else void speech.startListening();
+                  if (speech.isListening) void stopVoice(true);
+                  else void startVoice();
                 }}
                 size="sm"
                 type="button"
@@ -2625,7 +2769,7 @@ export function VoiceLessonClient({
                 {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
                 {speech.isListening ? "Dừng" : "Nói"}
               </Button>
-            </form>
+            </div>
             {!voicePrivacyAcknowledged && (
               <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-3 text-xs text-black">
                 <p>Âm thanh có thể được gửi tới nhà cung cấp nhận dạng, dịch vụ trình duyệt hoặc xử lý trên máy vận hành tại workshop. SAYNTAX không giữ âm thanh thô; lưu câu lệnh mặc định tắt.</p>
@@ -2637,6 +2781,7 @@ export function VoiceLessonClient({
                   className="mt-2"
                   onClick={() => {
                     acknowledgeVoiceProcessing(lessonBrowserStorage);
+                    acknowledgePrivacy();
                     setVoicePrivacyAcknowledged(true);
                   }}
                   size="sm"
@@ -2664,13 +2809,14 @@ export function VoiceLessonClient({
     >
       <style>{`
         .scc-voice-badge { pointer-events: none; }
-        .scc-voice-badge rect { fill: #121212; stroke: #ffffff; stroke-width: 2px; }
-        .scc-voice-badge text { fill: #ffffff; font: 700 12px system-ui, sans-serif; pointer-events: none; }
+        .scc-voice-badge rect { fill: #ffce47; stroke: #121212; stroke-width: 2px; filter: drop-shadow(1.5px 1.5px 0 #121212); }
+        .scc-voice-badge text { fill: #121212; font: 800 11px ui-monospace, SFMono-Regular, monospace; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
         .scc-voice-selected .blocklyPath { stroke: #0052cc !important; stroke-width: 6px !important; filter: drop-shadow(0 0 0.2rem #ffffff) drop-shadow(0 0 0.2rem #0052cc); }
         .scc-voice-cursor .blocklyPath { filter: drop-shadow(0 0 0.35rem #ff5f87); }
         .scc-high-contrast .blocklyMainBackground { fill: #ffffff !important; }
         .scc-high-contrast, .scc-high-contrast * { color-scheme: light; }
-        .scc-high-contrast .scc-voice-badge rect { fill: #000000; stroke: #ffff00; }
+        .scc-high-contrast .scc-voice-badge rect { fill: #000000; stroke: #ffff00; filter: none; }
+        .scc-high-contrast .scc-voice-badge text { fill: #ffff00; }
         .scc-large-targets button { min-height: 48px; }
         .scc-reduced-motion *, .scc-reduced-motion *::before, .scc-reduced-motion *::after { transition: none !important; animation: none !important; }
       `}</style>
@@ -2701,9 +2847,53 @@ export function VoiceLessonClient({
                 <dd className="mt-1 font-semibold text-black">{primer.goal}</dd>
               </div>
             </div>
+            {lesson.slug === "start-and-sequence-v2" && (
+              <div className="mt-4 space-y-3">
+                <div className="rounded-xl border-2 border-black bg-[#fff6fb] p-3 shadow-[2px_2px_0_#121212]">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#9f2348]">Chương trình là gì?</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                    Chương trình là tập hợp các chỉ dẫn từng bước để máy tính biết phải làm gì. Giống như bạn hướng dẫn một người làm việc:
+                  </p>
+                  <div className="mt-2 rounded-lg border border-black/15 bg-white p-2 font-mono text-xs font-bold text-black">
+                    Bắt đầu &rarr; In &ldquo;Xin chào&rdquo; &rarr; Màn hình hiển thị: Xin chào
+                  </div>
+                </div>
+
+                <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Khối lệnh & Cách kết nối</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                    Mỗi khối đại diện cho một lệnh. Bạn kết nối các khối bằng cách ghép ngàm từ trên xuống dưới — máy tính sẽ chạy lần lượt từng khối theo thứ tự.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border-2 border-black bg-[#ffefb8] p-3 shadow-[2px_2px_0_#121212]">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Vì sao cần bấm &ldquo;Chạy&rdquo;?</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                    Xếp khối xong chỉ là bản thiết kế. Bấm nút <strong>Chạy</strong> (hoặc nói &ldquo;chạy chương trình&rdquo;) để máy tính thực hiện các lệnh và hiển thị kết quả.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Hai cách tạo chương trình</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-800">
+                    <div className="rounded-lg border border-black/15 bg-white p-2.5">
+                      <span className="font-black text-black">🧩 Kéo thả Blockly</span><br />
+                      Kéo khối từ danh sách thả vào vùng làm việc. Không cần microphone.
+                    </div>
+                    <div className="rounded-lg border border-black/15 bg-white p-2.5">
+                      <span className="font-black text-black">🎙️ Giọng nói tiếng Việt</span><br />
+                      Bấm nút Mic, nói câu lệnh (ví dụ: &ldquo;Thêm khối bắt đầu&rdquo;), khối tự động ghép.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <Button className="mt-5 w-full border-2 border-black bg-[#ff5f87] text-black font-black uppercase tracking-wider text-sm py-3.5 shadow-[4px_4px_0_#121212] hover:shadow-[2px_2px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl transition-transform" onClick={closePrimer} type="button">
               Bắt đầu bài học →
             </Button>
+            <p className="mt-2.5 text-center text-xs font-semibold text-zinc-600">
+              Hoặc nói: <span className="font-mono font-bold text-black">&ldquo;Bắt đầu bài học&rdquo;</span>
+            </p>
           </div>
         </div>
       )}
@@ -2716,11 +2906,12 @@ export function VoiceLessonClient({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button
+              id="voice-activation"
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
               aria-label={speech.isListening ? "Dừng nghe lệnh bài học" : "Bắt đầu nói lệnh bài học"}
               aria-pressed={speech.asrState === "listening"}
               disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged)}
-              onClick={() => { if (speech.isListening) void speech.stopListening(); else void speech.startListening(); }}
+              onClick={() => { if (speech.isListening) void stopVoice(true); else void startVoice(); }}
               size="sm"
               type="button"
               className={`border-2 border-black font-bold shadow-[2px_2px_0_#121212] transition-transform ${speech.isListening ? "bg-[#7df2c3] text-black animate-pulse" : "bg-white text-black hover:bg-[#fff0a8]"}`}
@@ -2728,21 +2919,24 @@ export function VoiceLessonClient({
               {speech.isListening ? <MicOff className="mr-1.5 h-4 w-4" /> : <Mic className="mr-1.5 h-4 w-4" />}
               {speech.isListening ? "Đang nghe..." : "Mic"}
             </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-2 border-black bg-white font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-[#a8e6ff]"
-              onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))}
-              type="button"
-            >
-              Nhập lệnh
-            </Button>
+            {IS_DEV && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-2 border-black bg-white font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-[#a8e6ff]"
+                onClick={() => window.dispatchEvent(new Event("scc:focus-command-bar"))}
+                type="button"
+              >
+                [DEV] Nhập lệnh
+              </Button>
+            )}
             <span id="lesson-voice-status" className={`rounded-lg border border-black/20 px-2.5 py-1 text-xs font-bold text-black ${voiceToneClass}`}>{voicePresentation.label}</span>
           </div>
           {!voicePrivacyAcknowledged && (
             <p className="basis-full text-xs text-zinc-700 bg-[#fff6a8] p-2 rounded-lg border border-black/20" id="lesson-voice-privacy">
-              Có thể nhập lệnh mà không cần micro. <button className="min-h-11 font-bold underline underline-offset-2 text-black" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2 font-bold" href="/privacy">Quyền riêng tư</Link>
+              Bật giọng nói để nói lệnh, hoặc kéo thả khối trực tiếp. <button className="min-h-11 font-bold underline underline-offset-2 text-black" onClick={() => { acknowledgeVoiceProcessing(lessonBrowserStorage); acknowledgePrivacy(); setVoicePrivacyAcknowledged(true); }} type="button">Đồng ý dùng giọng nói</button> · <Link className="underline underline-offset-2 font-bold" href="/privacy">Quyền riêng tư</Link>
             </p>
+
           )}
           {speech.isSupportKnown && (!speech.isSupported || speech.errorMessage) && <Button disabled={speech.isListening} onClick={() => void speech.retryASR()} size="sm" type="button" variant="outline" className="border-2 border-black font-bold">Thử lại giọng nói</Button>}
         </div>
@@ -2883,7 +3077,7 @@ export function VoiceLessonClient({
           )}
           {speech.isSupportKnown && !speech.isSupported && (
             <p className="text-zinc-700 text-xs font-medium">
-              Chưa bật nhận dạng giọng nói trên trình duyệt này. Em vẫn có thể bấm nút “Nhập lệnh” để học rất tốt nhé!
+              Trình duyệt chưa hỗ trợ nhận dạng giọng nói. Bạn vẫn có thể kéo thả khối để học bình thường.
             </p>
           )}
           {speech.errorMessage && <p className="text-red-600 text-xs font-semibold">{speech.errorMessage}</p>}
@@ -2945,24 +3139,34 @@ export function VoiceLessonClient({
           <div className="mt-3 rounded-xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
             <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Nhiệm vụ của bạn</p>
             <p className="mt-1 text-sm leading-relaxed text-zinc-800 font-medium">
-              {splitBoldSegments(currentStep.instructions).map((seg, i) => seg.bold ? <strong key={i} className="font-extrabold text-black bg-[#ffe0eb] px-1 py-0.5 rounded border border-black/20">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}
+              {splitBoldSegments(currentStep.instructions.replace(/nói hoặc nhập:?/gi, "nói:")).map((seg, i) => seg.bold ? <strong key={i} className="font-extrabold text-black bg-[#ffe0eb] px-1 py-0.5 rounded border border-black/20">{seg.text}</strong> : <span key={i}>{seg.text}</span>)}
             </p>
           </div>
 
           {sampleUtterance && (
             <div className="mt-3 rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
-              <p className="text-[10px] font-black uppercase tracking-wider text-[#0052cc]">Thử nói hoặc nhập:</p>
+              <p className="text-[10px] font-black uppercase tracking-wider text-[#0052cc]">Hãy thử nói:</p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleTranscriptCommand(sampleUtterance, "text");
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8] hover:translate-x-0.5 hover:translate-y-0.5 transition-all text-left"
-                >
-                  🎙️ “{sampleUtterance}”
-                </button>
+                {IS_DEV ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleTranscriptCommand(sampleUtterance, "text");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-[#fff0a8] px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212] hover:bg-[#ffce47] hover:translate-x-0.5 hover:translate-y-0.5 transition-all text-left"
+                    title="[DEV] Nhấn để giả lập câu lệnh giọng nói"
+                  >
+                    [DEV] 🎙️ &ldquo;{sampleUtterance}&rdquo;
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212]">
+                    🎙️ &ldquo;{sampleUtterance}&rdquo;
+                  </span>
+                )}
               </div>
+              <p className="mt-2 text-[11px] font-medium text-zinc-600">
+                Nói câu lệnh trên hoặc kéo khối tương ứng từ danh sách khối vào vùng làm việc.
+              </p>
             </div>
           )}
 

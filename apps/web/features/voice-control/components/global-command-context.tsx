@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useSpeechRecognition } from "../hooks/use-speech-recognition";
 import {
   normalizeVoiceText,
   parseGlobalVoiceCommand,
@@ -14,10 +15,21 @@ import {
   type GlobalCommandExecutionResult,
   type WorkspaceCommandRegistration,
 } from "../utils/global-command-routing";
+import { acknowledgeVoiceProcessing, hasAcknowledgedVoiceProcessing } from "../utils/voice-privacy";
+
+export type VoiceOperationalState =
+  | { kind: "idle"; message: string }
+  | { kind: "requesting_permission"; message: string }
+  | { kind: "listening"; interimTranscript?: string; message: string }
+  | { kind: "processing"; transcript: string; message: string }
+  | { kind: "success"; transcript: string; action: string; message: string }
+  | { kind: "unknown_command"; transcript: string; message: string }
+  | { kind: "interrupted"; error: string; message: string }
+  | { kind: "stopped_by_user"; message: string };
 
 type ActionElement = HTMLAnchorElement | HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
 
-interface GlobalCommandContextValue {
+export interface GlobalCommandContextValue {
   commandBarHeight: number;
   lastResult: GlobalCommandExecutionResult | null;
   lastResultId: number;
@@ -25,6 +37,14 @@ interface GlobalCommandContextValue {
   setCommandBarHeight: (height: number) => void;
   submitCommand: (command: string) => GlobalCommandExecutionResult;
   workspace: WorkspaceCommandRegistration | null;
+  // Unified Voice State & Operations:
+  speech: ReturnType<typeof useSpeechRecognition>;
+  operationalState: VoiceOperationalState;
+  startVoice: () => Promise<void>;
+  stopVoice: (byUser?: boolean) => Promise<void>;
+  userExplicitlyStopped: boolean;
+  voicePrivacyAcknowledged: boolean;
+  acknowledgePrivacy: () => void;
 }
 
 const GlobalCommandContext = createContext<GlobalCommandContextValue | null>(null);
@@ -107,11 +127,166 @@ function describeGlobalCommand(command: GlobalVoiceCommand) {
 
 export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const speech = useSpeechRecognition();
   const [workspace, setWorkspace] = useState<WorkspaceCommandRegistration | null>(null);
   const [lastResult, setLastResult] = useState<GlobalCommandExecutionResult | null>(null);
   const [lastResultId, setLastResultId] = useState(0);
   const [commandBarHeight, setCommandBarHeight] = useState(0);
+  const [voicePrivacyAcknowledged, setVoicePrivacyAcknowledged] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return hasAcknowledgedVoiceProcessing(window.localStorage);
+    } catch {
+      return false;
+    }
+  });
+  const userExplicitlyStoppedRef = useRef(false);
+  const [userExplicitlyStopped, setUserExplicitlyStopped] = useState(false);
+  const hasEverStartedRef = useRef(false);
   const activeLessonSlugRef = useRef<string | null>(null);
+  const lastProcessedFinalIdRef = useRef(0);
+
+  const acknowledgePrivacy = useCallback(() => {
+    try {
+      acknowledgeVoiceProcessing(window.localStorage);
+    } catch {
+      // storage unavailable
+    }
+    setVoicePrivacyAcknowledged(true);
+  }, []);
+
+  const startVoice = useCallback(async () => {
+    userExplicitlyStoppedRef.current = false;
+    setUserExplicitlyStopped(false);
+    hasEverStartedRef.current = true;
+    acknowledgePrivacy();
+    await speech.startListening();
+  }, [acknowledgePrivacy, speech]);
+
+  const stopVoice = useCallback(async (byUser = false) => {
+    if (byUser) {
+      userExplicitlyStoppedRef.current = true;
+      setUserExplicitlyStopped(true);
+      hasEverStartedRef.current = false;
+    }
+    await speech.stopListening();
+  }, [speech]);
+
+  // Auto-recover from technical interruptions or browser SpeechRecognition silence timeouts,
+  // keeping the session continuously alive until the user explicitly stops.
+  useEffect(() => {
+    if (!hasEverStartedRef.current || userExplicitlyStoppedRef.current) return;
+    if (speech.isListening || speech.isStarting || speech.errorMessage) return;
+
+    const timer = setTimeout(() => {
+      if (hasEverStartedRef.current && !userExplicitlyStoppedRef.current && !speech.isListening && !speech.isStarting && !speech.errorMessage) {
+        void speech.startListening();
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [speech]);
+
+  // Operational State derived directly from speech engine, user gestures, and last outcome
+  const operationalState = useMemo<VoiceOperationalState>(() => {
+    if (userExplicitlyStopped && !speech.isListening) {
+      return {
+        kind: "stopped_by_user",
+        message: "Bạn đã chủ động dừng nghe. Bấm 'Bắt đầu' khi muốn tiếp tục.",
+      };
+    }
+    if (speech.errorMessage) {
+      return {
+        kind: "interrupted",
+        error: speech.errorMessage,
+        message: speech.errorMessage,
+      };
+    }
+    if (speech.isStarting) {
+      return {
+        kind: "requesting_permission",
+        message: "Đang kết nối nhận dạng giọng nói...",
+      };
+    }
+    if (speech.asrState === "processing") {
+      return {
+        kind: "processing",
+        transcript: speech.transcript,
+        message: `Đang xử lý câu lệnh: “${speech.transcript}”...`,
+      };
+    }
+    if (speech.isListening) {
+      if (speech.interimTranscript) {
+        return {
+          kind: "listening",
+          interimTranscript: speech.interimTranscript,
+          message: `Đang nghe: “${speech.interimTranscript}”`,
+        };
+      }
+      return {
+        kind: "listening",
+        message: "Đang lắng nghe câu lệnh của bạn...",
+      };
+    }
+    if (lastResult) {
+      if (lastResult.handled) {
+        return {
+          kind: "success",
+          transcript: lastResult.command,
+          action: lastResult.understoodAs ?? lastResult.feedback,
+          message: lastResult.feedback,
+        };
+      }
+      return {
+        kind: "unknown_command",
+        transcript: lastResult.command,
+        message: lastResult.feedback,
+      };
+    }
+    return {
+      kind: "idle",
+      message: "Chưa bật điều khiển giọng nói. Bấm nút hoặc dùng Voice Access để kích hoạt.",
+    };
+  }, [
+    lastResult,
+    speech.asrState,
+    speech.errorMessage,
+    speech.interimTranscript,
+    speech.isListening,
+    speech.isStarting,
+    speech.transcript,
+    userExplicitlyStopped,
+  ]);
+
+  // Auto-start for returning user with granted permission and consent
+  const autoStartedRef = useRef(false);
+  useEffect(() => {
+    if (autoStartedRef.current || userExplicitlyStoppedRef.current) return;
+    if (typeof navigator === "undefined" || !navigator.permissions?.query) return;
+    try {
+      const acknowledged = hasAcknowledgedVoiceProcessing(window.localStorage);
+      if (!acknowledged) return;
+    } catch {
+      return;
+    }
+
+    let cancelled = false;
+    navigator.permissions
+      .query({ name: "microphone" as PermissionName })
+      .then((status) => {
+        if (!cancelled && status.state === "granted" && !autoStartedRef.current && !userExplicitlyStoppedRef.current) {
+          autoStartedRef.current = true;
+          void startVoice();
+        }
+      })
+      .catch(() => {
+        // Permissions query not supported or failed - ignore
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [startVoice]);
 
   const registerWorkspaceCommand = useCallback((registration: WorkspaceCommandRegistration) => {
     const previousLessonSlug = activeLessonSlugRef.current;
@@ -189,36 +364,59 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
         setNativeValue(element, "");
         return { command: commandText, feedback: "Đã xoá nội dung ô đang chọn.", handled: true, target: "website", understoodAs };
       }
-      case "help":
-        return { command: commandText, feedback: "Có thể nhập: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, quay lại.", handled: true, target: "website", understoodAs };
+      case "help": {
+        const guide = document.getElementById("voice-guide");
+        if (guide) {
+          guide.scrollIntoView({ behavior: "smooth", block: "start" });
+          return {
+            command: commandText,
+            feedback: "Đã chuyển đến bảng hướng dẫn giọng nói chi tiết.",
+            handled: true,
+            target: "website",
+            understoodAs: "mở hướng dẫn chi tiết",
+          };
+        }
+        if (typeof window !== "undefined" && window.location.pathname !== "/") {
+          router.push("/#voice-guide");
+          return {
+            command: commandText,
+            feedback: "Đang mở bảng hướng dẫn giọng nói chi tiết.",
+            handled: true,
+            target: "website",
+            understoodAs: "mở hướng dẫn chi tiết",
+          };
+        }
+        return { command: commandText, feedback: "Có thể nói: học thử, bài 1, cuộn xuống, quay lại, trợ giúp.", handled: true, target: "website", understoodAs };
+      }
       case "stop":
-        return { command: commandText, feedback: "Nút micro toàn web có thể tắt trong panel giọng nói.", handled: true, target: "website", understoodAs };
+        void stopVoice(true);
+        return { command: commandText, feedback: "Đã tắt điều khiển bằng giọng nói theo yêu cầu.", handled: true, target: "website", understoodAs };
       case "unknown":
-        return { command: commandText, feedback: "Mình chưa hiểu lệnh website này. Hãy nhập: trải nghiệm ngay, cuộn xuống, hoặc trợ giúp.", handled: false, target: "website", understoodAs };
+        return { command: commandText, feedback: `Chưa hiểu câu lệnh “${commandText}”. Hãy nói: học thử, bài 1, cuộn xuống, hoặc trợ giúp.`, handled: false, target: "website", understoodAs };
       default: {
         const _exhaustive: never = command;
         return _exhaustive;
       }
     }
-  }, [router]);
+  }, [router, stopVoice]);
 
   const submitCommand = useCallback((command: string): GlobalCommandExecutionResult => {
     const trimmed = command.trim();
     const target = chooseGlobalCommandTarget(workspace);
     let result: GlobalCommandExecutionResult;
     if (!trimmed) {
-      result = { command, feedback: "Hãy nhập một câu lệnh.", handled: false, target };
+      result = { command, feedback: "Hãy nói một câu lệnh.", handled: false, target };
     } else if (target === "modal_blocked") {
       result = {
         command: trimmed,
-        feedback: "Bài học đang hiển thị hộp thoại hoàn thành. Hãy đóng hộp thoại trước khi nhập lệnh.",
+        feedback: "Bài học đang hiển thị hộp thoại hoàn thành. Hãy nói câu lệnh cho hộp thoại hoặc đóng nó.",
         handled: false,
         target,
       };
     } else if (target === "workspace_not_ready") {
       result = {
         command: trimmed,
-        feedback: "Workspace đang khởi tạo. Vui lòng thử lại sau giây lát.",
+        feedback: "Vùng làm việc đang khởi tạo. Vui lòng thử lại sau giây lát.",
         handled: false,
         target,
       };
@@ -232,15 +430,53 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     return result;
   }, [submitWebsiteCommand, workspace]);
 
+  // Dispatch global voice commands when outside workspace
+  useEffect(() => {
+    if (workspace !== null) return;
+    if (!speech.transcript || speech.finalResultId === lastProcessedFinalIdRef.current) return;
+    lastProcessedFinalIdRef.current = speech.finalResultId;
+
+    const trimmed = speech.transcript.trim();
+    if (!trimmed) return;
+
+    queueMicrotask(() => {
+      const result = submitWebsiteCommand(trimmed);
+      setLastResult(result);
+      setLastResultId((curr) => curr + 1);
+    });
+  }, [speech.finalResultId, speech.transcript, submitWebsiteCommand, workspace]);
+
   const value = useMemo<GlobalCommandContextValue>(() => ({
+    acknowledgePrivacy,
     commandBarHeight,
     lastResult,
     lastResultId,
+    operationalState,
     registerWorkspaceCommand,
     setCommandBarHeight,
+    speech,
+    startVoice,
+    stopVoice,
     submitCommand,
+    userExplicitlyStopped,
+    voicePrivacyAcknowledged,
     workspace,
-  }), [commandBarHeight, lastResult, lastResultId, registerWorkspaceCommand, submitCommand, workspace]);
+  }), [
+    acknowledgePrivacy,
+    commandBarHeight,
+    lastResult,
+    lastResultId,
+    operationalState,
+    registerWorkspaceCommand,
+    setCommandBarHeight,
+    speech,
+    startVoice,
+    stopVoice,
+    submitCommand,
+    userExplicitlyStopped,
+    voicePrivacyAcknowledged,
+    workspace,
+  ]);
 
   return <GlobalCommandContext.Provider value={value}>{children}</GlobalCommandContext.Provider>;
 }

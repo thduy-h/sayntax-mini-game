@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listSeedV2Lessons } from "@shecancode/lesson-engine";
 import { BrandLogo } from "@/components/brand-logo";
+import { HeroVoiceTrigger } from "@/features/voice-control/components/hero-voice-trigger";
+import { DetailedVoiceGuide } from "@/features/voice-control/components/detailed-voice-guide";
 
 const lessons = listSeedV2Lessons();
 const totalSteps = lessons.reduce((sum, lesson) => sum + lesson.stepCount, 0);
@@ -59,9 +61,11 @@ export default function Home() {
                 Học lập trình bằng giọng nói tiếng Việt.
               </h1>
               <p className="max-w-xl text-base font-medium leading-relaxed text-zinc-800 sm:text-lg">
-                Tạo khối lệnh, xây dựng tư duy thuật toán và viết chương trình đầu tiên bằng tiếng Việt, gõ lệnh hoặc kéo thả Blockly — không cần kinh nghiệm trước đó.
+                Tạo khối lệnh, xây dựng tư duy thuật toán và viết chương trình đầu tiên bằng tiếng Việt — bằng giọng nói hoặc kéo thả Blockly. Không cần kinh nghiệm trước đó.
               </p>
             </div>
+
+            <HeroVoiceTrigger />
           </div>
 
           <div className="mt-8 space-y-4">
@@ -93,83 +97,131 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero Right: Stats & Value Card */}
-        <div className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#e7fff3] p-6 shadow-[5px_5px_0_#121212] sm:p-8">
+        {/* Hero Right: 5-Lesson Visual Curriculum Roadmap */}
+        <div className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#e7fff3] p-5 shadow-[5px_5px_0_#121212] sm:p-7">
           <div>
-            <div className="inline-block rounded-md border border-black bg-white px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">
-              Lộ trình 5 bài học
+            <div className="flex items-center justify-between gap-2">
+              <span className="rounded-md border border-black bg-white px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">
+                Lộ trình 5 bài học
+              </span>
+              <span className="text-xs font-black uppercase text-zinc-600">
+                {lessons.length} bài · {totalSteps} bước
+              </span>
             </div>
-            <h2 className="font-heading mt-4 text-2xl font-black leading-snug sm:text-3xl text-black">
-              Bắt đầu từ những điều cơ bản nhất
+            <h2 className="font-heading mt-3 text-xl font-black leading-snug sm:text-2xl text-black">
+              Nói tên bài để bắt đầu ngay
             </h2>
-            <p className="mt-3 text-sm font-medium leading-relaxed text-zinc-800">
-              Từng bước một: từ xuất dòng chữ đầu tiên, tính toán toán học, đến vòng lặp logic và biến lưu trữ giá trị.
+            <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-700">
+              Người học có thể nói trực tiếp tên bài để vào học ngay mà không cần chạm chuột:
             </p>
+
+            {/* 5-Lesson Interactive Visual Progression */}
+            <div className="mt-4 space-y-2">
+              {lessons.map((lesson, idx) => {
+                const colors = [
+                  "bg-[#ff5f87]",
+                  "bg-[#ffce47]",
+                  "bg-[#7df2c3]",
+                  "bg-[#a8e6ff]",
+                  "bg-[#d4b8ff]",
+                ];
+                const badgeColor = colors[idx % colors.length];
+                return (
+                  <Link
+                    key={lesson.id}
+                    href={`/demo/${lesson.slug}`}
+                    className="group flex items-center justify-between rounded-xl border-2 border-black bg-white p-2.5 text-xs font-bold shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 hover:shadow-[3px_3px_0_#121212]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-black ${badgeColor} text-[11px] font-black text-black shadow-[1px_1px_0_#121212]`}
+                      >
+                        {lesson.orderIndex}
+                      </span>
+                      <div className="min-w-0 truncate">
+                        <span className="font-black text-black group-hover:text-[#ff5f87]">
+                          {lesson.title}
+                        </span>
+                        <span className="ml-2 hidden text-[11px] font-medium text-zinc-500 xl:inline truncate">
+                          · {lesson.stepCount} bước
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="font-mono text-[10px] font-bold text-zinc-600 bg-[#fffdf0] px-1.5 py-0.5 rounded border border-black/15">
+                        Nói &ldquo;Bài {lesson.orderIndex}&rdquo;
+                      </span>
+                      <span className="text-[11px] font-black uppercase text-zinc-400 group-hover:text-black">
+                        →
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="my-6 grid grid-cols-2 gap-4 rounded-2xl border-2 border-black bg-white p-4 shadow-[3px_3px_0_#121212]">
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Bài học cốt lõi</p>
-              <p className="mt-1 font-heading text-3xl font-black text-black sm:text-4xl">{lessons.length}</p>
-            </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-wider text-zinc-500">Bước thực hành</p>
-              <p className="mt-1 font-heading text-3xl font-black text-black sm:text-4xl">{totalSteps}</p>
-            </div>
+          <div className="mt-4 pt-3 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-2">
+            <Link
+              className="inline-flex flex-1 items-center justify-center rounded-xl border-2 border-black bg-[#ffce47] px-4 py-2.5 text-xs font-black uppercase tracking-wider text-black shadow-[3px_3px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0"
+              href="/demo"
+            >
+              Xem toàn bộ giáo trình →
+            </Link>
+            <a
+              href="#voice-guide"
+              className="inline-flex items-center justify-center rounded-xl border-2 border-black bg-white px-3 py-2.5 text-xs font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-50 transition-transform hover:-translate-y-0.5"
+            >
+              Bảng lệnh chi tiết ↓
+            </a>
           </div>
-
-          <Link
-            className="inline-flex items-center justify-center rounded-xl border-2 border-black bg-[#ffefb8] px-4 py-3 text-sm font-black text-black shadow-[3px_3px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0"
-            href="/demo"
-          >
-            Khám phá danh sách bài học →
-          </Link>
         </div>
       </section>
 
-      {/* 3 Interaction Modes Section */}
+      {/* How To Learn Section */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <span className="rounded-md border border-black bg-[#ffce47] px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">
-            Phương pháp học
+            Cách học
           </span>
           <h2 className="font-heading text-xl font-black uppercase tracking-tight text-black sm:text-2xl">
-            3 cách tương tác linh hoạt
+            Hai cách tạo chương trình
           </h2>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="rounded-2xl border-2 border-black bg-[#fffdf3] p-5 shadow-[4px_4px_0_#121212]">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="rounded-2xl border-2 border-black bg-[#fff6fb] p-5 shadow-[4px_4px_0_#121212]">
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-[#ff5f87] text-lg font-black text-white shadow-[2px_2px_0_#121212]">
               🎙️
             </div>
-            <h3 className="font-heading mt-3 text-lg font-black text-black">Giọng nói tiếng Việt</h3>
+            <h3 className="font-heading mt-3 text-lg font-black text-black">Học bằng giọng nói</h3>
             <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-700">
-              Nói tự nhiên như &ldquo;Thêm khối in&rdquo;, &ldquo;Đặt giá trị 5&rdquo; — hệ thống nhận diện tức thì và tự động ghép khối vào đúng vị trí.
+              Nói bằng tiếng Việt để tạo và chỉnh sửa chương trình. Hệ thống nhận diện lệnh tức thì và ghép khối vào đúng vị trí — không cần gõ phím.
             </p>
-          </div>
-
-          <div className="rounded-2xl border-2 border-black bg-[#fffdf3] p-5 shadow-[4px_4px_0_#121212]">
-            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-[#a8e6ff] text-lg font-black text-black shadow-[2px_2px_0_#121212]">
-              ⌨️
+            <div className="mt-3 rounded-lg border border-black/15 bg-white p-2.5 font-mono text-xs font-bold text-zinc-700">
+              🎤 &ldquo;Thêm khối in&rdquo; → Khối In xuất hiện
             </div>
-            <h3 className="font-heading mt-3 text-lg font-black text-black">Nhập lệnh tự nhiên</h3>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-700">
-              Nhấn phím tắt Alt+G mở thanh lệnh bất cứ lúc nào để gõ câu lệnh tiếng Việt có gợi ý trực quan, phù hợp khi ở nơi công cộng.
-            </p>
           </div>
 
-          <div className="rounded-2xl border-2 border-black bg-[#fffdf3] p-5 shadow-[4px_4px_0_#121212]">
+          <div className="rounded-2xl border-2 border-black bg-[#e7fff3] p-5 shadow-[4px_4px_0_#121212]">
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg border-2 border-black bg-[#7df2c3] text-lg font-black text-black shadow-[2px_2px_0_#121212]">
               🧩
             </div>
-            <h3 className="font-heading mt-3 text-lg font-black text-black">Kéo thả Blockly</h3>
+            <h3 className="font-heading mt-3 text-lg font-black text-black">Học bằng kéo thả</h3>
             <p className="mt-2 text-sm font-medium leading-relaxed text-zinc-700">
-              Học tư duy thuật toán trực quan chuẩn mực Google Blockly, các khối lệnh tự khớp ngàm chính xác, không lo lỗi cú pháp dấu chấm phẩy.
+              Kéo các khối lệnh vào vùng làm việc và kết nối chúng lại. Tư duy thuật toán trực quan, không lo lỗi cú pháp — không cần bật microphone.
             </p>
+            <div className="mt-3 rounded-lg border border-black/15 bg-white p-2.5 font-mono text-xs font-bold text-zinc-700">
+              🧩 Kéo khối → Thả vào vùng → Chạy chương trình
+            </div>
           </div>
         </div>
       </section>
+
+      {/* Tier 2: Detailed Voice Guide Section */}
+      <DetailedVoiceGuide />
+
+
 
       {/* 5 Lessons Curriculum Grid */}
       <section className="space-y-4">

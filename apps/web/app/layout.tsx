@@ -70,9 +70,17 @@ export default function RootLayout({
         </a>
         <GlobalCommandProvider>
           {children}
-          <footer className="scc-site-footer mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-6 text-sm font-semibold text-black sm:px-10">
-            <span>SAYNTAX · Công nghệ không rào cản</span>
-            <Link className="inline-flex min-h-11 items-center underline underline-offset-4 focus-visible:outline-4 focus-visible:outline-[#0052cc]" href="/privacy">Quyền riêng tư</Link>
+          <footer className="scc-site-footer mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 border-t-2 border-black/15 px-6 py-6 text-xs sm:text-sm font-semibold text-zinc-700 sm:px-8">
+            <div className="flex flex-wrap items-center gap-4">
+              <span>© SAYNTAX — Nền tảng học lập trình không rào cản.</span>
+              <Link className="underline decoration-1 underline-offset-4 hover:text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]" href="/voice-guide">
+                Hướng dẫn lệnh
+              </Link>
+              <Link className="underline decoration-1 underline-offset-4 hover:text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]" href="/privacy">
+                Quyền riêng tư
+              </Link>
+            </div>
+            <p className="text-xs text-zinc-600">Hỗ trợ nhận dạng giọng nói tiếng Việt · Blockly 12</p>
           </footer>
           <GlobalVoiceControl />
           <GlobalCommandBar />

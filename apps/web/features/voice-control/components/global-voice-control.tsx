@@ -1,15 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { Mic, MicOff, Volume2, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Mic,
+  MicOff,
+  Volume2,
+  HelpCircle,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGlobalCommand } from "./global-command-context";
-import {
-  normalizeVoiceText,
-  parseGlobalVoiceCommand,
-  type GlobalVoiceCommand,
-} from "../utils/global-voice-control";
 import { isWorkspaceVoiceRoute } from "../utils/global-voice-routes";
 import {
   conciseAnnouncement,
@@ -18,70 +23,48 @@ import {
   type SpeechAnnouncementState,
 } from "../utils/accessible-announcements";
 import {
-  canStartVoiceRecognition,
   VOICE_PROCESSING_DISCLOSURE,
 } from "../utils/voice-privacy";
 
-type ActionElement = HTMLAnchorElement | HTMLButtonElement | HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
-
-function isVisible(element: HTMLElement) {
-  const rect = element.getBoundingClientRect();
-  const style = window.getComputedStyle(element);
-  return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
-}
-
-function elementLabel(element: HTMLElement) {
-  const aria = element.getAttribute("aria-label");
-  const title = element.getAttribute("title");
-  const placeholder = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.placeholder : "";
-  const value = element instanceof HTMLInputElement && ["button", "submit", "reset"].includes(element.type) ? element.value : "";
-  return normalizeVoiceText([aria, title, placeholder, value, element.innerText, element.textContent].filter(Boolean).join(" "));
-}
-
-function findElementByVoiceLabel(label: string, selector: string) {
-  const normalized = normalizeVoiceText(label);
-  const queryTokens = new Set(normalized.split(" ").filter((token) => token.length > 1));
-  const candidates = Array.from(document.querySelectorAll<HTMLElement>(selector)).filter(isVisible);
-  return candidates
-    .map((element) => {
-      const label = elementLabel(element);
-      const labelTokens = new Set(label.split(" ").filter((token) => token.length > 1));
-      const overlap = Array.from(queryTokens).filter((token) => labelTokens.has(token)).length;
-      return { element, label, overlap };
-    })
-    .filter((entry) => entry.label)
-    .sort((a, b) => {
-      const aExact = a.label === normalized ? 0 : 1;
-      const bExact = b.label === normalized ? 0 : 1;
-      return aExact - bExact || b.overlap - a.overlap || a.label.length - b.label.length;
-    })
-    .find((entry) => entry.label === normalized || entry.label.includes(normalized) || normalized.includes(entry.label) || entry.overlap >= Math.max(1, queryTokens.size))?.element as ActionElement | undefined;
-}
-
-function setNativeValue(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
-  const prototype = Object.getPrototypeOf(element) as HTMLInputElement | HTMLTextAreaElement;
-  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
-  descriptor?.set?.call(element, value);
-  element.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText", data: value }));
-  element.dispatchEvent(new Event("change", { bubbles: true }));
-}
+type EngineDisplayStatus = "off" | "starting" | "listening" | "processing" | "error";
 
 export function GlobalVoiceControl() {
-  const router = useRouter();
   const pathname = usePathname();
-  const { speech, startVoice, stopVoice, voicePrivacyAcknowledged, acknowledgePrivacy } = useGlobalCommand();
-  const lastFinalResultIdRef = useRef(0);
+  const uniqueId = useId();
+  const {
+    speech,
+    startVoice,
+    stopVoice,
+    userExplicitlyStopped,
+    voicePrivacyAcknowledged,
+    acknowledgePrivacy,
+    lastResult,
+    lastResultId,
+    workspace,
+  } = useGlobalCommand();
+
   const [expanded, setExpanded] = useState(false);
-  const [enabled, setEnabled] = useState(false);
-  const [feedback, setFeedback] = useState("Nói: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, hoặc trợ giúp.");
-  const [lastCommand, setLastCommand] = useState<GlobalVoiceCommand | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const checkExpanded = () => {
+      if (window.location.hash === "#voice-expanded" || new URLSearchParams(window.location.search).get("voice") === "expanded") {
+        setExpanded(true);
+      }
+    };
+    checkExpanded();
+    window.addEventListener("hashchange", checkExpanded);
+    return () => window.removeEventListener("hashchange", checkExpanded);
+  }, []);
   const [announcement, setAnnouncement] = useState({ id: 0, text: "" });
   const previousSpeechStatusRef = useRef<SpeechAnnouncementState | null>(null);
-  const previousFeedbackRef = useRef(feedback);
-  const previousCommandRef = useRef<GlobalVoiceCommand | null>(null);
+  const previousFeedbackRef = useRef<string | null>(null);
+  const previousResultIdRef = useRef<number>(0);
   const lastAnnouncementRef = useRef("");
-  const hiddenForWorkspace = isWorkspaceVoiceRoute(pathname);
 
+  const inWorkspace = isWorkspaceVoiceRoute(pathname) || Boolean(workspace);
+
+  // Screen reader announcer
   const announce = useCallback((message: string | null, repeatEvent = false) => {
     const next = distinctAnnouncement(lastAnnouncementRef.current, message, repeatEvent);
     if (!next) return;
@@ -89,11 +72,8 @@ export function GlobalVoiceControl() {
     setAnnouncement((current) => ({ id: current.id + 1, text: next }));
   }, []);
 
+  // Announce speech connection status changes
   useEffect(() => {
-    if (hiddenForWorkspace || (!enabled && !speech.isListening)) {
-      previousSpeechStatusRef.current = null;
-      return;
-    }
     const current: SpeechAnnouncementState = {
       errorMessage: speech.errorMessage,
       isListening: speech.isListening,
@@ -103,257 +83,482 @@ export function GlobalVoiceControl() {
     const message = speechStatusAnnouncement(
       previousSpeechStatusRef.current,
       current,
-      "Bạn có thể kéo thả khối hoặc tải lại trang để thử lại microphone.",
+      "Bạn có thể kéo thả khối hoặc bấm Bật micro để thử lại.",
     );
     announce(message);
     previousSpeechStatusRef.current = current;
-  }, [announce, enabled, hiddenForWorkspace, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
+  }, [announce, speech.errorMessage, speech.isListening, speech.isSupportKnown, speech.isSupported]);
 
+  // Announce executed command outcomes
+  useEffect(() => {
+    const feedback = lastResult?.feedback ?? "";
+    const commandChanged = lastResultId !== previousResultIdRef.current;
+    if (feedback && (feedback !== previousFeedbackRef.current || commandChanged)) {
+      announce(conciseAnnouncement(feedback), commandChanged);
+      previousFeedbackRef.current = feedback;
+      previousResultIdRef.current = lastResultId;
+    }
+  }, [announce, lastResult, lastResultId]);
+
+  // Listen to open-global-voice custom event (e.g. from skip links or hotkeys)
   useEffect(() => {
     const handleOpen = () => {
-      start();
+      setExpanded(true);
+      if (!speech.isListening) {
+        void startVoice();
+      }
     };
     window.addEventListener("scc:open-global-voice", handleOpen);
     return () => window.removeEventListener("scc:open-global-voice", handleOpen);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hiddenForWorkspace, voicePrivacyAcknowledged, speech]);
+  }, [speech.isListening, startVoice]);
 
-  useEffect(() => {
-    const commandChanged = lastCommand !== previousCommandRef.current;
-    if ((feedback !== previousFeedbackRef.current || commandChanged) && !hiddenForWorkspace) {
-      announce(conciseAnnouncement(feedback), commandChanged);
+  // Determine true engine status (never faked!)
+  const engineStatus = useMemo<EngineDisplayStatus>(() => {
+    if (speech.errorMessage) return "error";
+    if (userExplicitlyStopped && !speech.isListening) return "off";
+    if (speech.isStarting || speech.asrState === "checking" || speech.asrState === "starting") return "starting";
+    if (speech.asrState === "processing") return "processing";
+    if (speech.isListening) return "listening";
+    return "off";
+  }, [speech.asrState, speech.errorMessage, speech.isListening, speech.isStarting, userExplicitlyStopped]);
+
+  // Status visual attributes
+  const statusMeta = useMemo(() => {
+    switch (engineStatus) {
+      case "listening":
+        return {
+          label: "Đang nghe",
+          dotColor: "bg-[#7df2c3]",
+          badgeClass: "border-black bg-[#7df2c3] text-black",
+          desc: speech.interimTranscript
+            ? `Đang nghe: “${speech.interimTranscript}”`
+            : "Micro đang mở liên tục · Sẵn sàng nhận câu lệnh",
+          icon: <Volume2 className="h-4 w-4 text-emerald-950 animate-pulse motion-reduce:animate-none shrink-0" />,
+        };
+      case "processing":
+        return {
+          label: "Đang xử lý",
+          dotColor: "bg-[#a8e6ff]",
+          badgeClass: "border-black bg-[#a8e6ff] text-black",
+          desc: `Đang nhận diện: “${speech.transcript || "..."}”`,
+          icon: <Loader2 className="h-4 w-4 text-blue-950 animate-spin motion-reduce:animate-none shrink-0" />,
+        };
+      case "starting":
+        return {
+          label: "Đang kết nối",
+          dotColor: "bg-[#fff0a8]",
+          badgeClass: "border-black bg-[#fff0a8] text-black",
+          desc: "Đang xin quyền micro và khởi động nhận dạng...",
+          icon: <Loader2 className="h-4 w-4 text-amber-950 animate-spin motion-reduce:animate-none shrink-0" />,
+        };
+      case "error":
+        return {
+          label: "Lỗi micro",
+          dotColor: "bg-[#ffd1dc]",
+          badgeClass: "border-black bg-[#ffd1dc] text-red-950",
+          desc: speech.errorMessage || "Không thể truy cập microphone. Kiểm tra quyền trình duyệt.",
+          icon: <AlertTriangle className="h-4 w-4 text-red-700 shrink-0" />,
+        };
+      case "off":
+      default:
+        return {
+          label: "Micro tắt",
+          dotColor: "bg-zinc-300",
+          badgeClass: "border-black/30 bg-white text-zinc-700",
+          desc: userExplicitlyStopped
+            ? "Đã dừng nghe. Bấm Bật micro khi muốn tiếp tục."
+            : "Chưa bật micro. Người hỗ trợ bấm Bật micro để bắt đầu.",
+          icon: <MicOff className="h-4 w-4 text-zinc-600 shrink-0" />,
+        };
     }
-    previousFeedbackRef.current = feedback;
-    previousCommandRef.current = lastCommand;
-  }, [announce, feedback, hiddenForWorkspace, lastCommand]);
+  }, [engineStatus, speech.errorMessage, speech.interimTranscript, speech.transcript, userExplicitlyStopped]);
 
-  useEffect(() => {
-    if (hiddenForWorkspace || !enabled || !speech.transcript || speech.finalResultId === lastFinalResultIdRef.current) return;
-    lastFinalResultIdRef.current = speech.finalResultId;
-    runCommand(parseGlobalVoiceCommand(speech.transcript));
-    // runCommand intentionally reads the latest DOM/router state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, hiddenForWorkspace, speech.finalResultId, speech.transcript]);
+  // Context page label
+  const pageContextLabel = workspace?.lessonTitle
+    ? `Bài học: ${workspace.lessonTitle}`
+    : pathname === "/"
+      ? "Trang chủ"
+      : pathname?.startsWith("/demo")
+        ? "Trang trải nghiệm (Demo)"
+        : pathname?.startsWith("/lessons-v2")
+          ? "Danh sách bài học"
+          : pathname === "/privacy"
+            ? "Chính sách quyền riêng tư"
+            : pathname || "SAYNTAX";
 
-  useEffect(() => {
-    if (!hiddenForWorkspace) return;
-    setEnabled(false);
-    setExpanded(false);
-  }, [hiddenForWorkspace]);
-
-  function start() {
-    if (hiddenForWorkspace) return;
+  const start = async () => {
     setExpanded(true);
     if (!voicePrivacyAcknowledged) return;
-    setEnabled(true);
-    void startVoice();
-  }
+    await startVoice();
+  };
 
-  function stop() {
-    void stopVoice(true);
-    setEnabled(false);
-    setFeedback("Đã tắt điều khiển web bằng giọng nói.");
-  }
-
-  function runCommand(command: GlobalVoiceCommand) {
-    setLastCommand(command);
-    switch (command.kind) {
-      case "navigate":
-        router.push(command.href);
-        setFeedback(`Đang mở ${command.label}.`);
-        return;
-      case "history":
-        if (command.direction === "back") {
-          router.back();
-          setFeedback("Đang quay lại trang trước.");
-        } else {
-          window.history.forward();
-          setFeedback("Đang đi tới trang sau.");
-        }
-        return;
-      case "scroll":
-        if (command.direction === "top") window.scrollTo({ top: 0, behavior: "smooth" });
-        if (command.direction === "bottom") window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-        if (command.direction === "down") window.scrollBy({ top: Math.round(window.innerHeight * 0.75), behavior: "smooth" });
-        if (command.direction === "up") window.scrollBy({ top: -Math.round(window.innerHeight * 0.75), behavior: "smooth" });
-        setFeedback(command.direction === "down" ? "Đã cuộn xuống." : command.direction === "up" ? "Đã cuộn lên." : command.direction === "top" ? "Đã về đầu trang." : "Đã xuống cuối trang.");
-        return;
-      case "click": {
-        const element = findElementByVoiceLabel(command.label, 'a[href], button:not([disabled]), [role="button"], input[type="button"], input[type="submit"]');
-        if (!element) {
-          setFeedback(`Chưa tìm thấy nút hoặc liên kết "${command.label}". Hãy nói tên hiển thị trên màn hình.`);
-          return;
-        }
-        element.focus();
-        element.click();
-        setFeedback(`Đã bấm ${elementLabel(element) || command.label}.`);
-        return;
-      }
-      case "focus": {
-        const element = findElementByVoiceLabel(command.label, "input, textarea, select, button, a[href]");
-        if (!element) {
-          setFeedback(`Chưa tìm thấy mục "${command.label}".`);
-          return;
-        }
-        element.focus();
-        setFeedback(`Đã chọn ${elementLabel(element) || command.label}.`);
-        return;
-      }
-      case "fill_focused": {
-        const element = document.activeElement;
-        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
-          setFeedback("Hãy chọn một ô nhập trước, ví dụ: chọn ô email.");
-          return;
-        }
-        setNativeValue(element, command.value);
-        setFeedback("Đã nhập vào ô đang chọn.");
-        return;
-      }
-      case "clear_focused": {
-        const element = document.activeElement;
-        if (!(element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)) {
-          setFeedback("Hãy chọn một ô nhập trước khi xoá nội dung.");
-          return;
-        }
-        setNativeValue(element, "");
-        setFeedback("Đã xoá nội dung ô đang chọn.");
-        return;
-      }
-      case "help":
-        setFeedback("Có thể nói: trải nghiệm ngay, mở bài học, bấm Đăng nhập, chọn ô email, nhập nội dung, cuộn xuống, quay lại.");
-        return;
-      case "stop":
-        stop();
-        return;
-      case "unknown":
-        setFeedback("Mình chưa hiểu lệnh điều khiển web này. Hãy nói: trải nghiệm ngay, bấm Đăng nhập, cuộn xuống, hoặc trợ giúp.");
-        return;
-      default: {
-        const _exhaustive: never = command;
-        return _exhaustive;
-      }
+  const handleToggleVoice = async () => {
+    if (speech.isListening) {
+      await stopVoice(true);
+    } else {
+      await start();
     }
-  }
+  };
 
-  if (hiddenForWorkspace || pathname === "/") return null;
+  const handleAcknowledgeAndStart = async () => {
+    acknowledgePrivacy();
+    await startVoice();
+  };
 
   return (
     <div
-      className={`fixed right-3 sm:right-4 z-[var(--z-global-voice)] ${expanded ? "w-[min(22rem,calc(100vw-2rem))]" : "w-auto max-w-[calc(100vw-1.5rem)]"}`}
-      style={{ bottom: "calc(var(--global-command-bar-height, 0px) + 0.75rem)" }}
+      className={`fixed z-[var(--z-global-voice)] transition-all duration-200 pointer-events-auto ${
+        expanded
+          ? "inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[min(26rem,calc(100vw-2rem))]"
+          : "inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-auto sm:max-w-[460px]"
+      }`}
+      style={{
+        marginBottom: "var(--global-command-bar-height, 0px)",
+      }}
     >
+      {/* Accessible aria-live screen-reader announcement */}
       <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
+
+      {/* COMPACT MODE */}
       {!expanded ? (
-        <Button
-          id="voice-activation"
-          aria-label="Bật điều khiển web bằng giọng nói"
-          className="inline-flex min-h-12 items-center justify-center border-2 border-black bg-[#ff5f87] text-black font-black uppercase text-xs tracking-wider shadow-[4px_4px_0_#121212] hover:shadow-[2px_2px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl px-4 py-2.5 transition-transform focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc]"
-          onClick={start}
-          type="button"
+        <div
+          role="region"
+          aria-label="Thanh điều khiển và trạng thái giọng nói toàn cục"
+          className="flex items-center justify-between gap-2 rounded-2xl border-2 border-black bg-white px-3 py-2 text-black shadow-[4px_4px_0_#121212] sm:px-3.5 sm:py-2.5"
         >
-          <Volume2 className="mr-2 h-4 w-4 shrink-0" />
-          <span className="hidden xs:inline">Điều khiển web</span>
-          <span className="xs:hidden">Nói</span>
-        </Button>
-      ) : (
-        <section
-          aria-label="Điều khiển web bằng giọng nói"
-          className="scc-voice-debug-panel min-w-0 max-w-full overflow-hidden rounded-2xl border-2 sm:border-[2.5px] border-black bg-white p-3.5 text-black shadow-[6px_6px_0_#121212]"
-        >
-          <div className="flex items-start justify-between gap-2 border-b border-black/10 pb-2">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black">Điều khiển bằng giọng nói</p>
-              <p className="mt-0.5 text-xs font-mono text-zinc-600">Trang: {pathname}</p>
-            </div>
-            <button
-              aria-label="Đóng điều khiển web bằng giọng nói"
-              className="rounded border-2 border-black bg-white p-1 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#ff5f87]"
-              onClick={() => {
-                stop();
-                setExpanded(false);
-              }}
-              type="button"
+          {/* Status Badge & Icon */}
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${
+                speech.isListening ? "bg-[#7df2c3]" : engineStatus === "error" ? "bg-[#ffd1dc]" : "bg-[#ffce47]"
+              }`}
             >
-              <X className="h-4 w-4" />
-            </button>
+              {statusMeta.icon}
+            </span>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`inline-block rounded px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider border ${statusMeta.badgeClass}`}
+                >
+                  {statusMeta.label}
+                </span>
+                <span className="hidden sm:inline-block text-[10px] font-bold text-zinc-500 truncate max-w-[110px]">
+                  {pageContextLabel}
+                </span>
+              </div>
+
+              {/* Dynamic Transcript / Latest Outcome in Compact Mode */}
+              <div className="mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] truncate text-xs font-semibold">
+                {speech.interimTranscript ? (
+                  <span className="font-mono text-zinc-900 font-bold">
+                    &ldquo;{speech.interimTranscript}&rdquo;
+                  </span>
+                ) : speech.asrState === "processing" ? (
+                  <span className="text-zinc-600 italic">Đang xử lý...</span>
+                ) : lastResult ? (
+                  <span
+                    className={
+                      lastResult.handled
+                        ? "text-emerald-950 font-bold"
+                        : "text-amber-950 font-bold"
+                    }
+                    title={lastResult.feedback}
+                  >
+                    {lastResult.handled ? "✓ " : "⚠ "}
+                    {lastResult.understoodAs ?? lastResult.feedback}
+                  </span>
+                ) : speech.isListening ? (
+                  <span className="text-zinc-600 font-medium">Sẵn sàng nhận lệnh</span>
+                ) : (
+                  <span className="text-zinc-500 font-normal">Chưa bật micro</span>
+                )}
+              </div>
+            </div>
           </div>
 
-          {!voicePrivacyAcknowledged && (
-            <div className="mt-3 rounded border-2 border-black bg-[#fff6a8] p-2 text-xs text-black">
-              <p>{VOICE_PROCESSING_DISCLOSURE}</p>
-              <Button
-                className="mt-2"
-                onClick={() => {
-                  acknowledgePrivacy();
-                  setEnabled(true);
-                  void startVoice();
-                }}
-                size="sm"
-                type="button"
+          {/* Compact Action Buttons */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
+              id="voice-activation"
+              size="sm"
+              type="button"
+              onClick={handleToggleVoice}
+              disabled={speech.isStarting}
+              aria-label={speech.isListening ? "Dừng nghe micro" : "Bật micro cho người học"}
+              aria-pressed={speech.isListening}
+              className={`inline-flex min-h-9 items-center gap-1 rounded-xl border-2 border-black px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc] ${
+                speech.isListening ? "bg-[#ffe4b5] hover:bg-[#ffd1dc]" : "bg-[#ff5f87] hover:bg-[#ff7aa0]"
+              }`}
+            >
+              {speech.isListening ? (
+                <>
+                  <MicOff className="h-3.5 w-3.5 text-red-600 shrink-0" />
+                  <span className="hidden xs:inline">Dừng</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden xs:inline">Bật</span>
+                </>
+              )}
+            </Button>
+
+            <Button
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={() => setExpanded(true)}
+              aria-label="Mở rộng chi tiết trạng thái giọng nói"
+              aria-expanded="false"
+              className="inline-flex min-h-9 w-8 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* EXPANDED MODE */
+        <section
+          role="dialog"
+          aria-label="Bảng điều khiển và theo dõi giọng nói toàn cục"
+          className="max-h-[80dvh] overflow-y-auto rounded-3xl border-3 border-black bg-[#fffdf3] p-3.5 sm:p-4 text-black shadow-[6px_6px_0_#121212]"
+        >
+          {/* Header Row */}
+          <div className="flex items-center justify-between gap-2 border-b-2 border-black/10 pb-2.5">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${
+                  speech.isListening ? "bg-[#7df2c3]" : "bg-[#ff5f87]"
+                }`}
               >
-                Đồng ý dùng giọng nói (không lưu lệnh)
+                {statusMeta.icon}
+              </span>
+              <div>
+                <p className="font-heading text-xs font-black uppercase tracking-wider text-black">
+                  Điều khiển giọng nói
+                </p>
+                <p className="text-[11px] font-medium text-zinc-600 truncate max-w-[200px] sm:max-w-[260px]">
+                  {pageContextLabel}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={() => setExpanded(false)}
+              aria-label="Thu gọn bảng điều khiển giọng nói"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Privacy Disclosure Warning (if unacknowledged) */}
+          {!voicePrivacyAcknowledged && (
+            <div className="mt-3 rounded-2xl border-2 border-black bg-[#fff6a8] p-3 text-xs shadow-[2px_2px_0_#121212]">
+              <p className="font-bold text-black">💡 Cấp quyền sử dụng giọng nói:</p>
+              <p className="mt-1 leading-relaxed text-zinc-800">{VOICE_PROCESSING_DISCLOSURE}</p>
+              <Button
+                type="button"
+                onClick={handleAcknowledgeAndStart}
+                className="mt-2.5 w-full rounded-xl border-2 border-black bg-[#ff5f87] text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212] hover:bg-[#ff7aa0]"
+              >
+                Đồng ý &amp; Bật micro
               </Button>
             </div>
           )}
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              aria-label={speech.isListening ? "Dừng nghe điều khiển web" : "Bắt đầu nghe điều khiển web"}
-              disabled={!canStartVoiceRecognition(speech.isSupportKnown, speech.isSupported, voicePrivacyAcknowledged) || speech.isStarting}
-              onClick={() => {
-                setEnabled(true);
-                if (speech.isListening) void stopVoice(true);
-                else void startVoice();
-              }}
-              size="sm"
-              type="button"
-            >
-              {speech.isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
-              {speech.isListening ? "Dừng" : speech.isStarting ? "Đang mở micro" : !speech.isSupportKnown ? "Đang kiểm tra" : "Nói"}
-            </Button>
-            <Button
-              disabled={speech.isListening || speech.isStarting}
-              onClick={() => {
-                void speech.retryASR();
-              }}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Thử lại nhận dạng
-            </Button>
-            <label className="min-w-[170px] flex-1 text-[10px] font-black uppercase tracking-[0.12em] text-black">
-              Micro
-              <select
-                aria-label="Chọn micro để kiểm tra điều khiển web bằng giọng nói"
-                className="mt-1 block min-h-9 w-full rounded border-2 border-black bg-white px-2 py-1 text-xs font-semibold normal-case tracking-normal text-black focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-[#ff5f87]"
-                disabled={speech.isListening || speech.isStarting}
-                onChange={(event) => speech.selectMicrophone(event.target.value)}
-                onFocus={() => {
-                  void speech.refreshMicrophones();
-                }}
-                value={speech.selectedMicrophoneId}
+          {/* Primary Status Card */}
+          <div className="mt-3 rounded-2xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500">
+                Trạng thái micro
+              </span>
+              <span
+                className={`rounded-md border px-2 py-0.5 text-[10px] font-black uppercase tracking-wide shadow-[1px_1px_0_#121212] ${statusMeta.badgeClass}`}
               >
-                <option value="">Micro mặc định</option>
-                {speech.audioInputs.map((input) => (
-                  <option key={input.deviceId || input.label} value={input.deviceId}>
-                    {input.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button onClick={() => runCommand({ kind: "help" })} size="sm" type="button" variant="outline">
-              Trợ giúp
-            </Button>
+                {statusMeta.label}
+              </span>
+            </div>
+            <p className="mt-1 text-xs font-medium text-zinc-700 leading-snug">
+              {statusMeta.desc}
+            </p>
           </div>
 
-          <div className="mt-3 min-w-0 space-y-1 text-xs">
-            {speech.interimTranscript && <p className="min-w-0 break-words">Đang nghe: “{speech.interimTranscript}”</p>}
-            {speech.transcript && <p className="min-w-0 break-words">Đã nghe: “{speech.transcript}”</p>}
-            {speech.asrState === "processing" && <p className="min-w-0 break-words text-zinc-600">Đang xử lý giọng nói...</p>}
-            <p className="min-w-0 break-words font-semibold text-black">{feedback}</p>
-            {!speech.isSupportKnown && <p className="min-w-0 break-words text-zinc-600">Đang kết nối nhận dạng giọng nói...</p>}
-            {speech.errorMessage && <p className="min-w-0 break-words text-red-700">{speech.errorMessage}</p>}
+          {/* Activity Tracking: Concrete Chain */}
+          <div className="mt-3 rounded-2xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212] space-y-2.5">
+            <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500 border-b border-black/10 pb-1">
+              Hoạt động &amp; Kết quả lệnh
+            </p>
+
+            {/* Live interim transcript (if user speaking right now) */}
+            {speech.interimTranscript && (
+              <div className="rounded-xl border border-blue-400 bg-[#e0f2fe] p-2 text-xs">
+                <span className="font-bold text-blue-950">Đang nghe: </span>
+                <span className="font-mono font-bold text-black">&ldquo;{speech.interimTranscript}&rdquo;</span>
+              </div>
+            )}
+
+            {/* Last Execution Outcome Chain */}
+            {lastResult ? (
+              <div className="space-y-1.5 text-xs">
+                {/* 1. Spoken Transcript */}
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[11px] font-bold text-zinc-500 shrink-0">Câu đã nghe:</span>
+                  <span className="rounded bg-[#ffe0eb] border border-black/20 px-1.5 py-0.5 font-mono text-xs font-black text-black">
+                    &ldquo;{lastResult.command}&rdquo;
+                  </span>
+                </div>
+
+                {/* 2. Recognized Intent */}
+                {lastResult.understoodAs && (
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[11px] font-bold text-zinc-500 shrink-0">Ý định hiểu:</span>
+                    <span className="font-bold text-black">{lastResult.understoodAs}</span>
+                  </div>
+                )}
+
+                {/* 3. Concrete Result Feedback */}
+                <div
+                  className={`mt-1 flex items-start gap-1.5 rounded-xl border p-2 ${
+                    lastResult.handled
+                      ? "border-emerald-600 bg-[#d1fae5] text-emerald-950"
+                      : "border-amber-500 bg-[#fef3c7] text-amber-950"
+                  }`}
+                >
+                  <span className="font-black mt-0.5 shrink-0">
+                    {lastResult.handled ? "✓" : "⚠"}
+                  </span>
+                  <div>
+                    <span className="font-black uppercase tracking-wider text-[10px] block">
+                      {lastResult.handled ? "Thành công" : "Chưa thực hiện được"}
+                    </span>
+                    <span className="font-medium text-xs leading-snug">
+                      {lastResult.feedback}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 italic">
+                Chưa có câu lệnh nào được thực thi trong phiên này.
+              </p>
+            )}
+          </div>
+
+          {/* Errors & Recovery Tips */}
+          {speech.errorMessage && (
+            <div className="mt-3 rounded-2xl border-2 border-red-600 bg-[#ffd1dc] p-3 text-xs text-red-950 shadow-[2px_2px_0_#121212]">
+              <div className="flex items-center gap-1.5 font-black">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>Gặp sự cố kết nối micro:</span>
+              </div>
+              <p className="mt-1 leading-snug">{speech.errorMessage}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                  onClick={() => void speech.retryASR()}
+                  className="rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-bold shadow-[1.5px_1.5px_0_#121212]"
+                >
+                  <RotateCcw className="mr-1 h-3.5 w-3.5" />
+                  Thử lại nhận dạng
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Microphone Selector & Technical Controls (For Supporters) */}
+          <div className="mt-3 rounded-2xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212] space-y-2">
+            <label
+              htmlFor={`${uniqueId}-mic-select`}
+              className="text-[10px] font-black uppercase tracking-wider text-black block"
+            >
+              Chọn thiết bị Microphone
+            </label>
+            <select
+              id={`${uniqueId}-mic-select`}
+              aria-label="Chọn microphone để thu âm giọng nói"
+              className="block w-full min-h-9 rounded-xl border-2 border-black bg-white px-2.5 py-1 text-xs font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+              disabled={speech.isListening || speech.isStarting}
+              onChange={(e) => speech.selectMicrophone(e.target.value)}
+              onFocus={() => {
+                void speech.refreshMicrophones();
+              }}
+              value={speech.selectedMicrophoneId}
+            >
+              <option value="">Microphone mặc định của hệ thống</option>
+              {speech.audioInputs.map((input) => (
+                <option key={input.deviceId || input.label} value={input.deviceId}>
+                  {input.label || `Microphone (${input.deviceId.slice(0, 8)})`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick Command Suggestions based on current context */}
+          <div className="mt-3 rounded-2xl border-2 border-black bg-[#fff6fb] p-3 shadow-[2px_2px_0_#121212]">
+            <div className="flex items-center gap-1.5 border-b border-black/10 pb-1">
+              <HelpCircle className="h-3.5 w-3.5 text-zinc-600" />
+              <span className="text-[10px] font-black uppercase tracking-wider text-black">
+                {inWorkspace ? "Lệnh mẫu trong bài học" : "Lệnh mẫu trên website"}
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {inWorkspace ? (
+                <>
+                  {["Thêm khối bắt đầu", "Thêm khối in", "Chạy", "Hoàn tác", "Trợ giúp", "Dừng nghe"].map((cmd) => (
+                    <span
+                      key={cmd}
+                      className="rounded-md border border-black/20 bg-white px-2 py-0.5 font-mono text-[11px] font-black text-black shadow-[1px_1px_0_#121212]"
+                    >
+                      &ldquo;{cmd}&rdquo;
+                    </span>
+                  ))}
+                </>
+              ) : (
+                <>
+                  {["Học thử", "Bài 1", "Cuộn xuống", "Về đầu trang", "Trợ giúp", "Dừng nghe"].map((cmd) => (
+                    <span
+                      key={cmd}
+                      className="rounded-md border border-black/20 bg-white px-2 py-0.5 font-mono text-[11px] font-black text-black shadow-[1px_1px_0_#121212]"
+                    >
+                      &ldquo;{cmd}&rdquo;
+                    </span>
+                  ))}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Primary Action Button (Supporter initial setup / Learner toggle) */}
+          <div className="mt-3 pt-2 flex items-center justify-between gap-2 border-t border-black/10">
+            <Button
+              type="button"
+              onClick={handleToggleVoice}
+              disabled={speech.isStarting}
+              className={`w-full min-h-10 rounded-xl border-2 border-black px-4 py-2 text-xs font-black uppercase tracking-wider text-black shadow-[3px_3px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc] ${
+                speech.isListening
+                  ? "bg-[#ffe4b5] hover:bg-[#ffd1dc]"
+                  : "bg-[#7df2c3] hover:bg-[#9af7d0]"
+              }`}
+            >
+              {speech.isListening ? (
+                <>
+                  <MicOff className="mr-2 h-4 w-4 text-red-600 shrink-0" />
+                  Dừng nghe điều khiển giọng nói
+                </>
+              ) : (
+                <>
+                  <Mic className="mr-2 h-4 w-4 shrink-0" />
+                  Bật micro (Bắt đầu điều khiển)
+                </>
+              )}
+            </Button>
           </div>
         </section>
       )}

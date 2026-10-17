@@ -37,7 +37,7 @@
   --z-global-command: 850;
   --z-global-voice: 900;
   --z-completion-modal: 1000;
-  --global-command-bar-height: 8rem;
+  --global-command-bar-height: 0px;
 }
 
 * {
@@ -50,10 +50,10 @@ html {
 
 body {
   min-height: 100vh;
-  padding-bottom: var(--global-command-bar-height);
+  padding-bottom: max(6.5rem, calc(var(--global-command-bar-height, 0px) + 4.5rem + env(safe-area-inset-bottom, 0px)));
   background:
-    linear-gradient(90deg, rgba(18, 18, 18, 0.08) 1px, transparent 1px),
-    linear-gradient(rgba(18, 18, 18, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(18, 18, 18, 0.035) 1px, transparent 1px),
+    linear-gradient(rgba(18, 18, 18, 0.035) 1px, transparent 1px),
     linear-gradient(135deg, #fff8da 0%, #ffe0eb 46%, #e7fff3 100%);
   background-size: 34px 34px, 34px 34px, 100% 100%;
   color: var(--foreground);

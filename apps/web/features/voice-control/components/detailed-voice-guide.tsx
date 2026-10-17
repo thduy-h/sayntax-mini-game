@@ -241,9 +241,9 @@ export const DetailedVoiceGuide: FC = () => {
           </div>
           <a
             href="#voice-activation"
-            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-black bg-[#ff5f87] px-3.5 py-2 text-xs font-black uppercase text-black shadow-[2px_2px_0_#121212] hover:-translate-y-0.5 transition-transform shrink-0"
+            className="inline-flex items-center gap-1.5 rounded-xl border-2 border-black bg-[#ff5f87] px-3.5 py-2 text-xs font-black uppercase text-black shadow-[2px_2px_0_#121212] hover:-translate-y-0.5 transition-transform shrink-0 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
           >
-            Lên khu vực micro ↑
+            Bật micro ở góc màn hình 🎙️
           </a>
         </div>
       </div>

@@ -26,7 +26,8 @@ const ROUTES: ReadonlyArray<readonly [string, string, readonly string[]]> = [
   ["/dashboard", "dashboard", ["dashboard", "bang dieu khien", "tong quan hoc vien"]],
   ["/lessons-v2", "bài học", ["bai hoc", "danh sach bai hoc", "lessons"]],
   ["/role-models", "role models", ["role models", "hinh mau", "hinh mau nu", "nu cong nghe"]],
-  ["/onboarding", "trợ giúp", ["tro giup", "huong dan", "onboarding"]],
+  ["/voice-guide", "hướng dẫn chi tiết", ["huong dan chi tiet", "bang huong dan", "voice guide", "huong dan giong noi"]],
+  ["/onboarding", "thiết lập", ["thiet lap", "onboarding"]],
   ["/admin", "admin", ["admin", "quan tri", "khu vuc quan tri"]],
 ] as const;
 

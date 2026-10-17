@@ -601,6 +601,7 @@ export function VoiceLessonClient({
   const {
     commandBarHeight,
     registerWorkspaceCommand,
+    reportCommandResult,
     speech,
     startVoice,
     stopVoice,
@@ -614,6 +615,7 @@ export function VoiceLessonClient({
   const previousAnnouncedStepRef = useRef(currentStepIndex);
   const lastAnnouncementRef = useRef("");
   const autoStartedRef = useRef(false);
+  const lastProcessedFinalIdRef = useRef(speech.finalResultId);
   const currentStep = lesson.steps[currentStepIndex];
   const isDemoMode = mode === "demo";
   const primer = LESSON_PRIMERS[lesson.slug];
@@ -2379,6 +2381,7 @@ export function VoiceLessonClient({
   textCommandHandlerRef.current = (command: string) => {
     const result = handleTranscriptCommand(command, "text");
     setLastCommandResult(result);
+    reportCommandResult(result);
     return result;
   };
 
@@ -2541,9 +2544,11 @@ export function VoiceLessonClient({
   }, [currentStep, currentStepIndex]);
 
   useEffect(() => {
-    if (!speech.finalResultId) return;
+    if (!speech.finalResultId || speech.finalResultId === lastProcessedFinalIdRef.current) return;
+    lastProcessedFinalIdRef.current = speech.finalResultId;
     const result = handleSpeechAlternatives(speech.alternatives.length ? speech.alternatives : [{ transcript: speech.transcript }]);
     setLastCommandResult(result);
+    reportCommandResult(result);
     // Transcript handling intentionally uses the same closure pattern as the
     // Blockly listener to avoid reprocessing while a step is advancing.
     // eslint-disable-next-line react-hooks/exhaustive-deps

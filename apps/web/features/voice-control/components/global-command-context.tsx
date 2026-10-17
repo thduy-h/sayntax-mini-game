@@ -34,6 +34,7 @@ export interface GlobalCommandContextValue {
   lastResult: GlobalCommandExecutionResult | null;
   lastResultId: number;
   registerWorkspaceCommand: (registration: WorkspaceCommandRegistration) => () => void;
+  reportCommandResult: (result: GlobalCommandExecutionResult) => void;
   setCommandBarHeight: (height: number) => void;
   submitCommand: (command: string) => GlobalCommandExecutionResult;
   workspace: WorkspaceCommandRegistration | null;
@@ -215,17 +216,11 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
         message: `Đang xử lý câu lệnh: “${speech.transcript}”...`,
       };
     }
-    if (speech.isListening) {
-      if (speech.interimTranscript) {
-        return {
-          kind: "listening",
-          interimTranscript: speech.interimTranscript,
-          message: `Đang nghe: “${speech.interimTranscript}”`,
-        };
-      }
+    if (speech.isListening && speech.interimTranscript) {
       return {
         kind: "listening",
-        message: "Đang lắng nghe câu lệnh của bạn...",
+        interimTranscript: speech.interimTranscript,
+        message: `Đang nghe: “${speech.interimTranscript}”`,
       };
     }
     if (lastResult) {
@@ -241,6 +236,12 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
         kind: "unknown_command",
         transcript: lastResult.command,
         message: lastResult.feedback,
+      };
+    }
+    if (speech.isListening) {
+      return {
+        kind: "listening",
+        message: "Đang lắng nghe câu lệnh của bạn...",
       };
     }
     return {
@@ -376,8 +377,8 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
             understoodAs: "mở hướng dẫn chi tiết",
           };
         }
-        if (typeof window !== "undefined" && window.location.pathname !== "/") {
-          router.push("/#voice-guide");
+        if (typeof window !== "undefined" && window.location.pathname !== "/voice-guide") {
+          router.push("/voice-guide");
           return {
             command: commandText,
             feedback: "Đang mở bảng hướng dẫn giọng nói chi tiết.",
@@ -430,9 +431,17 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     return result;
   }, [submitWebsiteCommand, workspace]);
 
+  const reportCommandResult = useCallback((result: GlobalCommandExecutionResult) => {
+    setLastResult(result);
+    setLastResultId((curr) => curr + 1);
+  }, []);
+
   // Dispatch global voice commands when outside workspace
   useEffect(() => {
-    if (workspace !== null) return;
+    if (workspace !== null) {
+      lastProcessedFinalIdRef.current = speech.finalResultId;
+      return;
+    }
     if (!speech.transcript || speech.finalResultId === lastProcessedFinalIdRef.current) return;
     lastProcessedFinalIdRef.current = speech.finalResultId;
 
@@ -453,6 +462,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     lastResultId,
     operationalState,
     registerWorkspaceCommand,
+    reportCommandResult,
     setCommandBarHeight,
     speech,
     startVoice,
@@ -468,6 +478,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     lastResultId,
     operationalState,
     registerWorkspaceCommand,
+    reportCommandResult,
     setCommandBarHeight,
     speech,
     startVoice,

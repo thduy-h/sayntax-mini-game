@@ -164,10 +164,10 @@ export default function Home() {
                 </span>
                 <div>
                   <h2 className="font-heading text-base font-black text-black uppercase tracking-tight">
-                    Cách SAYNTAX hoạt động
+                    Cơ chế hoạt động của SAYNTAX
                   </h2>
                   <p className="text-[11px] font-bold text-zinc-600">
-                    Minh họa: Lời nói → Khối lệnh → Kết quả
+                    Minh họa trực quan: Lời nói → Khối lệnh → Kết quả
                   </p>
                 </div>
               </div>
@@ -176,58 +176,69 @@ export default function Home() {
               </span>
             </div>
 
-            {/* 3-Stage Visual Pipeline */}
-            <div className="mt-3.5 space-y-2">
-              {/* Stage 1: Spoken Words */}
-              <div className="rounded-2xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+            {/* Single Cohesive Visual Canvas (No nested card-in-card) */}
+            <div className="mt-3.5 rounded-2xl border-2 border-black bg-white p-3.5 sm:p-4 shadow-[3px_3px_0_#121212] space-y-2.5">
+              {/* Stage 1: Spoken Speech Bubble */}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
                     <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#ff5f87] text-[10px] font-black text-white">1</span>
                     Lời nói tiếng Việt
                   </span>
-                  <span className="text-[10px] font-bold text-zinc-500">Giọng đọc tự nhiên</span>
+                  <span className="text-[10px] font-bold text-zinc-500">Giọng nói tự nhiên</span>
                 </div>
-                <div className="mt-2 flex items-center gap-2 rounded-xl border border-black/20 bg-[#fff6fb] px-3 py-2">
-                  <span className="text-lg">🎙️</span>
-                  <strong className="font-mono text-sm sm:text-base font-black text-black">
-                    &ldquo;In ra Xin chào&rdquo;
-                  </strong>
+
+                <div className="flex items-center justify-between gap-2 rounded-xl border-2 border-black bg-[#fff0f5] px-3.5 py-2 shadow-[1.5px_1.5px_0_#121212]">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-xl shrink-0">🎙️</span>
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#b3003b] block">Câu lệnh người học nói:</span>
+                      <strong className="font-mono text-sm sm:text-base font-black text-black truncate block">
+                        &ldquo;In ra Xin chào&rdquo;
+                      </strong>
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-0.5 text-zinc-400 shrink-0" aria-hidden="true">
+                    <span className="h-2 w-1 bg-[#ff5f87] rounded-full" />
+                    <span className="h-4 w-1 bg-[#ff5f87] rounded-full" />
+                    <span className="h-6 w-1 bg-[#ff5f87] rounded-full" />
+                    <span className="h-3 w-1 bg-[#ff5f87] rounded-full" />
+                  </div>
                 </div>
               </div>
 
-              {/* Connector 1 */}
-              <div className="flex items-center justify-center gap-1.5 py-0.5">
-                <div className="h-2 w-0.5 bg-black/30" />
-                <span className="rounded-full border border-black bg-[#ffce47] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[1px_1px_0_#121212]">
-                  Ghép khối tự động ↓
+              {/* Transition Indicator 1 */}
+              <div className="flex items-center justify-center gap-2 py-0.5 text-[11px] font-black text-zinc-600">
+                <span className="h-px w-8 bg-black/20" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-black bg-[#ffce47] px-2.5 py-0.5 text-[10px] font-black uppercase text-black shadow-[1px_1px_0_#121212]">
+                  ⚡ Tự động ghép khối ↓
                 </span>
-                <div className="h-2 w-0.5 bg-black/30" />
+                <span className="h-px w-8 bg-black/20" />
               </div>
 
-              {/* Stage 2: Blockly Blocks */}
-              <div className="rounded-2xl border-2 border-black bg-[#fffdf0] p-3 shadow-[2px_2px_0_#121212]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+              {/* Stage 2: Interlocking Blockly Blocks */}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
                     <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#ffce47] text-[10px] font-black text-black">2</span>
-                    Khối lệnh Blockly
+                    Khối lệnh Blockly tương ứng
                   </span>
                   <span className="text-[10px] font-bold text-emerald-800">Không lỗi cú pháp</span>
                 </div>
 
-                {/* Neo-brutalist visual block stack */}
-                <div className="mt-2 space-y-1 font-mono text-xs font-black">
+                <div className="rounded-xl border border-black/15 bg-[#fffdf0] p-3 font-mono">
                   {/* Block 1: Start */}
-                  <div className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#ffce47] px-2.5 py-1 text-black shadow-[1.5px_1.5px_0_#121212]">
-                    <span className="rounded bg-white/80 border border-black/30 px-1 text-[10px] font-black">1</span>
+                  <div className="inline-flex items-center gap-2 rounded-t-lg rounded-br-lg border-2 border-black bg-[#ffce47] px-3 py-1.5 text-xs font-black text-black shadow-[1.5px_1.5px_0_#121212]">
+                    <span className="rounded bg-white/90 border border-black/30 px-1 text-[10px] font-black">1</span>
                     <span>▶ khi bắt đầu</span>
                   </div>
 
-                  {/* Block 2: Print (Nested inside Start) */}
-                  <div className="flex items-center gap-1.5 pl-4">
-                    <div className="inline-flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#ff5f87] px-2.5 py-1 text-white shadow-[1.5px_1.5px_0_#121212]">
+                  {/* Block 2: Interlocked Print Block */}
+                  <div className="pl-4 -mt-0.5">
+                    <div className="inline-flex flex-wrap items-center gap-2 rounded-lg border-2 border-black bg-[#ff5f87] px-3 py-1.5 text-xs font-black text-white shadow-[1.5px_1.5px_0_#121212]">
                       <span className="rounded bg-white/20 border border-white/40 px-1 text-[10px] font-black text-white">2</span>
                       <span>in ra</span>
-                      <span className="rounded border border-black bg-white px-1.5 py-0.5 text-black">
+                      <span className="rounded border border-black bg-white px-2 py-0.5 text-xs font-black text-black shadow-[1px_1px_0_#121212]">
                         &ldquo;Xin chào!&rdquo;
                       </span>
                     </div>
@@ -235,44 +246,48 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Connector 2 */}
-              <div className="flex items-center justify-center gap-1.5 py-0.5">
-                <div className="h-2 w-0.5 bg-black/30" />
-                <span className="rounded-full border border-black bg-[#7df2c3] px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-black shadow-[1px_1px_0_#121212]">
-                  Thực thi chương trình ↓
+              {/* Transition Indicator 2 */}
+              <div className="flex items-center justify-center gap-2 py-0.5 text-[11px] font-black text-zinc-600">
+                <span className="h-px w-8 bg-black/20" />
+                <span className="inline-flex items-center gap-1 rounded-full border border-black bg-[#7df2c3] px-2.5 py-0.5 text-[10px] font-black uppercase text-black shadow-[1px_1px_0_#121212]">
+                  ▶ Máy tính thực thi ↓
                 </span>
-                <div className="h-2 w-0.5 bg-black/30" />
+                <span className="h-px w-8 bg-black/20" />
               </div>
 
-              {/* Stage 3: Program Outcome (Terminal) */}
-              <div className="rounded-2xl border-2 border-black bg-[#121212] p-3 text-white shadow-[2px_2px_0_#121212]">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-[#ff5f87]" />
-                    <span className="h-2 w-2 rounded-full bg-[#ffce47]" />
-                    <span className="h-2 w-2 rounded-full bg-[#7df2c3]" />
-                    <span className="ml-1 text-[10px] font-mono font-bold text-zinc-400">
-                      Màn hình kết quả
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-[#7df2c3]">Đã chạy</span>
+              {/* Stage 3: Program Outcome (Terminal Output) */}
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
+                    <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#7df2c3] text-[10px] font-black text-black">3</span>
+                    Màn hình kết quả
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-[#0e6245]">✓ Đạt yêu cầu</span>
                 </div>
-                <div className="mt-2 font-mono text-xs">
-                  <p className="text-[#7df2c3] text-sm font-black">&gt; Xin chào!</p>
-                  <p className="mt-0.5 text-[10px] text-zinc-400">✓ Chương trình chạy chính xác theo yêu cầu</p>
+
+                <div className="rounded-xl border-2 border-black bg-[#121212] p-2.5 sm:p-3 text-white shadow-[1.5px_1.5px_0_#121212]">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-1 text-[10px] font-mono text-zinc-400">
+                    <div className="flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-[#ff5f87]" />
+                      <span className="h-2 w-2 rounded-full bg-[#ffce47]" />
+                      <span className="h-2 w-2 rounded-full bg-[#7df2c3]" />
+                      <span className="ml-1 text-zinc-300 font-bold">Màn hình kết quả</span>
+                    </div>
+                    <span className="text-[#7df2c3] font-bold">Thành công</span>
+                  </div>
+                  <div className="mt-1.5 font-mono">
+                    <p className="text-sm sm:text-base font-black text-[#7df2c3]">&gt; Xin chào!</p>
+                    <p className="text-[10px] text-zinc-400 mt-0.5">Dòng chữ đã xuất hiện trên màn hình máy tính.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Hands-Free Guarantee Note */}
-          <div className="mt-3.5 rounded-2xl border-2 border-black bg-[#fffdf3] p-3 text-xs font-medium text-zinc-800 shadow-[2px_2px_0_#121212]">
-            <strong className="font-black text-black flex items-center gap-1.5 uppercase tracking-wide">
-              <span>💡</span> Điều khiển không cần chuột:
-            </strong>
-            <p className="mt-0.5 leading-relaxed text-zinc-700">
-              Người hỗ trợ bật micro ban đầu một lần duy nhất. Sau đó, học sinh nói câu lệnh để tự tạo khối, chạy thử và hoàn thành bài tập độc lập.
-            </p>
+          {/* Hands-Free Guarantee Callout */}
+          <div className="mt-3 rounded-xl border border-black/15 bg-white/80 px-3 py-2 text-xs font-medium text-zinc-800">
+            <strong className="font-black text-black">💡 Điều khiển rảnh tay: </strong>
+            Người hỗ trợ bật micro ban đầu một lần duy nhất. Sau đó, học sinh tự do nói câu lệnh để tạo chương trình mà không cần chạm chuột.
           </div>
         </div>
       </section>

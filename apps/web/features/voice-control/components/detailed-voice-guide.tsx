@@ -6,10 +6,10 @@ interface GuideGroup {
   title: string;
   icon: string;
   bgColor: string;
-  commands: Array<{ text: string; note: string }>;
+  purpose: string;
   whenToUse: string;
-  systemAction: string;
-  nextStep: string;
+  commands: Array<{ text: string; note: string }>;
+  expectedResult: string;
 }
 
 const GUIDE_GROUPS: GuideGroup[] = [
@@ -19,120 +19,137 @@ const GUIDE_GROUPS: GuideGroup[] = [
     title: "Điều hướng website",
     icon: "🌐",
     bgColor: "bg-[#fff6fb]",
-    commands: [
-      { text: "Học thử", note: "Mở danh sách bài học" },
-      { text: "Trang chủ", note: "Về lại trang chủ" },
-      { text: "Đăng nhập", note: "Mở trang đăng nhập" },
-      { text: "Cuộn xuống", note: "Cuộn trang xuống 75%" },
-      { text: "Cuộn lên", note: "Cuộn trang lên" },
-      { text: "Quay lại", note: "Về trang trước đó" },
-    ],
+    purpose:
+      "Di chuyển giữa các trang, cuộn trang lên xuống và quay lại trang trước hoàn toàn bằng giọng nói.",
     whenToUse:
       "Dùng khi bạn muốn chuyển trang, khám phá nội dung bên dưới, hoặc quay lại trang trước mà không cần cuộn chuột hay bấm phím.",
-    systemAction:
-      "SAYNTAX tự động cuộn trang mượt mà hoặc chuyển hướng ngay lập tức. Phiên nghe của micro tiếp tục được duy trì xuyên suốt giữa các trang.",
-    nextStep:
-      "Sau khi trang chuyển hoặc màn hình cuộn tới nơi, bạn có thể nói tiếp câu lệnh tiếp theo ngay mà không cần kích hoạt lại micro.",
+    commands: [
+      { text: "Cuộn xuống", note: "Cuộn trang xuống để đọc tiếp" },
+      { text: "Lên đầu trang", note: "Cuộn về đỉnh trang" },
+      { text: "Cuộn lên", note: "Cuộn trang lên" },
+      { text: "Quay lại", note: "Trở về trang vừa xem" },
+      { text: "Học thử", note: "Mở danh sách bài học" },
+      { text: "Trang chủ", note: "Về lại trang chủ" },
+    ],
+    expectedResult:
+      "SAYNTAX tự động cuộn trang mượt mà hoặc chuyển hướng tức thì; phiên thu âm của micro tiếp tục được duy trì xuyên suốt.",
+  },
+  {
+    id: "global-voice",
+    badge: "Nhóm 2",
+    title: "Sử dụng Global Voice",
+    icon: "🎙️",
+    bgColor: "bg-[#fffdf0]",
+    purpose:
+      "Kiểm soát hoạt động của micro và theo dõi phản hồi nhận lệnh trên thanh điều khiển toàn cục ở góc phải dưới màn hình.",
+    whenToUse:
+      "Dùng khi muốn biết hệ thống có đang nghe không, kiểm tra câu vừa nhận, tạm dừng micro khi nghỉ ngơi hoặc xem bảng hướng dẫn.",
+    commands: [
+      { text: "Dừng nghe", note: "Tạm dừng nhận diện giọng nói" },
+      { text: "Tắt micro", note: "Ngắt kết nối thu âm" },
+      { text: "Trợ giúp", note: "Mở bảng hướng dẫn câu lệnh này" },
+    ],
+    expectedResult:
+      "Thanh giọng nói phản hồi rõ: Đang nghe (xanh) → Đang xử lý (xanh dương) → Đã nghe được gì → Kết quả hoàn thành (✓ kèm thông báo).",
   },
   {
     id: "lesson-access",
-    badge: "Nhóm 2",
-    title: "Mở & tham gia bài học",
+    badge: "Nhóm 3",
+    title: "Mở & chọn bài học",
     icon: "📚",
-    bgColor: "bg-[#fffdf0]",
+    bgColor: "bg-[#e7fff3]",
+    purpose:
+      "Truy cập trực tiếp từng bài học trong lộ trình 5 bài và đóng cửa sổ kiến thức chuẩn bị để bắt đầu làm bài.",
+    whenToUse:
+      "Dùng khi ở trang danh sách bài học hoặc muốn vào thẳng một bài từ bất cứ đâu trên website.",
     commands: [
-      { text: "Bài 1", note: "Vào thẳng bài 1 (Tuần tự)" },
-      { text: "Bài 2", note: "Vào bài 2 (In kết quả)" },
-      { text: "Bài 3", note: "Vào bài 3 (Vòng lặp)" },
-      { text: "Bài 4", note: "Vào bài 4 (Điều kiện)" },
-      { text: "Bài 5", note: "Vào bài 5 (Biến số)" },
-      { text: "Bắt đầu bài học", note: "Đóng popup lý thuyết để vào code" },
+      { text: "Bài 1", note: "Vào bài 1: Bắt đầu & Tuần tự" },
+      { text: "Bài 2", note: "Vào bài 2: In kết quả" },
+      { text: "Bài 3", note: "Vào bài 3: Vòng lặp" },
+      { text: "Bài 4", note: "Vào bài 4: Điều kiện" },
+      { text: "Bài 5", note: "Vào bài 5: Biến số" },
+      { text: "Bắt đầu bài học", note: "Đóng bảng lý thuyết để code" },
       { text: "Làm lại", note: "Đặt lại bài tập từ đầu" },
     ],
+    expectedResult:
+      "SAYNTAX nạp bài học tương ứng, mở vùng làm việc Blockly và thiết lập mục tiêu bài tập sẵn sàng cho bạn thực hành.",
+  },
+  {
+    id: "blockly-interaction",
+    badge: "Nhóm 4",
+    title: "Tương tác với Blockly",
+    icon: "🎯",
+    bgColor: "bg-[#f0f6ff]",
+    purpose:
+      "Định vị, chọn khối lệnh cụ thể và đổi vị trí con trỏ chèn trên vùng làm việc Blockly mà không cần dùng chuột.",
     whenToUse:
-      "Dùng khi bạn muốn học một bài cụ thể, hoặc khi vừa mở bài và màn hình hiện cửa sổ kiến thức chuẩn bị (Primer modal).",
-    systemAction:
-      "SAYNTAX nạp không gian làm việc Blockly của bài học, thiết lập mục tiêu bài tập và thông báo trạng thái sẵn sàng qua giọng nói.",
-    nextStep:
-      "Nếu có popup kiến thức chuẩn bị, chỉ cần nói “Bắt đầu bài học” để vào thực hành. Sau đó lắng nghe giọng đọc hoặc nhìn ô nhiệm vụ góc trái.",
+      "Dùng khi bài học có nhiều khối lệnh và bạn muốn chỉ định vị trí cần thêm hoặc chỉnh sửa khối tiếp theo.",
+    commands: [
+      { text: "Chọn khối 1", note: "Chọn khối theo số thứ tự" },
+      { text: "Chọn khối 2", note: "Chọn khối thứ 2" },
+      { text: "Chèn sau khối 1", note: "Đổi vị trí con trỏ chèn" },
+      { text: "Chèn sau khối 2", note: "Đổi vị trí con trỏ chèn" },
+    ],
+    expectedResult:
+      "Khối lệnh tương ứng được viền sáng nổi bật (focus), con trỏ chèn chuyển đến vị trí bạn vừa chỉ định.",
   },
   {
     id: "block-editing",
-    badge: "Nhóm 3",
-    title: "Tạo & chỉnh sửa khối lệnh",
+    badge: "Nhóm 5",
+    title: "Tạo, sửa & nối khối lệnh",
     icon: "🧩",
-    bgColor: "bg-[#e7fff3]",
+    bgColor: "bg-[#fdf4ff]",
+    purpose:
+      "Sinh khối lệnh mới, thay đổi nội dung chữ hoặc số bên trong khối, xóa khối và khôi phục thao tác trước.",
+    whenToUse:
+      "Dùng trong khu vực bài học để lập trình, ghép nối các khối thuật toán theo từng bước yêu cầu của nhiệm vụ.",
     commands: [
-      { text: "Thêm khối in", note: "Thêm khối in ra màn hình" },
+      { text: "Thêm khối in", note: "Thêm khối hiển thị văn bản" },
       { text: "Thêm khối lặp 3 lần", note: "Thêm vòng lặp repeat" },
-      { text: "Chọn khối 1", note: "Chọn khối theo số thứ tự" },
-      { text: "Chèn sau khối 1", note: "Đổi vị trí con trỏ chèn" },
       { text: "Đổi chữ thành Xin chào", note: "Sửa văn bản trong khối" },
       { text: "Đổi số thành 5", note: "Sửa giá trị số" },
       { text: "Xóa khối này", note: "Xóa khối đang chọn" },
       { text: "Hoàn tác", note: "Khôi phục thao tác trước (Undo)" },
     ],
-    whenToUse:
-      "Dùng trong khu vực bài học để lập trình, ghép nối các khối thuật toán theo từng bước của nhiệm vụ.",
-    systemAction:
-      "SAYNTAX tạo khối lệnh tương ứng và ghép tự động vào vị trí con trỏ. Mỗi khối có huy hiệu số vàng ngoài lề trái ([1], [2], [2.1]) để bạn dễ gọi tên.",
-    nextStep:
-      "Quan sát khối xuất hiện trên màn hình. Nếu cần thay đổi giá trị, bạn nói “Đổi chữ thành...” hoặc “Đổi số thành...” mà không cần gõ phím.",
+    expectedResult:
+      "Khối lệnh tự động sinh ra và kết nối vào đúng ngàm của khối trước; nội dung chữ hoặc số được cập nhật tức thì.",
   },
   {
     id: "program-execution",
-    badge: "Nhóm 4",
-    title: "Chạy thử & xem kết quả",
+    badge: "Nhóm 6",
+    title: "Chạy chương trình & xem kết quả",
     icon: "▶️",
-    bgColor: "bg-[#f0f6ff]",
-    commands: [
-      { text: "Chạy chương trình", note: "Chạy và kiểm tra bài" },
-      { text: "Chạy thử", note: "Xem chương trình in ra gì" },
-      { text: "Kiểm tra bài", note: "Chấm điểm bước làm" },
-    ],
+    bgColor: "bg-[#fff8e7]",
+    purpose:
+      "Thực thi chuỗi khối lệnh đã lắp ráp, quan sát kết quả đầu ra và kiểm tra độ chính xác theo đề bài.",
     whenToUse:
-      "Dùng sau khi bạn đã thêm hoặc chỉnh sửa xong các khối lệnh và muốn kiểm tra thuật toán của mình có chạy đúng đề bài không.",
-    systemAction:
-      "Trình thông dịch thực thi toàn bộ chuỗi khối lệnh, hiển thị kết quả ra màn hình Terminal phía dưới, phát âm thanh chấm điểm và đọc nhận xét.",
-    nextStep:
-      "Nếu chương trình đúng yêu cầu, bạn nói “Bước tiếp theo” để sang bước mới. Nếu chưa đúng, nghe lời nhắc để chỉnh sửa lại khối lệnh.",
+      "Dùng sau khi bạn đã thêm hoặc sửa xong các khối lệnh và muốn kiểm tra thuật toán của mình có chạy đúng không.",
+    commands: [
+      { text: "Chạy chương trình", note: "Chạy và chấm điểm bài" },
+      { text: "Chạy thử", note: "Xem chương trình in ra gì" },
+      { text: "Kiểm tra bài", note: "Đối chiếu với mục tiêu bài tập" },
+    ],
+    expectedResult:
+      "Trình thông dịch chạy các khối lệnh từ trên xuống dưới, in kết quả ra màn hình Terminal và thông báo kết quả chấm điểm.",
   },
   {
-    id: "hints-and-help",
-    badge: "Nhóm 5",
-    title: "Yêu cầu gợi ý & trợ giúp",
+    id: "hints-and-recovery",
+    badge: "Nhóm 7",
+    title: "Gợi ý, trợ giúp & xử lý lỗi",
     icon: "💡",
-    bgColor: "bg-[#fdf4ff]",
+    bgColor: "bg-[#fff1f2]",
+    purpose:
+      "Nhận gợi ý khi bị kẹt, điều hướng các bước học và xử lý khi phát âm chưa được hệ thống nhận diện đúng.",
+    whenToUse:
+      "Dùng khi chưa rõ cần làm gì tiếp theo, muốn quay lại bước trước, hoặc khi hệ thống thông báo chưa hiểu câu lệnh.",
     commands: [
       { text: "Gợi ý", note: "Xin gợi ý cho bước hiện tại" },
-      { text: "Bước tiếp theo", note: "Chuyển sang bước kế tiếp" },
+      { text: "Bước tiếp theo", note: "Sang bước mới khi hoàn thành" },
       { text: "Bước trước", note: "Quay về bước trước đó" },
-      { text: "Trợ giúp", note: "Cuộn tới bảng hướng dẫn này" },
+      { text: "Trợ giúp", note: "Mở bảng hướng dẫn câu lệnh" },
     ],
-    whenToUse:
-      "Dùng khi bạn chưa rõ cần làm gì tiếp theo, muốn nhận gợi ý từng bước, hoặc muốn xem lại bảng câu lệnh đầy đủ.",
-    systemAction:
-      "Trong bài học, SAYNTAX cung cấp gợi ý chi tiết nêu rõ khối lệnh hoặc thông số cần nói tiếp. Trên website, nói “Trợ giúp” sẽ tự động cuộn đến phần này.",
-    nextStep:
-      "Lắng nghe hoặc đọc gợi ý hiển thị, sau đó nói câu lệnh mẫu được đề xuất trên giao diện.",
-  },
-  {
-    id: "microphone-control",
-    badge: "Nhóm 6",
-    title: "Dừng micro & xử lý khi không hiểu",
-    icon: "🛑",
-    bgColor: "bg-[#fff1f2]",
-    commands: [
-      { text: "Dừng nghe", note: "Tắt micro tức thì" },
-      { text: "Tắt micro", note: "Ngắt phiên nhận dạng" },
-      { text: "Nói lại câu lệnh", note: "Khi hệ thống chưa nghe rõ" },
-    ],
-    whenToUse:
-      "Dùng khi bạn muốn nghỉ ngơi, nói chuyện riêng tư, hoặc khi phát âm trong môi trường có tiếng ồn khiến hệ thống chưa nhận diện đúng.",
-    systemAction:
-      "Nói “Dừng nghe” sẽ ngắt micro ngay. Khi không hiểu câu lệnh, SAYNTAX hiển thị cảnh báo hổ phách và giữ micro tiếp tục mở để bạn nói lại.",
-    nextStep:
-      "Nếu hệ thống chưa hiểu, bạn chỉ cần nói lại câu lệnh với tốc độ vừa phải. Để bật lại micro sau khi đã tắt, người hỗ trợ nhấn nút “Bật micro”.",
+    expectedResult:
+      "SAYNTAX đọc to lời gợi ý cụ thể hoặc mở bảng hướng dẫn; micro vẫn tiếp tục lắng nghe để bạn dễ dàng nói lại.",
   },
 ];
 
@@ -158,7 +175,7 @@ export const DetailedVoiceGuide: FC = () => {
             Bảng hướng dẫn điều khiển giọng nói đầy đủ
           </h2>
           <p className="mt-1 text-sm font-medium leading-relaxed text-zinc-700 max-w-2xl">
-            Học viên hạn chế vận động tay có thể làm chủ toàn bộ SAYNTAX mà không cần người hỗ trợ can thiệp chuột sau bước thiết lập ban đầu.
+            Học viên có thể điều khiển toàn bộ website và bài học SAYNTAX bằng giọng nói mà không cần dùng chuột sau bước bật micro ban đầu.
           </p>
         </div>
 
@@ -167,7 +184,7 @@ export const DetailedVoiceGuide: FC = () => {
         </div>
       </div>
 
-      {/* 6 Comprehensive Contextual Guidance Groups */}
+      {/* 7 Comprehensive Progressive Guidance Groups */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {GUIDE_GROUPS.map((group) => (
           <div
@@ -188,10 +205,16 @@ export const DetailedVoiceGuide: FC = () => {
                 </span>
               </div>
 
+              {/* Purpose */}
+              <p className="mt-2.5 text-xs font-medium leading-relaxed text-zinc-800">
+                <strong className="font-black text-black">Công dụng: </strong>
+                {group.purpose}
+              </p>
+
               {/* Sample Utterance Badges */}
               <div className="mt-3">
                 <p className="text-[10px] font-black uppercase tracking-wider text-zinc-600">
-                  Câu lệnh nói (Ví dụ thực tế):
+                  Ví dụ khẩu lệnh:
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {group.commands.map((cmd) => (
@@ -206,23 +229,17 @@ export const DetailedVoiceGuide: FC = () => {
                 </div>
               </div>
 
-              {/* Context: When to use */}
+              {/* When to use */}
               <div className="mt-3 rounded-lg border border-black/10 bg-white/70 p-2.5 text-xs text-zinc-800">
                 <strong className="font-black text-black">Khi nào dùng: </strong>
                 {group.whenToUse}
               </div>
-
-              {/* System Action */}
-              <div className="mt-2 rounded-lg border border-black/10 bg-white/70 p-2.5 text-xs text-zinc-800">
-                <strong className="font-black text-black">SAYNTAX sẽ làm gì: </strong>
-                {group.systemAction}
-              </div>
             </div>
 
-            {/* Next Step */}
+            {/* Expected Result */}
             <div className="mt-3 border-t border-black/10 pt-2.5 text-xs font-semibold text-emerald-950">
-              👉 <strong className="font-black text-black">Bước tiếp theo: </strong>
-              {group.nextStep}
+              👉 <strong className="font-black text-black">Kết quả mong đợi: </strong>
+              {group.expectedResult}
             </div>
           </div>
         ))}

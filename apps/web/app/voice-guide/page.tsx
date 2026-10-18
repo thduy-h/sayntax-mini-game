@@ -48,7 +48,7 @@ export default function VoiceGuidePage() {
         </div>
       </div>
 
-      {/* Full 6-group Detailed Voice Guide */}
+      {/* Full 7-group Detailed Voice Guide */}
       <DetailedVoiceGuide />
     </main>
   );

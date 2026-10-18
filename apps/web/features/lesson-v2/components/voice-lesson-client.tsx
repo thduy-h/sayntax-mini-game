@@ -84,8 +84,8 @@ const lessonBrowserStorage: Storage = {
   key: (index) => window.localStorage.key(index),
 };
 const DEMO_SAVE_WARNING = "Không thể lưu tiến độ demo trên thiết bị này. Bạn vẫn có thể tiếp tục học; tiến độ có thể mất khi tải lại trang.";
-/** Text command bar and shortcuts are developer-only; hidden in production builds. */
-const IS_DEV = process.env.NODE_ENV === "development";
+/** Text command bar and shortcuts are developer-only; hidden in production builds unless NEXT_PUBLIC_DEV_MODE=true. */
+const IS_DEV = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 
 interface VoiceLessonClientProps {

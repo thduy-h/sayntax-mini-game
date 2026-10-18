@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { useGlobalCommand } from "./global-command-context";
 import { conciseAnnouncement } from "../utils/accessible-announcements";
 
-const IS_DEV = process.env.NODE_ENV === "development";
+const IS_DEV = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;

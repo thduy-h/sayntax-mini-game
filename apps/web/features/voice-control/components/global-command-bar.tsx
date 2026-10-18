@@ -23,7 +23,6 @@ function GlobalCommandBarInner() {
   const [collapsed, setCollapsed] = useState(true);
   const barRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const wasWorkspaceRef = useRef(false);
   const hiddenForModal = workspace?.modalOpen === true;
 
   useEffect(() => {
@@ -35,7 +34,7 @@ function GlobalCommandBarInner() {
     const element = barRef.current;
     if (!element) return;
     const updateHeight = () => {
-      const height = Math.ceil(element.getBoundingClientRect().height);
+      const height = collapsed ? 0 : Math.ceil(element.getBoundingClientRect().height);
       document.documentElement.style.setProperty("--global-command-bar-height", `${height}px`);
       setCommandBarHeight(height);
     };
@@ -47,6 +46,10 @@ function GlobalCommandBarInner() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !collapsed) {
+        setCollapsed(true);
+        return;
+      }
       if (!event.altKey || event.key.toLowerCase() !== "g") return;
       if (isTypingTarget(event.target)) return;
       event.preventDefault();
@@ -55,7 +58,7 @@ function GlobalCommandBarInner() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [collapsed]);
 
   useEffect(() => {
     const focusCommandBar = () => {
@@ -65,14 +68,6 @@ function GlobalCommandBarInner() {
     window.addEventListener("scc:focus-command-bar", focusCommandBar);
     return () => window.removeEventListener("scc:focus-command-bar", focusCommandBar);
   }, []);
-
-  useEffect(() => {
-    const inWorkspace = Boolean(workspace);
-    if (inWorkspace && !wasWorkspaceRef.current) {
-      window.queueMicrotask(() => setCollapsed(false));
-    }
-    wasWorkspaceRef.current = inWorkspace;
-  }, [workspace]);
 
   function sendCommand(value: string) {
     const result = submitCommand(value);
@@ -86,21 +81,21 @@ function GlobalCommandBarInner() {
     return (
       <div
         ref={barRef}
-        className="scc-global-command-collapsed fixed inset-x-0 bottom-0 z-[var(--z-global-command)] flex justify-center px-3 pb-3 pointer-events-none"
+        className="scc-global-command-collapsed fixed inset-x-0 bottom-2 z-[var(--z-global-command)] flex justify-center px-3 pointer-events-none"
       >
         <Button
           aria-expanded="false"
           aria-label="Mở thanh nhập lệnh toàn cục"
-          className="pointer-events-auto min-h-11 border-2 sm:border-[2.5px] border-black bg-[#a8e6ff] text-black font-black uppercase text-xs tracking-wider shadow-[3px_3px_0_#121212] hover:shadow-[1px_1px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 transition-transform rounded-xl px-4 py-2"
+          className="pointer-events-auto min-h-8 border-2 border-black bg-[#a8e6ff] text-black font-black uppercase text-[11px] tracking-wider shadow-[2px_2px_0_#121212] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-transform rounded-xl px-3 py-1"
           onClick={() => {
             setCollapsed(false);
             window.setTimeout(() => inputRef.current?.focus(), 0);
           }}
           type="button"
         >
-          <PanelTopOpen className="mr-2 h-4 w-4" />
+          <PanelTopOpen className="mr-1.5 h-3.5 w-3.5" />
           [DEV] Nhập lệnh
-          <span className="ml-2 rounded border border-black/30 bg-white/60 px-1.5 py-0.5 text-[10px] font-mono">Alt+G</span>
+          <span className="ml-1.5 rounded border border-black/30 bg-white/60 px-1 py-0.2 text-[9px] font-mono">Alt+G</span>
         </Button>
       </div>
     );

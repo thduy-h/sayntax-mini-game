@@ -3,19 +3,23 @@ import { readFileSync } from "node:fs";
 
 const lesson = readFileSync("features/lesson-v2/components/voice-lesson-client.tsx", "utf8");
 const commandBar = readFileSync("features/voice-control/components/global-command-bar.tsx", "utf8");
+const globalVoice = readFileSync("features/voice-control/components/global-voice-control.tsx", "utf8");
 const globals = readFileSync("app/globals.css", "utf8");
 const demoPage = readFileSync("app/demo/[slug]/page.tsx", "utf8");
 const studentPage = readFileSync("app/lessons-v2/[slug]/page.tsx", "utf8");
 
 assert.ok(lesson.includes("{currentStep.title}</h2>"));
-assert.ok(lesson.includes("Bắt đầu nói lệnh bài học"));
+assert.ok(globalVoice.includes('id="voice-activation"'));
 assert.ok(lesson.includes("<div ref={containerRef}"));
 assert.ok(lesson.includes("Kiến thức nhanh"));
 assert.ok(lesson.includes("Bắt đầu bài học"));
 assert.ok(lesson.includes("Xem kiến thức"));
-assert.ok(lesson.includes('window.dispatchEvent(new Event("scc:focus-command-bar"))'));
+assert.ok(lesson.includes('role="tablist"'));
+assert.ok(lesson.includes('id="tab-knowledge"'));
+assert.ok(lesson.includes('id="tab-practice"'));
+assert.ok(commandBar.includes('[DEV] Nhập lệnh'));
+assert.ok(commandBar.includes('Alt+G'));
 assert.ok(commandBar.includes('window.addEventListener("scc:focus-command-bar", focusCommandBar)'));
-assert.ok(commandBar.includes("inWorkspace && !wasWorkspaceRef.current"));
 assert.ok(commandBar.includes("Nhập lệnh, ví dụ:"));
 assert.ok(lesson.includes("selectedBlockSummary"));
 assert.ok(lesson.includes("setSelectedBlockSummary(selectedItem"));

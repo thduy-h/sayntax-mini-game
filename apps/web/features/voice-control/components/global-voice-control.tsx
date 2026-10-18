@@ -276,7 +276,9 @@ export function GlobalVoiceControl() {
             : pathname || "SAYNTAX";
 
   const start = async () => {
-    setExpanded(true);
+    if (!voicePrivacyAcknowledged) {
+      setExpanded(true);
+    }
     if (!voicePrivacyAcknowledged) return;
     await startVoice();
   };

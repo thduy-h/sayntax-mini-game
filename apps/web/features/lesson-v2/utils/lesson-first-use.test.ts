@@ -28,4 +28,22 @@ assert.ok(lesson.includes("Công cụ"));
 assert.ok(commandBar.includes("scc-global-command-collapsed"));
 assert.ok(globals.includes("@media (max-height: 500px)"));
 
+assert.ok(lesson.includes("isPrimerOpen"));
+assert.ok(lesson.includes("hasStartedLesson"));
+assert.ok(lesson.includes("scc_lesson_started:"));
+assert.ok(lesson.includes("scrollPrimer"));
+assert.ok(lesson.includes("Đã cuộn kiến thức nhanh xuống."));
+assert.ok(lesson.includes("Đã cuộn kiến thức nhanh lên."));
+assert.ok(lesson.includes("Đã về đầu nội dung kiến thức nhanh."));
+assert.ok(lesson.includes("Đã xuống cuối nội dung kiến thức nhanh."));
+assert.ok(lesson.includes("Nội dung ngắn, không cần cuộn."));
+assert.ok(lesson.includes("document.body.style.overflow = \"hidden\""));
+assert.ok(lesson.includes("aria-describedby=\"lesson-primer-desc\""));
+assert.ok(lesson.includes("Ôn lại kiến thức"));
+assert.ok(lesson.includes("Tiếp tục học →"));
+assert.ok(lesson.includes("Đóng kiến thức nhanh"));
+assert.ok(lesson.includes("primerCanScrollDown"));
+assert.ok(lesson.includes("modalOpen: false"));
+
 console.log("lesson first-use contracts passed");
+

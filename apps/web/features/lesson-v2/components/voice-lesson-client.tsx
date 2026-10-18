@@ -596,7 +596,9 @@ export function VoiceLessonClient({
   const [undoSnapshot, setUndoSnapshot] = useState<UndoSnapshot | null>(null);
   const [toolboxOpen, setToolboxOpen] = useState(true);
   const [stepPanelOpen, setStepPanelOpen] = useState(false);
-  const [showPrimer, setShowPrimer] = useState(false);
+  const [isPrimerOpen, setIsPrimerOpen] = useState(false);
+  const [hasStartedLesson, setHasStartedLesson] = useState(false);
+  const [primerCanScrollDown, setPrimerCanScrollDown] = useState(false);
   const prevStepIndexRef = useRef(currentStepIndex);
   const {
     commandBarHeight,
@@ -627,9 +629,104 @@ export function VoiceLessonClient({
   const lessonsHref = isDemoMode ? "/demo" : "/lessons-v2";
   const nextLessonHref = nextLesson ? `${isDemoMode ? "/demo" : "/lessons-v2"}/${nextLesson.slug}` : lessonsHref;
   const isChallenge = currentStep?.isChallenge === true;
+
+  const checkPrimerScroll = useCallback(() => {
+    const el = primerRef.current;
+    if (!el) return;
+    const canScroll = el.scrollTop + el.clientHeight < el.scrollHeight - 16;
+    setPrimerCanScrollDown(canScroll);
+  }, []);
+
+  useEffect(() => {
+    if (!isPrimerOpen) return;
+    const timer = window.setTimeout(checkPrimerScroll, 120);
+    return () => window.clearTimeout(timer);
+  }, [isPrimerOpen, checkPrimerScroll]);
+
+  function startLessonFromPrimer() {
+    try {
+      window.localStorage.setItem(`scc_lesson_started:${lesson.slug}`, "1");
+    } catch {
+      // Storage can be unavailable.
+    }
+    setHasStartedLesson(true);
+    setIsPrimerOpen(false);
+  }
+
   function closePrimer() {
-    try { window.localStorage.setItem(`scc_primer_seen:${lesson.slug}`, "1"); } catch { /* Storage can be unavailable. */ }
-    setShowPrimer(false);
+    setIsPrimerOpen(false);
+  }
+
+  function markLessonStarted() {
+    if (!hasStartedLesson) {
+      setHasStartedLesson(true);
+      try {
+        window.localStorage.setItem(`scc_lesson_started:${lesson.slug}`, "1");
+      } catch {
+        // Storage can be unavailable.
+      }
+    }
+  }
+
+  function scrollPrimer(direction: "down" | "up" | "top" | "bottom", rawTranscript: string): GlobalCommandExecutionResult {
+    const el = primerRef.current;
+    if (!el) {
+      return makeWorkspaceCommandResult(rawTranscript, "Không tìm thấy nội dung kiến thức nhanh.", false, "cuộn kiến thức", null, "not_applied");
+    }
+    const isScrollable = el.scrollHeight > el.clientHeight + 8;
+    if (!isScrollable) {
+      const feedback = "Nội dung ngắn, không cần cuộn.";
+      setLastFeedback(feedback);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+    }
+
+    if (direction === "down") {
+      const isAtBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+      if (isAtBottom) {
+        const feedback = "Đã ở cuối nội dung kiến thức nhanh.";
+        setLastFeedback(feedback);
+        return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+      }
+      const scrollAmount = Math.max(160, Math.round(el.clientHeight * 0.7));
+      el.scrollBy({ top: scrollAmount, behavior: "smooth" });
+      const feedback = "Đã cuộn kiến thức nhanh xuống.";
+      setLastFeedback(feedback);
+      window.setTimeout(checkPrimerScroll, 150);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+    }
+
+    if (direction === "up") {
+      const isAtTop = el.scrollTop <= 8;
+      if (isAtTop) {
+        const feedback = "Đã ở đầu nội dung kiến thức nhanh.";
+        setLastFeedback(feedback);
+        return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+      }
+      const scrollAmount = Math.max(160, Math.round(el.clientHeight * 0.7));
+      el.scrollBy({ top: -scrollAmount, behavior: "smooth" });
+      const feedback = "Đã cuộn kiến thức nhanh lên.";
+      setLastFeedback(feedback);
+      window.setTimeout(checkPrimerScroll, 150);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+    }
+
+    if (direction === "top") {
+      el.scrollTo({ top: 0, behavior: "smooth" });
+      const feedback = "Đã về đầu nội dung kiến thức nhanh.";
+      setLastFeedback(feedback);
+      window.setTimeout(checkPrimerScroll, 150);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+    }
+
+    if (direction === "bottom") {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      const feedback = "Đã xuống cuối nội dung kiến thức nhanh.";
+      setLastFeedback(feedback);
+      window.setTimeout(checkPrimerScroll, 150);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, true, "cuộn kiến thức", null, "applied");
+    }
+
+    return makeWorkspaceCommandResult(rawTranscript, "Không thể cuộn.", false, "cuộn kiến thức", null, "not_applied");
   }
   const sampleUtterance = currentStep && !isChallenge
     ? extractSampleFromInstructions(currentStep.instructions) ?? deriveSampleUtterance(currentStep.action)
@@ -737,18 +834,37 @@ export function VoiceLessonClient({
 
   useEffect(() => {
     if (isDemoMode && !demoProgressLoaded) return;
-    if (initialAllCompleted || completedStepIdsRef.current.size > 0 || currentStepIndex > 0) return;
+    if (initialAllCompleted || completedStepIdsRef.current.size > 0 || currentStepIndex > 0) {
+      setHasStartedLesson(true);
+      return;
+    }
     try {
-      setShowPrimer(window.localStorage.getItem(`scc_primer_seen:${lesson.slug}`) !== "1");
+      const alreadyStarted = window.localStorage.getItem(`scc_lesson_started:${lesson.slug}`) === "1";
+      if (alreadyStarted) {
+        setHasStartedLesson(true);
+        setIsPrimerOpen(false);
+        return;
+      }
+      setIsPrimerOpen(true);
     } catch {
-      setShowPrimer(true);
+      setIsPrimerOpen(true);
     }
   // Check once when restored demo progress is ready; step changes must not reopen it.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson.slug, isDemoMode, demoProgressLoaded]);
 
+  // Lock background body scroll while Knowledge Primer is open
   useEffect(() => {
-    if (!showPrimer) return;
+    if (!isPrimerOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isPrimerOpen]);
+
+  useEffect(() => {
+    if (!isPrimerOpen) return;
     primerRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") { closePrimer(); return; }
@@ -764,9 +880,7 @@ export function VoiceLessonClient({
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  // Primer dismissal uses the current lesson slug and does not change while open.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showPrimer]);
+  }, [isPrimerOpen]);
 
   useEffect(() => {
     stepIndexRef.current = currentStepIndex;
@@ -1407,6 +1521,7 @@ export function VoiceLessonClient({
   }
 
   function evaluateAndMaybeAdvance(intent?: VoiceIntent): LessonStepEvaluationResult | null {
+    markLessonStarted();
     if (advancingRef.current) return null;
     const workspace = workspaceRef.current;
     if (!workspace || !currentStep) return null;
@@ -2154,6 +2269,11 @@ export function VoiceLessonClient({
       setLastFeedback("Đang quay về trang chủ.");
       return { command, feedback: "Đang quay về trang chủ.", handled: true, outcome: "applied", target: "workspace", understoodAs: "Về trang chủ" };
     }
+    if (/^(?:xem kien thuc|mo kien thuc nhanh|mo kien thuc|on lai kien thuc|xem lai kien thuc|kien thuc nhanh|kien thuc)$/.test(normalized)) {
+      setIsPrimerOpen(true);
+      setLastFeedback("Đã mở kiến thức nhanh của bài học.");
+      return { command, feedback: "Đã mở kiến thức nhanh của bài học.", handled: true, outcome: "applied", target: "workspace", understoodAs: "Xem kiến thức" };
+    }
 
     const action = runCompletionModalCommand(command, Boolean(nextLesson), {
       next: () => router.push(nextLessonHref),
@@ -2173,8 +2293,6 @@ export function VoiceLessonClient({
   }
 
   function handleTranscriptCommand(rawTranscript: string, source: VoiceCommandSource = "microphone"): GlobalCommandExecutionResult {
-    if (lessonComplete) return handleCompletionCommand(rawTranscript);
-
     const normalizedPrimerCmd = rawTranscript
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -2185,19 +2303,71 @@ export function VoiceLessonClient({
       .replace(/\s+/g, " ")
       .trim();
 
-    if (showPrimer && /^(?:bat dau bai hoc|bat dau|dong|dong lai|dong kien thuc|tiep tuc)$/.test(normalizedPrimerCmd)) {
-      closePrimer();
-      setLastFeedback("Đã đóng kiến thức nhanh. Bắt đầu bài học!");
-      return makeWorkspaceCommandResult(rawTranscript, "Đã bắt đầu bài học.", true, "Bắt đầu bài học", null, "applied");
+    if (isPrimerOpen) {
+      if (/^(?:dung nghe|tat micro|tat mic|ngung nghe)$/.test(normalizedPrimerCmd)) {
+        void stopVoice(true);
+        setLastFeedback("Đã tắt điều khiển bằng giọng nói.");
+        return makeWorkspaceCommandResult(rawTranscript, "Đã tắt điều khiển bằng giọng nói.", true, "Dừng nghe", null, "applied");
+      }
+
+      if (/^(?:ve trang chu|trang chu|ve nha)$/.test(normalizedPrimerCmd)) {
+        router.push("/");
+        setLastFeedback("Đang quay về trang chủ.");
+        return makeWorkspaceCommandResult(rawTranscript, "Đang quay về trang chủ.", true, "Về trang chủ", null, "applied");
+      }
+
+      if (/^(?:danh sach bai hoc|danh sach bai|tat ca bai hoc|mo danh sach bai)$/.test(normalizedPrimerCmd)) {
+        router.push(lessonsHref);
+        setLastFeedback("Đang mở danh sách bài học.");
+        return makeWorkspaceCommandResult(rawTranscript, "Đang mở danh sách bài học.", true, "Danh sách bài", null, "applied");
+      }
+
+      if (/^(?:cuon xuong|cuon xuong duoi|xuong duoi|xuong tiep|cuon tiep|cuon)$/.test(normalizedPrimerCmd)) {
+        return scrollPrimer("down", rawTranscript);
+      }
+
+      if (/^(?:cuon len|cuon len tren|len tren|len tiep)$/.test(normalizedPrimerCmd)) {
+        return scrollPrimer("up", rawTranscript);
+      }
+
+      if (/^(?:ve dau trang|len dau trang|len dau|ve dau|ve dau tien|dau trang)$/.test(normalizedPrimerCmd)) {
+        return scrollPrimer("top", rawTranscript);
+      }
+
+      if (/^(?:xuong cuoi|xuong cuoi trang|ve cuoi|ve cuoi trang|xuong day|cuoi trang)$/.test(normalizedPrimerCmd)) {
+        return scrollPrimer("bottom", rawTranscript);
+      }
+
+      if (/^(?:bat dau bai hoc|bat dau|bat dau hoc|vao hoc|bat dau thuc hanh)$/.test(normalizedPrimerCmd)) {
+        startLessonFromPrimer();
+        setLastFeedback("Đã đóng kiến thức nhanh. Bắt đầu bài học!");
+        return makeWorkspaceCommandResult(rawTranscript, "Đã bắt đầu bài học.", true, "Bắt đầu bài học", null, "applied");
+      }
+
+      if (/^(?:dong kien thuc|dong lai|dong|tiep tuc|tiep tuc hoc|quay lai)$/.test(normalizedPrimerCmd)) {
+        closePrimer();
+        setLastFeedback("Đã đóng kiến thức nhanh.");
+        return makeWorkspaceCommandResult(rawTranscript, "Đã đóng kiến thức nhanh.", true, "Đóng kiến thức", null, "applied");
+      }
+
+      if (/^(?:tro giup|giup|huong dan|tro giup kien thuc)$/.test(normalizedPrimerCmd)) {
+        const feedback = "Kiến thức nhanh đang mở. Em có thể nói: cuộn xuống, cuộn lên, bắt đầu bài học, hoặc đóng kiến thức.";
+        setLastFeedback(feedback);
+        return makeWorkspaceCommandResult(rawTranscript, feedback, true, "Trợ giúp kiến thức", null, "applied");
+      }
+
+      const feedback = "Kiến thức nhanh đang mở. Nói 'cuộn xuống' để đọc tiếp, hoặc 'bắt đầu bài học' để thực hành.";
+      setLastFeedback(feedback);
+      return makeWorkspaceCommandResult(rawTranscript, feedback, false, "kiến thức nhanh đang mở", null, "not_applied");
     }
-    if (!showPrimer && /^(?:xem kien thuc|mo kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedPrimerCmd)) {
-      setShowPrimer(true);
+
+    if (/^(?:xem kien thuc|mo kien thuc nhanh|mo kien thuc|on lai kien thuc|xem lai kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedPrimerCmd)) {
+      setIsPrimerOpen(true);
       setLastFeedback("Đã mở kiến thức nhanh của bài học.");
       return makeWorkspaceCommandResult(rawTranscript, "Đã mở kiến thức nhanh của bài học.", true, "Xem kiến thức", null, "applied");
     }
-    if (showPrimer) {
-      closePrimer();
-    }
+
+    if (lessonComplete) return handleCompletionCommand(rawTranscript);
 
     if (/^(?:dung nghe|tat micro|tat mic|ngung nghe)$/.test(normalizedPrimerCmd)) {
       void stopVoice(true);
@@ -2300,6 +2470,9 @@ export function VoiceLessonClient({
 
   function handleSpeechAlternatives(alternatives: readonly SpeechAlternativeInput[]): GlobalCommandExecutionResult {
     const heardTranscript = alternatives[0]?.transcript.trim() ?? "";
+    if (isPrimerOpen) {
+      return handleTranscriptCommand(heardTranscript, "microphone");
+    }
     if (lessonComplete) return handleCompletionCommand(heardTranscript);
     if (!heardTranscript) return makeWorkspaceCommandResult("", "Không nghe rõ câu lệnh. Hãy nói lại rõ hơn hoặc thử câu khác.", false, undefined, null, "unsupported");
 
@@ -2313,13 +2486,8 @@ export function VoiceLessonClient({
       .replace(/\s+/g, " ")
       .trim();
 
-    if (showPrimer && /^(?:bat dau bai hoc|bat dau|dong|dong lai|dong kien thuc|tiep tuc)$/.test(normalizedHeard)) {
-      closePrimer();
-      setLastFeedback("Đã đóng kiến thức nhanh. Bắt đầu bài học!");
-      return makeWorkspaceCommandResult(heardTranscript, "Đã bắt đầu bài học.", true, "Bắt đầu bài học", null, "applied");
-    }
-    if (!showPrimer && /^(?:xem kien thuc|mo kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedHeard)) {
-      setShowPrimer(true);
+    if (/^(?:xem kien thuc|mo kien thuc nhanh|mo kien thuc|on lai kien thuc|xem lai kien thuc|kien thuc nhanh|kien thuc)$/.test(normalizedHeard)) {
+      setIsPrimerOpen(true);
       setLastFeedback("Đã mở kiến thức nhanh của bài học.");
       return makeWorkspaceCommandResult(heardTranscript, "Đã mở kiến thức nhanh của bài học.", true, "Xem kiến thức", null, "applied");
     }
@@ -2392,7 +2560,7 @@ export function VoiceLessonClient({
       id: `${lesson.slug}:${currentStep.id}`,
       lessonSlug: lesson.slug,
       lessonTitle: lesson.title,
-      modalOpen: lessonComplete,
+      modalOpen: false,
       pendingPreview: pendingAction?.preview ?? null,
       sampleUtterance,
       stepTitle: currentStep.title,
@@ -2402,7 +2570,6 @@ export function VoiceLessonClient({
     currentStep,
     lesson.slug,
     lesson.title,
-    lessonComplete,
     pendingAction?.preview,
     registerWorkspaceCommand,
     sampleUtterance,
@@ -2737,6 +2904,16 @@ export function VoiceLessonClient({
               >
                 Làm lại
               </Button>
+              {primer && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsPrimerOpen(true)}
+                  className="border-2 border-black bg-white font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]"
+                >
+                  💡 Ôn lại kiến thức
+                </Button>
+              )}
             </div>
             <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2">
               {IS_DEV && (
@@ -2826,79 +3003,129 @@ export function VoiceLessonClient({
         .scc-reduced-motion *, .scc-reduced-motion *::before, .scc-reduced-motion *::after { transition: none !important; animation: none !important; }
       `}</style>
       {completionModal}
-      {showPrimer && primer && !lessonComplete && (
-        <div className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4" role="presentation">
-          <div ref={primerRef} aria-labelledby="lesson-primer-title" aria-modal="true" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-3xl border-3 border-black bg-[#fffdf3] p-5 text-black shadow-[8px_8px_0_#121212] sm:p-7" role="dialog" tabIndex={-1}>
-            <div className="flex items-center justify-between gap-2 border-b-2 border-black pb-3">
-              <span className="rounded-md border-2 border-black bg-[#ff5f87] px-2.5 py-0.5 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">Kiến thức nhanh</span>
-              <span className="text-xs font-black uppercase text-zinc-600 truncate">{lesson.title}</span>
+      {isPrimerOpen && primer && (
+        <div
+          className="fixed inset-0 z-[var(--z-completion-modal)] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm sm:p-4"
+          role="presentation"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              closePrimer();
+            }
+          }}
+        >
+          <div
+            ref={primerRef}
+            aria-describedby="lesson-primer-desc"
+            aria-labelledby="lesson-primer-title"
+            aria-modal="true"
+            className="relative flex max-h-[90dvh] w-full max-w-lg flex-col overflow-y-auto rounded-3xl border-3 border-black bg-[#fffdf3] p-0 text-black shadow-[8px_8px_0_#121212]"
+            role="dialog"
+            tabIndex={-1}
+            onScroll={checkPrimerScroll}
+          >
+            <div className="sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 border-b-2 border-black bg-[#fffdf3] px-5 py-3 rounded-t-[21px] sm:px-7 sm:py-3.5">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="shrink-0 rounded-md border-2 border-black bg-[#ff5f87] px-2.5 py-0.5 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212]">
+                  Kiến thức nhanh
+                </span>
+                <span className="truncate text-xs font-black uppercase text-zinc-600">
+                  {lesson.title}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={closePrimer}
+                aria-label="Đóng kiến thức nhanh"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-white text-lg font-black text-black shadow-[2px_2px_0_#121212] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:bg-[#ff5f87] hover:shadow-none focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+              >
+                ✕
+              </button>
             </div>
-            <h2 className="mt-3 text-2xl sm:text-3xl font-black uppercase tracking-tight text-black" id="lesson-primer-title">Trước khi bắt đầu</h2>
-            <div className="mt-4 space-y-3 text-sm leading-relaxed">
-              <div className="rounded-xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
-                <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Khái niệm</dt>
-                <dd className="mt-1 font-semibold text-black">{primer.concept}</dd>
-              </div>
-              <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
-                <dt className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Dùng để làm gì?</dt>
-                <dd className="mt-1 font-semibold text-black">{primer.purpose}</dd>
-              </div>
-              <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
-                <dt className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Ví dụ</dt>
-                <dd className="mt-1.5 rounded-lg border border-black/20 bg-white px-2.5 py-1.5 font-mono text-xs font-bold text-black">{primer.example}</dd>
-              </div>
-              <div className="rounded-xl border-2 border-black bg-[#fff0a8] p-3 shadow-[2px_2px_0_#121212]">
-                <dt className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Trong bài này</dt>
-                <dd className="mt-1 font-semibold text-black">{primer.goal}</dd>
-              </div>
-            </div>
-            {lesson.slug === "start-and-sequence-v2" && (
-              <div className="mt-4 space-y-3">
-                <div className="rounded-xl border-2 border-black bg-[#fff6fb] p-3 shadow-[2px_2px_0_#121212]">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#9f2348]">Chương trình là gì?</p>
-                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                    Chương trình là tập hợp các chỉ dẫn từng bước để máy tính biết phải làm gì. Giống như bạn hướng dẫn một người làm việc:
-                  </p>
-                  <div className="mt-2 rounded-lg border border-black/15 bg-white p-2 font-mono text-xs font-bold text-black">
-                    Bắt đầu &rarr; In &ldquo;Xin chào&rdquo; &rarr; Màn hình hiển thị: Xin chào
+
+            <div className="p-5 sm:p-7 pt-4 space-y-4">
+              <div id="lesson-primer-desc" className="space-y-3">
+                <h2 className="text-2xl font-black uppercase tracking-tight text-black sm:text-3xl" id="lesson-primer-title">
+                  {hasStartedLesson ? "Ôn lại kiến thức" : "Trước khi bắt đầu"}
+                </h2>
+                <div className="space-y-3 text-sm leading-relaxed">
+                  <div className="rounded-xl border-2 border-black bg-white p-3 shadow-[2px_2px_0_#121212]">
+                    <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Khái niệm</dt>
+                    <dd className="mt-1 font-semibold text-black">{primer.concept}</dd>
+                  </div>
+                  <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
+                    <dt className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Dùng để làm gì?</dt>
+                    <dd className="mt-1 font-semibold text-black">{primer.purpose}</dd>
+                  </div>
+                  <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
+                    <dt className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Ví dụ</dt>
+                    <dd className="mt-1.5 rounded-lg border border-black/20 bg-white px-2.5 py-1.5 font-mono text-xs font-bold text-black">{primer.example}</dd>
+                  </div>
+                  <div className="rounded-xl border-2 border-black bg-[#fff0a8] p-3 shadow-[2px_2px_0_#121212]">
+                    <dt className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Trong bài này</dt>
+                    <dd className="mt-1 font-semibold text-black">{primer.goal}</dd>
                   </div>
                 </div>
-
-                <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Khối lệnh & Cách kết nối</p>
-                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                    Mỗi khối đại diện cho một lệnh. Bạn kết nối các khối bằng cách ghép ngàm từ trên xuống dưới — máy tính sẽ chạy lần lượt từng khối theo thứ tự.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border-2 border-black bg-[#ffefb8] p-3 shadow-[2px_2px_0_#121212]">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Vì sao cần bấm &ldquo;Chạy&rdquo;?</p>
-                  <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                    Xếp khối xong chỉ là bản thiết kế. Bấm nút <strong>Chạy</strong> (hoặc nói &ldquo;chạy chương trình&rdquo;) để máy tính thực hiện các lệnh và hiển thị kết quả.
-                  </p>
-                </div>
-
-                <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Hai cách tạo chương trình</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-800">
-                    <div className="rounded-lg border border-black/15 bg-white p-2.5">
-                      <span className="font-black text-black">🧩 Kéo thả Blockly</span><br />
-                      Kéo khối từ danh sách thả vào vùng làm việc. Không cần microphone.
+                {lesson.slug === "start-and-sequence-v2" && (
+                  <div className="space-y-3 pt-1">
+                    <div className="rounded-xl border-2 border-black bg-[#fff6fb] p-3 shadow-[2px_2px_0_#121212]">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-[#9f2348]">Chương trình là gì?</p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                        Chương trình là tập hợp các chỉ dẫn từng bước để máy tính biết phải làm gì. Giống như bạn hướng dẫn một người làm việc:
+                      </p>
+                      <div className="mt-2 rounded-lg border border-black/15 bg-white p-2 font-mono text-xs font-bold text-black">
+                        Bắt đầu &rarr; In &ldquo;Xin chào&rdquo; &rarr; Màn hình hiển thị: Xin chào
+                      </div>
                     </div>
-                    <div className="rounded-lg border border-black/15 bg-white p-2.5">
-                      <span className="font-black text-black">🎙️ Giọng nói tiếng Việt</span><br />
-                      Bấm nút Mic, nói câu lệnh (ví dụ: &ldquo;Thêm khối bắt đầu&rdquo;), khối tự động ghép.
+
+                    <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3 shadow-[2px_2px_0_#121212]">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Khối lệnh & Cách kết nối</p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                        Mỗi khối đại diện cho một lệnh. Bạn kết nối các khối bằng cách ghép ngàm từ trên xuống dưới — máy tính sẽ chạy lần lượt từng khối theo thứ tự.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-black bg-[#ffefb8] p-3 shadow-[2px_2px_0_#121212]">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Vì sao cần bấm &ldquo;Chạy&rdquo;?</p>
+                      <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
+                        Xếp khối xong chỉ là bản thiết kế. Bấm nút <strong>Chạy</strong> (hoặc nói &ldquo;chạy chương trình&rdquo;) để máy tính thực hiện các lệnh và hiển thị kết quả.
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3 shadow-[2px_2px_0_#121212]">
+                      <p className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Hai cách tạo chương trình</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-medium text-zinc-800">
+                        <div className="rounded-lg border border-black/15 bg-white p-2.5">
+                          <span className="font-black text-black">🧩 Kéo thả Blockly</span><br />
+                          Kéo khối từ danh sách thả vào vùng làm việc. Không cần microphone.
+                        </div>
+                        <div className="rounded-lg border border-black/15 bg-white p-2.5">
+                          <span className="font-black text-black">🎙️ Giọng nói tiếng Việt</span><br />
+                          Bấm nút Mic, nói câu lệnh (ví dụ: &ldquo;Thêm khối bắt đầu&rdquo;), khối tự động ghép.
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
-            )}
-            <Button className="mt-5 w-full border-2 border-black bg-[#ff5f87] text-black font-black uppercase tracking-wider text-sm py-3.5 shadow-[4px_4px_0_#121212] hover:shadow-[2px_2px_0_#121212] hover:translate-x-0.5 hover:translate-y-0.5 rounded-xl transition-transform" onClick={closePrimer} type="button">
-              Bắt đầu bài học →
-            </Button>
-            <p className="mt-2.5 text-center text-xs font-semibold text-zinc-600">
-              Hoặc nói: <span className="font-mono font-bold text-black">&ldquo;Bắt đầu bài học&rdquo;</span>
-            </p>
+
+              {primerCanScrollDown && (
+                <div className="flex items-center justify-center gap-1.5 rounded-lg border border-black/20 bg-[#fff0a8] py-1.5 px-3 text-xs font-bold text-black shadow-[2px_2px_0_#121212]">
+                  <span>↓ Còn nội dung bên dưới</span>
+                  <span className="font-normal text-zinc-700">(Nói &ldquo;Cuộn xuống&rdquo;)</span>
+                </div>
+              )}
+
+              <Button
+                className="w-full min-h-[48px] rounded-xl border-2 border-black bg-[#ff5f87] py-3.5 text-sm font-black uppercase tracking-wider text-black shadow-[4px_4px_0_#121212] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_#121212]"
+                onClick={hasStartedLesson ? closePrimer : startLessonFromPrimer}
+                type="button"
+              >
+                {hasStartedLesson ? "Tiếp tục học →" : "Bắt đầu bài học →"}
+              </Button>
+              <p className="mt-2 text-center text-xs font-semibold text-zinc-600">
+                Hoặc nói: <span className="font-mono font-bold text-black">&ldquo;{hasStartedLesson ? "Tiếp tục" : "Bắt đầu bài học"}&rdquo;</span> · <span className="font-mono font-bold text-black">&ldquo;Cuộn xuống&rdquo;</span>
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -2910,6 +3137,18 @@ export function VoiceLessonClient({
             <p className="font-extrabold text-black">Vùng xếp khối <span className="font-medium text-zinc-600">· {selectedBlockSummary ?? "Chưa chọn khối"}</span></p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {primer && (
+              <Button
+                size="sm"
+                variant="outline"
+                aria-label="Xem kiến thức nhanh của bài học"
+                className="border-2 border-black bg-white font-bold text-black shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]"
+                onClick={() => setIsPrimerOpen(true)}
+                type="button"
+              >
+                💡 Kiến thức nhanh
+              </Button>
+            )}
             <Button
               id="voice-activation"
               aria-describedby={voicePrivacyAcknowledged ? "lesson-voice-status" : "lesson-voice-status lesson-voice-privacy"}
@@ -3131,7 +3370,7 @@ export function VoiceLessonClient({
             <span className="rounded-lg border-2 border-black bg-[#fff6a8] px-2.5 py-1 text-xs font-black uppercase text-black shadow-[2px_2px_0_#121212]">
               Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}
             </span>
-            <Button size="sm" type="button" variant="outline" onClick={() => setShowPrimer(true)} className="border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]">
+            <Button size="sm" type="button" variant="outline" onClick={() => setIsPrimerOpen(true)} className="border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]">
               Xem kiến thức
             </Button>
           </div>

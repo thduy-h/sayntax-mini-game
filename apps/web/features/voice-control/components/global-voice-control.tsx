@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { usePathname } from "next/navigation";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -26,7 +27,14 @@ import {
   VOICE_PROCESSING_DISCLOSURE,
 } from "../utils/voice-privacy";
 
-type EngineDisplayStatus = "off" | "starting" | "listening" | "processing" | "error";
+type EngineDisplayStatus =
+  | "unstarted"
+  | "starting"
+  | "listening"
+  | "processing"
+  | "executed"
+  | "unrecognized"
+  | "error";
 
 export function GlobalVoiceControl() {
   const pathname = usePathname();
@@ -35,6 +43,7 @@ export function GlobalVoiceControl() {
     speech,
     startVoice,
     stopVoice,
+    hasStartedVoice,
     userExplicitlyStopped,
     voicePrivacyAcknowledged,
     acknowledgePrivacy,
@@ -112,19 +121,82 @@ export function GlobalVoiceControl() {
     return () => window.removeEventListener("scc:open-global-voice", handleOpen);
   }, [speech.isListening, startVoice]);
 
-  // Determine true engine status (never faked!)
+  // Determine true engine status matching 7 distinct states
   const engineStatus = useMemo<EngineDisplayStatus>(() => {
-    if (speech.errorMessage) return "error";
-    if (userExplicitlyStopped && !speech.isListening) return "off";
-    if (speech.isStarting || speech.asrState === "checking" || speech.asrState === "starting") return "starting";
-    if (speech.asrState === "processing") return "processing";
-    if (speech.isListening) return "listening";
-    return "off";
-  }, [speech.asrState, speech.errorMessage, speech.isListening, speech.isStarting, userExplicitlyStopped]);
+    // 1. Micro chưa kích hoạt (người dùng chưa kích hoạt hoặc đã chủ động dừng)
+    if (!hasStartedVoice && !speech.isListening) {
+      return "unstarted";
+    }
+
+    // 2. Lỗi microphone thật sự khi phiên đang diễn ra
+    if (speech.errorMessage && (speech.isListening || speech.isStarting || userExplicitlyStopped === false)) {
+      return "error";
+    }
+
+    // 3. Đã tắt hoặc chưa kích hoạt
+    if (!speech.isListening && !speech.isStarting) {
+      if (speech.errorMessage) return "error";
+      return "unstarted";
+    }
+
+    // 4. Đang khởi động
+    if (speech.isStarting || (speech.isListening && speech.asrState === "starting")) {
+      return "starting";
+    }
+
+    // 5. Đang xử lý
+    if (speech.asrState === "processing") {
+      return "processing";
+    }
+
+    // 6. Đang nghe (hoặc vừa thực hiện / không hiểu)
+    if (speech.isListening) {
+      if (speech.interimTranscript) {
+        return "listening";
+      }
+      if (lastResult) {
+        return lastResult.handled ? "executed" : "unrecognized";
+      }
+      return "listening";
+    }
+
+    return "unstarted";
+  }, [
+    hasStartedVoice,
+    lastResult,
+    speech.asrState,
+    speech.errorMessage,
+    speech.interimTranscript,
+    speech.isListening,
+    speech.isStarting,
+    userExplicitlyStopped,
+  ]);
 
   // Status visual attributes
   const statusMeta = useMemo(() => {
     switch (engineStatus) {
+      case "unstarted":
+        return {
+          label: "Chưa bật",
+          dotColor: "bg-zinc-400",
+          badgeClass: "border-black/30 bg-zinc-100 text-zinc-700",
+          desc: userExplicitlyStopped
+            ? "Đã dừng nghe. Bấm Bật micro khi muốn tiếp tục."
+            : "Micro chưa được kích hoạt. Bấm Bật micro để bắt đầu.",
+          icon: <MicOff className="h-4 w-4 text-zinc-500 shrink-0" />,
+          iconBg: "bg-zinc-100",
+          compactText: "Chưa bật micro",
+        };
+      case "starting":
+        return {
+          label: "Đang khởi động",
+          dotColor: "bg-[#fff0a8]",
+          badgeClass: "border-black bg-[#fff0a8] text-black",
+          desc: "Đang chuẩn bị microphone và kết nối...",
+          icon: <Loader2 className="h-4 w-4 text-amber-950 animate-spin motion-reduce:animate-none shrink-0" />,
+          iconBg: "bg-[#fff0a8]",
+          compactText: "Đang khởi động micro...",
+        };
       case "listening":
         return {
           label: "Đang nghe",
@@ -132,46 +204,63 @@ export function GlobalVoiceControl() {
           badgeClass: "border-black bg-[#7df2c3] text-black",
           desc: speech.interimTranscript
             ? `Đang nghe: “${speech.interimTranscript}”`
-            : "Micro đang mở liên tục · Sẵn sàng nhận câu lệnh",
+            : "Micro đang mở · Sẵn sàng tiếp nhận lời nói",
           icon: <Volume2 className="h-4 w-4 text-emerald-950 animate-pulse motion-reduce:animate-none shrink-0" />,
+          iconBg: "bg-[#7df2c3]",
+          compactText: speech.interimTranscript
+            ? `“${speech.interimTranscript}”`
+            : "Sẵn sàng tiếp nhận lời nói",
         };
       case "processing":
         return {
           label: "Đang xử lý",
           dotColor: "bg-[#a8e6ff]",
           badgeClass: "border-black bg-[#a8e6ff] text-black",
-          desc: `Đang nhận diện: “${speech.transcript || "..."}”`,
+          desc: `Đang nhận dạng hoặc thực hiện lệnh: “${speech.transcript || "..."}”`,
           icon: <Loader2 className="h-4 w-4 text-blue-950 animate-spin motion-reduce:animate-none shrink-0" />,
+          iconBg: "bg-[#a8e6ff]",
+          compactText: speech.transcript ? `Đang xử lý: “${speech.transcript}”` : "Đang xử lý lệnh...",
         };
-      case "starting":
+      case "executed":
         return {
-          label: "Đang kết nối",
-          dotColor: "bg-[#fff0a8]",
-          badgeClass: "border-black bg-[#fff0a8] text-black",
-          desc: "Đang xin quyền micro và khởi động nhận dạng...",
-          icon: <Loader2 className="h-4 w-4 text-amber-950 animate-spin motion-reduce:animate-none shrink-0" />,
+          label: "Đã thực hiện",
+          dotColor: "bg-[#7df2c3]",
+          badgeClass: "border-black bg-[#7df2c3] text-black",
+          desc: lastResult?.feedback ?? "Lệnh được xử lý thành công.",
+          icon: <Check className="h-4 w-4 text-emerald-950 shrink-0" />,
+          iconBg: "bg-[#7df2c3]",
+          compactText: `✓ ${lastResult?.understoodAs ?? lastResult?.feedback ?? "Thành công"}`,
+        };
+      case "unrecognized":
+        return {
+          label: "Không hiểu lệnh",
+          dotColor: "bg-[#ffce47]",
+          badgeClass: "border-black bg-[#ffce47] text-black",
+          desc: lastResult?.feedback ?? "Đã nghe được nhưng chưa xác định được yêu cầu.",
+          icon: <HelpCircle className="h-4 w-4 text-black shrink-0" />,
+          iconBg: "bg-[#ffce47]",
+          compactText: `⚠ ${lastResult?.feedback ?? "Chưa hiểu câu lệnh"}`,
         };
       case "error":
-        return {
-          label: "Lỗi micro",
-          dotColor: "bg-[#ffd1dc]",
-          badgeClass: "border-black bg-[#ffd1dc] text-red-950",
-          desc: speech.errorMessage || "Không thể truy cập microphone. Kiểm tra quyền trình duyệt.",
-          icon: <AlertTriangle className="h-4 w-4 text-red-700 shrink-0" />,
-        };
-      case "off":
       default:
         return {
-          label: "Micro tắt",
-          dotColor: "bg-zinc-300",
-          badgeClass: "border-black/30 bg-white text-zinc-700",
-          desc: userExplicitlyStopped
-            ? "Đã dừng nghe. Bấm Bật micro khi muốn tiếp tục."
-            : "Chưa bật micro. Người hỗ trợ bấm Bật micro để bắt đầu.",
-          icon: <MicOff className="h-4 w-4 text-zinc-600 shrink-0" />,
+          label: "Lỗi microphone",
+          dotColor: "bg-[#ffd1dc]",
+          badgeClass: "border-black bg-[#ffd1dc] text-red-950",
+          desc: speech.errorMessage || "Không thể truy cập microphone. Kiểm tra thiết bị và quyền trình duyệt.",
+          icon: <AlertTriangle className="h-4 w-4 text-red-700 shrink-0" />,
+          iconBg: "bg-[#ffd1dc]",
+          compactText: speech.errorMessage || "Lỗi truy cập microphone",
         };
     }
-  }, [engineStatus, speech.errorMessage, speech.interimTranscript, speech.transcript, userExplicitlyStopped]);
+  }, [
+    engineStatus,
+    lastResult,
+    speech.errorMessage,
+    speech.interimTranscript,
+    speech.transcript,
+    userExplicitlyStopped,
+  ]);
 
   // Context page label
   const pageContextLabel = workspace?.lessonTitle
@@ -229,9 +318,7 @@ export function GlobalVoiceControl() {
           {/* Status Badge & Icon */}
           <div className="flex min-w-0 items-center gap-2">
             <span
-              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${
-                speech.isListening ? "bg-[#7df2c3]" : engineStatus === "error" ? "bg-[#ffd1dc]" : "bg-[#ffce47]"
-              }`}
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${statusMeta.iconBg}`}
             >
               {statusMeta.icon}
             </span>
@@ -250,29 +337,7 @@ export function GlobalVoiceControl() {
 
               {/* Dynamic Transcript / Latest Outcome in Compact Mode */}
               <div className="mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] truncate text-xs font-semibold">
-                {speech.interimTranscript ? (
-                  <span className="font-mono text-zinc-900 font-bold">
-                    &ldquo;{speech.interimTranscript}&rdquo;
-                  </span>
-                ) : speech.asrState === "processing" ? (
-                  <span className="text-zinc-600 italic">Đang xử lý...</span>
-                ) : lastResult ? (
-                  <span
-                    className={
-                      lastResult.handled
-                        ? "text-emerald-950 font-bold"
-                        : "text-amber-950 font-bold"
-                    }
-                    title={lastResult.feedback}
-                  >
-                    {lastResult.handled ? "✓ " : "⚠ "}
-                    {lastResult.understoodAs ?? lastResult.feedback}
-                  </span>
-                ) : speech.isListening ? (
-                  <span className="text-zinc-600 font-medium">Sẵn sàng nhận lệnh</span>
-                ) : (
-                  <span className="text-zinc-500 font-normal">Chưa bật micro</span>
-                )}
+                {statusMeta.compactText}
               </div>
             </div>
           </div>
@@ -328,9 +393,7 @@ export function GlobalVoiceControl() {
           <div className="flex items-center justify-between gap-2 border-b-2 border-black/10 pb-2.5">
             <div className="flex items-center gap-2">
               <span
-                className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${
-                  speech.isListening ? "bg-[#7df2c3]" : "bg-[#ff5f87]"
-                }`}
+                className={`inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-black shadow-[1.5px_1.5px_0_#121212] ${statusMeta.iconBg}`}
               >
                 {statusMeta.icon}
               </span>

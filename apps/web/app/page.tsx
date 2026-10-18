@@ -58,11 +58,11 @@ export default function Home() {
       {/* KHU VỰC 1 — HERO */}
       <section
         aria-label="Giới thiệu nền tảng SAYNTAX"
-        className="grid gap-6 lg:grid-cols-2 items-stretch"
+        className="grid gap-6 lg:grid-cols-2 items-start"
       >
-        {/* Hero Left: Product Message & Mouse CTAs */}
-        <div className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 lg:p-8 shadow-[4px_4px_0_#121212]">
-          <div className="space-y-4">
+        {/* Hero Left: Product Message & CTAs */}
+        <div className="flex flex-col rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 shadow-[4px_4px_0_#121212]">
+          <div className="space-y-3 sm:space-y-3.5">
             <span className="inline-block rounded-md border border-black bg-[#ffce47] px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[1.5px_1.5px_0_#121212]">
               Học lập trình không rào cản
             </span>
@@ -72,11 +72,11 @@ export default function Home() {
             </h1>
 
             <p className="text-base sm:text-lg font-medium leading-relaxed text-zinc-800">
-              Không cần biết code trước. SAYNTAX giúp bạn tạo chương trình bằng cách nói hoặc kéo thả các khối lệnh.
+              SAYNTAX giúp người mới học lập trình bằng giọng nói hoặc kéo thả khối lệnh.
             </p>
 
-            {/* Mouse Primary CTAs */}
-            <div className="pt-2 flex flex-wrap items-center gap-3">
+            {/* Primary & Secondary CTAs close to introduction */}
+            <div className="pt-1 flex flex-wrap items-center gap-3">
               <Link
                 className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-black bg-[#ff5f87] px-6 py-2.5 text-base sm:text-lg font-black text-black shadow-[3px_3px_0_#121212] transition-all hover:-translate-y-0.5 hover:shadow-[5px_5px_0_#121212] active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
                 href="/demo"
@@ -87,14 +87,22 @@ export default function Home() {
                 className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-black bg-white px-5 py-2.5 text-sm sm:text-base font-black text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
                 href="/voice-guide"
               >
-                Bảng câu lệnh
+                Xem hướng dẫn
               </Link>
+            </div>
+
+            {/* Clear Voice Prompt & Mouse note */}
+            <div className="pt-1 text-xs sm:text-sm font-semibold text-zinc-800">
+              🎙️ Hãy nói <span className="font-mono font-black text-black bg-white px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0_#121212]">&ldquo;Học thử&rdquo;</span> để bắt đầu.
+              <span className="block mt-1 text-[11px] sm:text-xs font-medium text-zinc-600">
+                (Nút bấm dành cho người có thể sử dụng chuột, không phải điều kiện bắt buộc đối với người học bằng giọng nói).
+              </span>
             </div>
           </div>
 
           {/* Hands-Free Guarantee & Reassurance */}
-          <div className="mt-6 pt-5 border-t border-black/10 space-y-3">
-            <div className="rounded-xl border border-black/15 bg-white/70 p-3 text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
+          <div className="mt-5 pt-4 border-t border-black/10 space-y-2.5">
+            <div className="rounded-xl border border-black/15 bg-white/70 p-2.5 text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
               <strong className="font-black text-black">💡 Điều khiển rảnh tay: </strong>
               Người hỗ trợ bật micro ban đầu một lần. Sau đó, bạn có thể tự do điều khiển toàn bộ bằng giọng nói theo hướng dẫn bên cạnh.
             </div>
@@ -113,120 +121,88 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero Right: Tầng 1 — Làm quen website */}
+        {/* Hero Right: 3 Bước Làm quen với SAYNTAX */}
         <div
           aria-label="Làm quen với SAYNTAX"
-          className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#fffdf0] p-6 sm:p-7 lg:p-8 shadow-[4px_4px_0_#121212]"
+          className="flex flex-col rounded-3xl border-2 border-black bg-[#fffdf0] p-6 sm:p-7 shadow-[4px_4px_0_#121212]"
         >
-          <div>
-            <div className="border-b border-black/10 pb-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-heading text-xs font-black uppercase tracking-[0.16em] text-zinc-600">
-                  Tầng 1 · Làm quen website
-                </p>
-                <span className="rounded border border-black bg-[#ffce47] px-2 py-0.5 text-[10px] font-black uppercase shadow-[1px_1px_0_#121212]">
-                  Khởi động nhanh
-                </span>
-              </div>
-              <h2 className="font-heading text-xl sm:text-2xl font-black uppercase tracking-tight text-black mt-1.5">
+          <div className="border-b border-black/10 pb-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-heading text-xs font-black uppercase tracking-[0.16em] text-zinc-600">
                 Làm quen với SAYNTAX
-              </h2>
-              <p className="text-xs sm:text-sm font-medium text-zinc-700 mt-1">
-                Làm quen điều khiển website bằng giọng nói trước khi bước vào các bài học lập trình.
               </p>
+              <span className="rounded border border-black bg-[#ffce47] px-2 py-0.5 text-[10px] font-black uppercase shadow-[1px_1px_0_#121212]">
+                3 bước nhanh
+              </span>
+            </div>
+            <h2 className="font-heading text-xl sm:text-2xl font-black uppercase tracking-tight text-black mt-1">
+              Bạn bắt đầu như thế nào?
+            </h2>
+          </div>
+
+          <div className="mt-4 space-y-4">
+            {/* Bước 1 */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ff5f87] text-sm font-black text-white shadow-[1.5px_1.5px_0_#121212]">
+                1
+              </span>
+              <div className="space-y-1 min-w-0">
+                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
+                  Bước 1 — Điều khiển website
+                </h3>
+                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
+                  Bạn có thể sử dụng giọng nói để mở các mục, cuộn trang và điều hướng SAYNTAX.
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-xs font-semibold text-zinc-600">Ví dụ khẩu lệnh:</span>
+                  <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
+                    &ldquo;Cuộn xuống&rdquo;
+                  </span>
+                  <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
+                    &ldquo;Trợ giúp&rdquo;
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-4 space-y-3.5">
-              {/* Điểm 1: Khám phá */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ff5f87] text-sm font-black text-white shadow-[1.5px_1.5px_0_#121212]">
-                  1
-                </span>
-                <div className="space-y-1 min-w-0">
-                  <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                    Khám phá bằng giọng nói
-                  </h3>
-                  <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                    Dùng giọng nói để di chuyển và xem website thay cho chuột:
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
-                      &ldquo;Cuộn xuống&rdquo;
-                    </span>
-                    <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
-                      &ldquo;Lên đầu trang&rdquo;
-                    </span>
-                    <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
-                      &ldquo;Quay lại&rdquo;
-                    </span>
-                  </div>
-                </div>
+            {/* Bước 2 */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ffce47] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
+                2
+              </span>
+              <div className="space-y-1 min-w-0">
+                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
+                  Bước 2 — Theo dõi giọng nói
+                </h3>
+                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
+                  Thanh trạng thái giọng nói cho biết SAYNTAX đang nghe hay đã dừng, nhận được lời nói gì và thực hiện lệnh nào.
+                </p>
               </div>
+            </div>
 
-              {/* Điểm 2: Theo dõi thanh giọng nói */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#7df2c3] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
-                  2
-                </span>
-                <div className="space-y-1 min-w-0">
-                  <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                    Theo dõi thanh giọng nói
-                  </h3>
-                  <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                    Thanh ở <strong>góc phải dưới</strong> luôn phản hồi trực tiếp:
-                  </p>
-                  <div className="grid grid-cols-2 gap-1.5 pt-0.5 text-[11px] sm:text-xs">
-                    <div className="rounded-lg border border-black/15 bg-white/80 p-1.5">
-                      <span className="font-black text-[#0e6245]">● Đang nghe:</span> Sẵn sàng nhận lệnh
-                    </div>
-                    <div className="rounded-lg border border-black/15 bg-white/80 p-1.5">
-                      <span className="font-black text-[#0052cc]">● Đang xử lý:</span> Phân tích câu nói
-                    </div>
-                    <div className="rounded-lg border border-black/15 bg-white/80 p-1.5">
-                      <span className="font-black text-zinc-700">💬 Đã nghe gì:</span> Hiện câu vừa nói
-                    </div>
-                    <div className="rounded-lg border border-black/15 bg-white/80 p-1.5">
-                      <span className="font-black text-black">✓ Kết quả:</span> Báo lệnh đã thực hiện
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Điểm 3: Nhờ hỗ trợ */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ffce47] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
-                  3
-                </span>
-                <div className="space-y-1 min-w-0">
-                  <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                    Nhờ hỗ trợ khi cần
-                  </h3>
-                  <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                    Nói <span className="font-mono font-black text-black bg-white px-2 py-0.5 rounded-lg border border-black shadow-[1px_1px_0_#121212]">&ldquo;Trợ giúp&rdquo;</span> bất kỳ lúc nào để xem bảng câu lệnh đầy đủ mà không cần dùng chuột.
-                  </p>
-                </div>
-              </div>
-
-              {/* Điểm 4: Bắt đầu học */}
-              <div className="flex items-start gap-3">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#a8e6ff] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
-                  4
-                </span>
-                <div className="space-y-1 min-w-0">
-                  <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                    Bắt đầu học khi sẵn sàng
-                  </h3>
-                  <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                    Khi đã sẵn sàng, nói <span className="font-mono font-black text-black bg-[#ff5f87] text-white px-2 py-0.5 rounded-lg border border-black shadow-[1px_1px_0_#121212]">&ldquo;Học thử&rdquo;</span> (hoặc bấm &ldquo;Học thử ngay&rdquo;) để khám phá bài học.
-                  </p>
-                </div>
+            {/* Bước 3 */}
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#7df2c3] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
+                3
+              </span>
+              <div className="space-y-1 min-w-0">
+                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
+                  Bước 3 — Bắt đầu học
+                </h3>
+                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
+                  Khi đã làm quen, hãy nói <span className="font-mono font-black text-black bg-white px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0_#121212]">&ldquo;Học thử&rdquo;</span> để khám phá các bài học. SAYNTAX sẽ hướng dẫn bạn tạo chương trình theo từng bước.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Concluding Helper Guidance */}
-          <div className="mt-4 pt-3.5 border-t border-black/10 text-xs sm:text-sm font-medium text-zinc-800 leading-relaxed">
-            ✨ <strong className="font-black text-black">Trình tự tự nhiên:</strong> Làm quen điều hướng website → Xem bảng câu lệnh chi tiết (Tầng 2) → Vào bài học thực hành có hướng dẫn từng bước (Tầng 3).
+          {/* Dedicated guide link note */}
+          <div className="mt-4 pt-3.5 border-t border-black/10 text-xs font-medium text-zinc-700 leading-relaxed">
+            📖 Các câu lệnh và ví dụ chuyên sâu nằm trong{" "}
+            <Link href="/voice-guide" className="font-bold underline text-black hover:text-[#ff5f87]">
+              trang Hướng dẫn lệnh
+            </Link>{" "}
+            (nói &ldquo;Trợ giúp&rdquo; để mở).
           </div>
         </div>
       </section>

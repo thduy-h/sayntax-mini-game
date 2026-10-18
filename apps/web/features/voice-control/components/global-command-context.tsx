@@ -41,6 +41,7 @@ export interface GlobalCommandContextValue {
   // Unified Voice State & Operations:
   speech: ReturnType<typeof useSpeechRecognition>;
   operationalState: VoiceOperationalState;
+  hasStartedVoice: boolean;
   startVoice: () => Promise<void>;
   stopVoice: (byUser?: boolean) => Promise<void>;
   userExplicitlyStopped: boolean;
@@ -144,6 +145,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   const userExplicitlyStoppedRef = useRef(false);
   const [userExplicitlyStopped, setUserExplicitlyStopped] = useState(false);
   const hasEverStartedRef = useRef(false);
+  const [hasStartedVoice, setHasStartedVoice] = useState(false);
   const activeLessonSlugRef = useRef<string | null>(null);
   const lastProcessedFinalIdRef = useRef(0);
 
@@ -160,6 +162,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     userExplicitlyStoppedRef.current = false;
     setUserExplicitlyStopped(false);
     hasEverStartedRef.current = true;
+    setHasStartedVoice(true);
     acknowledgePrivacy();
     await speech.startListening();
   }, [acknowledgePrivacy, speech]);
@@ -169,6 +172,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
       userExplicitlyStoppedRef.current = true;
       setUserExplicitlyStopped(true);
       hasEverStartedRef.current = false;
+      setHasStartedVoice(false);
     }
     await speech.stopListening();
   }, [speech]);
@@ -194,6 +198,12 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
       return {
         kind: "stopped_by_user",
         message: "Bạn đã chủ động dừng nghe. Bấm 'Bắt đầu' khi muốn tiếp tục.",
+      };
+    }
+    if (!hasStartedVoice && !speech.isListening) {
+      return {
+        kind: "idle",
+        message: "Chưa bật điều khiển giọng nói. Bấm nút hoặc dùng Voice Access để kích hoạt.",
       };
     }
     if (speech.errorMessage) {
@@ -257,6 +267,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
     speech.isStarting,
     speech.transcript,
     userExplicitlyStopped,
+    hasStartedVoice,
   ]);
 
   // Auto-start for returning user with granted permission and consent
@@ -458,6 +469,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   const value = useMemo<GlobalCommandContextValue>(() => ({
     acknowledgePrivacy,
     commandBarHeight,
+    hasStartedVoice,
     lastResult,
     lastResultId,
     operationalState,
@@ -474,6 +486,7 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
   }), [
     acknowledgePrivacy,
     commandBarHeight,
+    hasStartedVoice,
     lastResult,
     lastResultId,
     operationalState,

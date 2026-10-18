@@ -70,7 +70,7 @@ export default function RootLayout({
         </a>
         <GlobalCommandProvider>
           {children}
-          <footer className="scc-site-footer mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 border-t-2 border-black/15 px-6 py-6 text-xs sm:text-sm font-semibold text-zinc-700 sm:px-8">
+          <footer className="scc-site-footer mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 border-t-2 border-black/15 px-6 pt-6 pb-20 sm:px-8 sm:pt-6 sm:pb-24 text-xs sm:text-sm font-semibold text-zinc-700">
             <div className="flex flex-wrap items-center gap-4">
               <span>© SAYNTAX — Nền tảng học lập trình không rào cản.</span>
               <Link className="underline decoration-1 underline-offset-4 hover:text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]" href="/voice-guide">

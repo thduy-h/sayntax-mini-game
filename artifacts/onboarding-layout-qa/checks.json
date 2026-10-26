@@ -1,0 +1,23 @@
+{
+  "branch": "gemini-ui",
+  "lint": "passed",
+  "typecheck": "passed",
+  "test": "passed",
+  "build": "passed",
+  "browser": {
+    "developmentProfiles": 7,
+    "localProductionProfiles": 4,
+    "screenshots": 128,
+    "runtimeErrors": 0,
+    "replayFocusRechecked": 11
+  },
+  "limits": [
+    "SpeechRecognition input mocked; real microphone/audio ASR not verified.",
+    "Zoom uses viewport reflow and deviceScaleFactor; browser toolbar/OS zoom not verified.",
+    "Screenshot/layout assertions and visual review; no pixel-diff baseline.",
+    "No physical mobile or screen reader verification."
+  ],
+  "buildWarning": "Existing metadataBase warning when site URL is unset.",
+  "merged": false,
+  "deployed": false
+}

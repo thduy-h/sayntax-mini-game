@@ -53,6 +53,8 @@ export function GlobalVoiceControl() {
   } = useGlobalCommand();
 
   const [expanded, setExpanded] = useState(false);
+  const [guidanceResultId, setGuidanceResultId] = useState<number | null>(null);
+  const hudRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,6 +82,19 @@ export function GlobalVoiceControl() {
     lastAnnouncementRef.current = next;
     setAnnouncement((current) => ({ id: current.id + 1, text: next }));
   }, []);
+
+  useEffect(() => {
+    const onGuidanceReady = (event: Event) => {
+      const resultId = (event as CustomEvent<{ resultId: number }>).detail?.resultId;
+      if (typeof resultId !== "number") return;
+      setGuidanceResultId(resultId);
+      announce("Đã cuộn trang. Bạn đã biết cách điều khiển SAYNTAX! Tiếp theo, hãy nói Học thử.");
+    };
+    window.addEventListener("scc:guidance-ready", onGuidanceReady);
+    return () => window.removeEventListener("scc:guidance-ready", onGuidanceReady);
+  }, [announce]);
+
+  const showGuidanceReady = guidanceResultId !== null && guidanceResultId === lastResultId;
 
   // Announce speech connection status changes
   useEffect(() => {
@@ -113,13 +128,16 @@ export function GlobalVoiceControl() {
   useEffect(() => {
     const handleOpen = () => {
       setExpanded(true);
-      if (!speech.isListening) {
+      // Opening the HUD must not grant microphone consent implicitly. The
+      // explicit disclosure action below is the only path that acknowledges
+      // processing and starts recognition for a new user.
+      if (!speech.isListening && voicePrivacyAcknowledged) {
         void startVoice();
       }
     };
     window.addEventListener("scc:open-global-voice", handleOpen);
     return () => window.removeEventListener("scc:open-global-voice", handleOpen);
-  }, [speech.isListening, startVoice]);
+  }, [speech.isListening, startVoice, voicePrivacyAcknowledged]);
 
   // Determine true engine status matching 7 distinct states
   const engineStatus = useMemo<EngineDisplayStatus>(() => {
@@ -298,14 +316,13 @@ export function GlobalVoiceControl() {
 
   return (
     <div
-      className={`fixed z-[var(--z-global-voice)] transition-all duration-200 pointer-events-auto ${
-        expanded
-          ? "inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[min(26rem,calc(100vw-2rem))]"
-          : "inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-auto sm:max-w-[460px]"
+      ref={hudRef}
+      data-global-voice-hud
+      className={`fixed z-[var(--z-global-voice)] pointer-events-auto right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom,0px))] sm:right-4 sm:bottom-4 ${expanded
+        ? "w-[calc(100vw-1.5rem)] sm:w-[min(26rem,calc(100vw-2rem))]"
+        : "w-auto max-w-[calc(100vw-1.5rem)] sm:max-w-[460px]"
       }`}
-      style={{
-        marginBottom: "var(--global-command-bar-height, 0px)",
-      }}
+      style={{ marginBottom: "var(--global-command-bar-height, 0px)" }}
     >
       {/* Accessible aria-live screen-reader announcement */}
       <p aria-atomic="true" className="sr-only" role="status"><span key={announcement.id}>{announcement.text}</span></p>
@@ -338,8 +355,8 @@ export function GlobalVoiceControl() {
               </div>
 
               {/* Dynamic Transcript / Latest Outcome in Compact Mode */}
-              <div className="mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] truncate text-xs font-semibold">
-                {statusMeta.compactText}
+              <div className={`mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] text-xs font-semibold ${showGuidanceReady ? "whitespace-normal" : "truncate"}`}>
+                {showGuidanceReady ? "✓ Đã làm quen 3/3 · Hãy nói “Học thử”." : statusMeta.compactText}
               </div>
             </div>
           </div>
@@ -354,7 +371,7 @@ export function GlobalVoiceControl() {
               disabled={speech.isStarting}
               aria-label={speech.isListening ? "Dừng nghe micro" : "Bật micro cho người học"}
               aria-pressed={speech.isListening}
-              className={`inline-flex min-h-9 items-center gap-1 rounded-xl border-2 border-black px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc] ${
+              className={`inline-flex min-h-11 min-w-11 items-center gap-1 rounded-xl border-2 border-black px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc] ${
                 speech.isListening ? "bg-[#ffe4b5] hover:bg-[#ffd1dc]" : "bg-[#ff5f87] hover:bg-[#ff7aa0]"
               }`}
             >
@@ -378,7 +395,7 @@ export function GlobalVoiceControl() {
               onClick={() => setExpanded(true)}
               aria-label="Mở rộng chi tiết trạng thái giọng nói"
               aria-expanded="false"
-              className="inline-flex min-h-9 w-8 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
             >
               <ChevronUp className="h-4 w-4" />
             </Button>
@@ -390,7 +407,11 @@ export function GlobalVoiceControl() {
           role="dialog"
           aria-label="Bảng điều khiển và theo dõi giọng nói toàn cục"
           className="max-h-[80dvh] overflow-y-auto rounded-3xl border-3 border-black bg-[#fffdf3] p-3.5 sm:p-4 text-black shadow-[6px_6px_0_#121212]"
+          style={{
+            maxHeight: "min(80dvh, calc(100dvh - var(--global-command-bar-height, 0px) - 2rem))",
+          }}
         >
+          {showGuidanceReady && <p className="mb-3 text-sm font-bold text-black">✓ Đã làm quen 3/3 · Hãy nói “Học thử”.</p>}
           {/* Header Row */}
           <div className="flex items-center justify-between gap-2 border-b-2 border-black/10 pb-2.5">
             <div className="flex items-center gap-2">
@@ -415,7 +436,7 @@ export function GlobalVoiceControl() {
               variant="outline"
               onClick={() => setExpanded(false)}
               aria-label="Thu gọn bảng điều khiển giọng nói"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border-2 border-black bg-white p-0 text-black shadow-[2px_2px_0_#121212] hover:bg-zinc-100 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
             >
               <ChevronDown className="h-4 w-4" />
             </Button>

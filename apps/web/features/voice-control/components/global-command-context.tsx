@@ -16,6 +16,7 @@ import {
   type WorkspaceCommandRegistration,
 } from "../utils/global-command-routing";
 import { acknowledgeVoiceProcessing, hasAcknowledgedVoiceProcessing } from "../utils/voice-privacy";
+import { calculateWebsiteScrollTarget } from "@/features/onboarding/utils/website-scroll";
 
 export type VoiceOperationalState =
   | { kind: "idle"; message: string }
@@ -334,10 +335,24 @@ export function GlobalCommandProvider({ children }: { children: ReactNode }) {
           understoodAs,
         };
       case "scroll":
-        if (command.direction === "top") window.scrollTo({ top: 0, behavior: "smooth" });
-        if (command.direction === "bottom") window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-        if (command.direction === "down") window.scrollBy({ top: Math.round(window.innerHeight * 0.75), behavior: "smooth" });
-        if (command.direction === "up") window.scrollBy({ top: -Math.round(window.innerHeight * 0.75), behavior: "smooth" });
+        {
+          const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          const maxScroll = Math.max(0, documentHeight - window.innerHeight);
+          const currentScroll = window.scrollY || window.pageYOffset || 0;
+          const targetScroll = calculateWebsiteScrollTarget(command.direction, currentScroll, maxScroll, window.innerHeight);
+          if (targetScroll === null) {
+            return {
+              command: commandText,
+              feedback: command.direction === "down" ? "Trang đã ở cuối hoặc chưa có phần nội dung để cuộn xuống." : "Trang không thể cuộn theo hướng này.",
+              handled: false,
+              target: "website",
+              understoodAs,
+            };
+          }
+          // Use an immediate movement so the execution result reflects a real
+          // position change before onboarding advances to the next stage.
+          window.scrollTo({ top: targetScroll, behavior: "auto" });
+        }
         return {
           command: commandText,
           feedback: command.direction === "down" ? "Đã cuộn trang xuống." : command.direction === "up" ? "Đã cuộn trang lên." : command.direction === "top" ? "Đã về đầu trang." : "Đã xuống cuối trang.",

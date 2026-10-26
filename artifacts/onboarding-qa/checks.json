@@ -1,0 +1,28 @@
+{
+  "lint": "passed",
+  "typecheck": "passed",
+  "test": "passed",
+  "build": "passed",
+  "smoke": {
+    "passed": 15,
+    "total": 17,
+    "failures": [
+      {
+        "check": "ASR malformed upload",
+        "expected": 400,
+        "actual": 503
+      },
+      {
+        "check": "ASR oversized upload",
+        "expected": 413,
+        "actual": 503
+      }
+    ],
+    "reason": "ASR cloud chưa được cấu hình."
+  },
+  "limitations": [
+    "Browser speech input mocked at ASR boundary; real audio recognition not verified.",
+    "Zoom tested through viewport reflow emulation, not physical browser toolbar/OS scaling.",
+    "No prior pixel-diff baseline; screenshots and layout assertions reviewed."
+  ]
+}

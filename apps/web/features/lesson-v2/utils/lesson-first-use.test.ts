@@ -29,7 +29,7 @@ assert.ok(lesson.includes("overflow-y-auto overscroll-contain"));
 assert.ok(demoPage.includes("min-h-[calc(100dvh-var(--global-command-bar-height,0px))]"));
 assert.ok(studentPage.includes("min-h-[calc(100dvh-var(--global-command-bar-height,0px))]"));
 assert.ok(lesson.includes("Công cụ"));
-assert.ok(commandBar.includes("scc-global-command-collapsed"));
+assert.ok(commandBar.includes("if (hiddenForModal || collapsed) return null;"));
 assert.ok(globals.includes("@media (max-height: 500px)"));
 
 assert.ok(lesson.includes("isPrimerOpen"));

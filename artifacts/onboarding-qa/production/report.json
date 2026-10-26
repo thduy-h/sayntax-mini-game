@@ -1,0 +1,36 @@
+{
+  "baseURL": "http://localhost:3011",
+  "expectedDev": false,
+  "checkedAt": "2026-10-25T16:55:19.483Z",
+  "input": "Mock browser SpeechRecognition events; real command pipeline. No real audio/ASR verification.",
+  "zoom": "Desktop zoom reflow emulated with CSS viewport / zoom and deviceScaleFactor = zoom.",
+  "checks": [
+    {
+      "profile": "desktop-1366",
+      "passed": true,
+      "initialHeight": 536.5,
+      "completedHeight": 105,
+      "micSessionsAcrossVoiceJourney": 1
+    },
+    {
+      "profile": "mobile-390",
+      "passed": true,
+      "initialHeight": 632.25,
+      "completedHeight": 181,
+      "micSessionsAcrossVoiceJourney": 1
+    }
+  ],
+  "screenshots": [
+    "desktop-1366-01-stage1.png",
+    "desktop-1366-02-stage2.png",
+    "desktop-1366-03-stage3-after-scroll.png",
+    "desktop-1366-04-completed.png",
+    "desktop-1366-05-returning.png",
+    "mobile-390-01-stage1.png",
+    "mobile-390-02-stage2.png",
+    "mobile-390-03-stage3-after-scroll.png",
+    "mobile-390-04-completed.png",
+    "mobile-390-05-returning.png"
+  ],
+  "errors": []
+}

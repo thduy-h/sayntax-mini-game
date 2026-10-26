@@ -1,0 +1,119 @@
+{
+  "baseURL": "http://localhost:3011",
+  "expectedDev": false,
+  "checkedAt": "2026-10-26T00:27:52.872Z",
+  "input": "Mock browser SpeechRecognition events; real command pipeline. No real audio/ASR verification.",
+  "zoom": "Desktop zoom reflow emulated with CSS viewport / zoom and deviceScaleFactor = zoom.",
+  "checks": [
+    {
+      "profile": "desktop-1366",
+      "passed": true,
+      "initialHeight": 455.75,
+      "replayLinkHeight": 44,
+      "independentHeroHeight": 543.375,
+      "completedPanelCount": 0,
+      "micSessionsAcrossVoiceJourney": 1
+    },
+    {
+      "profile": "fhd-100",
+      "passed": true,
+      "initialHeight": 455.75,
+      "replayLinkHeight": 44,
+      "independentHeroHeight": 543.375,
+      "completedPanelCount": 0,
+      "micSessionsAcrossVoiceJourney": 1
+    },
+    {
+      "profile": "fhd-125",
+      "passed": true,
+      "initialHeight": 455.75,
+      "replayLinkHeight": 44,
+      "independentHeroHeight": 543.375,
+      "completedPanelCount": 0,
+      "micSessionsAcrossVoiceJourney": 1
+    },
+    {
+      "profile": "mobile-390",
+      "passed": true,
+      "initialHeight": 632.25,
+      "replayLinkHeight": 44,
+      "independentHeroHeight": 679.46875,
+      "completedPanelCount": 0,
+      "micSessionsAcrossVoiceJourney": 1
+    }
+  ],
+  "screenshots": [
+    "desktop-1366-01-stage1.png",
+    "desktop-1366-01-first-visit-layout.png",
+    "desktop-1366-02-stage2.png",
+    "desktop-1366-02-stage2-landing.png",
+    "desktop-1366-03-stage3-after-scroll.png",
+    "desktop-1366-04-completed.png",
+    "desktop-1366-04-completed-layout.png",
+    "desktop-1366-05-returning.png",
+    "desktop-1366-06-skipped.png",
+    "desktop-1366-07-reopened.png",
+    "desktop-1366-08-methods-expanded-voice.png",
+    "fhd-100-01-stage1.png",
+    "fhd-100-01-first-visit-layout.png",
+    "fhd-100-02-stage2.png",
+    "fhd-100-02-stage2-landing.png",
+    "fhd-100-03-stage3-after-scroll.png",
+    "fhd-100-04-completed.png",
+    "fhd-100-04-completed-layout.png",
+    "fhd-100-05-returning.png",
+    "fhd-100-06-skipped.png",
+    "fhd-100-07-reopened.png",
+    "fhd-100-08-methods-expanded-voice.png",
+    "fhd-125-01-stage1.png",
+    "fhd-125-01-first-visit-layout.png",
+    "fhd-125-02-stage2.png",
+    "fhd-125-02-stage2-landing.png",
+    "fhd-125-03-stage3-after-scroll.png",
+    "fhd-125-04-completed.png",
+    "fhd-125-04-completed-layout.png",
+    "fhd-125-05-returning.png",
+    "fhd-125-06-skipped.png",
+    "fhd-125-07-reopened.png",
+    "fhd-125-08-methods-expanded-voice.png",
+    "mobile-390-01-stage1.png",
+    "mobile-390-01-first-visit-layout.png",
+    "mobile-390-02-stage2.png",
+    "mobile-390-02-stage2-landing.png",
+    "mobile-390-03-stage3-after-scroll.png",
+    "mobile-390-04-completed.png",
+    "mobile-390-04-completed-layout.png",
+    "mobile-390-05-returning.png",
+    "mobile-390-06-skipped.png",
+    "mobile-390-07-reopened.png",
+    "mobile-390-08-methods-expanded-voice.png"
+  ],
+  "errors": [],
+  "replayFocusRegression": [
+    {
+      "profile": "desktop-1366",
+      "passed": true,
+      "stageIndicatorVisible": true,
+      "headingFocused": true
+    },
+    {
+      "profile": "fhd-100",
+      "passed": true,
+      "stageIndicatorVisible": true,
+      "headingFocused": true
+    },
+    {
+      "profile": "fhd-125",
+      "passed": true,
+      "stageIndicatorVisible": true,
+      "headingFocused": true
+    },
+    {
+      "profile": "mobile-390",
+      "passed": true,
+      "stageIndicatorVisible": true,
+      "headingFocused": true
+    }
+  ],
+  "replayFocusCheckedAt": "2026-10-26T00:32:25.999Z"
+}

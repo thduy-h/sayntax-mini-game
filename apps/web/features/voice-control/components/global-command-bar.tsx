@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Command, PanelTopClose, PanelTopOpen } from "lucide-react";
+import { Command, PanelTopClose } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGlobalCommand } from "./global-command-context";
@@ -26,7 +26,7 @@ function GlobalCommandBarInner() {
   const hiddenForModal = workspace?.modalOpen === true;
 
   useEffect(() => {
-    if (hiddenForModal) {
+    if (hiddenForModal || collapsed) {
       document.documentElement.style.setProperty("--global-command-bar-height", "0px");
       setCommandBarHeight(0);
       return;
@@ -41,13 +41,18 @@ function GlobalCommandBarInner() {
     updateHeight();
     const observer = new ResizeObserver(updateHeight);
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.setProperty("--global-command-bar-height", "0px");
+      setCommandBarHeight(0);
+    };
   }, [collapsed, hiddenForModal, setCommandBarHeight]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !collapsed) {
         setCollapsed(true);
+        document.getElementById("voice-activation")?.focus({ preventScroll: true });
         return;
       }
       if (!event.altKey || event.key.toLowerCase() !== "g") return;
@@ -75,31 +80,9 @@ function GlobalCommandBarInner() {
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }
 
-  if (hiddenForModal) return null;
-
-  if (collapsed) {
-    return (
-      <div
-        ref={barRef}
-        className="scc-global-command-collapsed fixed inset-x-0 bottom-2 z-[var(--z-global-command)] flex justify-center px-3 pointer-events-none"
-      >
-        <Button
-          aria-expanded="false"
-          aria-label="Mở thanh nhập lệnh toàn cục"
-          className="pointer-events-auto min-h-8 border-2 border-black bg-[#a8e6ff] text-black font-black uppercase text-[11px] tracking-wider shadow-[2px_2px_0_#121212] hover:shadow-none hover:translate-x-0.5 hover:translate-y-0.5 transition-transform rounded-xl px-3 py-1"
-          onClick={() => {
-            setCollapsed(false);
-            window.setTimeout(() => inputRef.current?.focus(), 0);
-          }}
-          type="button"
-        >
-          <PanelTopOpen className="mr-1.5 h-3.5 w-3.5" />
-          [DEV] Nhập lệnh
-          <span className="ml-1.5 rounded border border-black/30 bg-white/60 px-1 py-0.2 text-[9px] font-mono">Alt+G</span>
-        </Button>
-      </div>
-    );
-  }
+  // Developer tooling is opt-in via Alt+G (or the existing developer event).
+  // A second collapsed floating bar must not cover the learner's voice HUD.
+  if (hiddenForModal || collapsed) return null;
 
   return (
     <div
@@ -118,7 +101,10 @@ function GlobalCommandBarInner() {
           <Button
             aria-expanded="true"
             aria-label="Thu gọn thanh nhập lệnh toàn cục"
-            onClick={() => setCollapsed(true)}
+            onClick={() => {
+              setCollapsed(true);
+              document.getElementById("voice-activation")?.focus({ preventScroll: true });
+            }}
             size="sm"
             type="button"
             variant="outline"

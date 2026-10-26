@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function VoiceGuidePage() {
   return (
-    <main className="mx-auto flex min-h-[85dvh] w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
       {/* Top Navigation */}
       <nav className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white px-4 sm:px-5 py-2 sm:py-2.5 shadow-[3px_3px_0_#121212]">
         <Link aria-label="SAYNTAX - Trang chủ" className="flex items-center" href="/">

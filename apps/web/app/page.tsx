@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { listSeedV2Lessons } from "@shecancode/lesson-engine";
 import { BrandLogo } from "@/components/brand-logo";
+import { FirstTimeGuidance } from "@/features/onboarding/components/first-time-guidance";
 
 const lessons = listSeedV2Lessons();
 const totalSteps = lessons.reduce((sum, lesson) => sum + lesson.stepCount, 0);
@@ -18,7 +19,7 @@ const LESSON_BADGES = [
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-[85dvh] w-full max-w-7xl flex-col gap-8 sm:gap-10 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
+    <main className="mx-auto flex w-full max-w-7xl flex-col gap-8 sm:gap-10 px-4 py-4 sm:px-6 sm:py-6 lg:px-8">
       {/* Top Navigation Bar */}
       <nav
         aria-label="Điều hướng chính"
@@ -46,23 +47,18 @@ export default function Home() {
           >
             Đăng nhập
           </Link>
-          <Link
-            className="inline-flex min-h-[42px] items-center rounded-xl border-2 border-black bg-[#ff5f87] px-4 py-1.5 text-xs sm:text-sm font-black uppercase tracking-wide text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
-            href="/demo"
-          >
-            Học thử ngay
-          </Link>
         </div>
       </nav>
 
-      {/* KHU VỰC 1 — HERO */}
+      {/* KHU VỰC 1 — HERO: BỐ CỤC HAI CỘT ỔN ĐỊNH */}
       <section
         aria-label="Giới thiệu nền tảng SAYNTAX"
-        className="grid gap-6 lg:grid-cols-2 items-start"
+        data-landing-hero
+        className="grid gap-6 lg:grid-cols-2 items-stretch"
       >
-        {/* Hero Left: Product Message & CTAs */}
-        <div className="flex flex-col rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 shadow-[4px_4px_0_#121212]">
-          <div className="space-y-3 sm:space-y-3.5">
+        {/* Cột trái: Giới thiệu SAYNTAX, thông điệp sản phẩm và CTA chính */}
+        <div className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 shadow-[4px_4px_0_#121212]">
+          <div className="space-y-3.5">
             <span className="inline-block rounded-md border border-black bg-[#ffce47] px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[1.5px_1.5px_0_#121212]">
               Học lập trình không rào cản
             </span>
@@ -101,10 +97,10 @@ export default function Home() {
           </div>
 
           {/* Hands-Free Guarantee & Reassurance */}
-          <div className="mt-5 pt-4 border-t border-black/10 space-y-2.5">
+          <div className="mt-5 space-y-2.5 border-t border-black/10 pt-4">
             <div className="rounded-xl border border-black/15 bg-white/70 p-2.5 text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
               <strong className="font-black text-black">💡 Điều khiển rảnh tay: </strong>
-              Người hỗ trợ bật micro ban đầu một lần. Sau đó, bạn có thể tự do điều khiển toàn bộ bằng giọng nói theo hướng dẫn bên cạnh.
+              Người hỗ trợ bật micro ban đầu một lần. Sau đó, bạn có thể tự do điều khiển toàn bộ bằng giọng nói theo hướng dẫn từng bước.
             </div>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-zinc-700">
@@ -121,90 +117,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Hero Right: 3 Bước Làm quen với SAYNTAX */}
-        <div
-          aria-label="Làm quen với SAYNTAX"
-          className="flex flex-col rounded-3xl border-2 border-black bg-[#fffdf0] p-6 sm:p-7 shadow-[4px_4px_0_#121212]"
-        >
-          <div className="border-b border-black/10 pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-heading text-xs font-black uppercase tracking-[0.16em] text-zinc-600">
-                Làm quen với SAYNTAX
-              </p>
-              <span className="rounded border border-black bg-[#ffce47] px-2 py-0.5 text-[10px] font-black uppercase shadow-[1px_1px_0_#121212]">
-                3 bước nhanh
-              </span>
-            </div>
-            <h2 className="font-heading text-xl sm:text-2xl font-black uppercase tracking-tight text-black mt-1">
-              Bạn bắt đầu như thế nào?
-            </h2>
-          </div>
-
-          <div className="mt-4 space-y-4">
-            {/* Bước 1 */}
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ff5f87] text-sm font-black text-white shadow-[1.5px_1.5px_0_#121212]">
-                1
-              </span>
-              <div className="space-y-1 min-w-0">
-                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                  Bước 1 — Điều khiển website
-                </h3>
-                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                  Bạn có thể sử dụng giọng nói để mở các mục, cuộn trang và điều hướng SAYNTAX.
-                </p>
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <span className="text-xs font-semibold text-zinc-600">Ví dụ khẩu lệnh:</span>
-                  <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
-                    &ldquo;Cuộn xuống&rdquo;
-                  </span>
-                  <span className="inline-flex items-center rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">
-                    &ldquo;Trợ giúp&rdquo;
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Bước 2 */}
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#ffce47] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
-                2
-              </span>
-              <div className="space-y-1 min-w-0">
-                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                  Bước 2 — Theo dõi giọng nói
-                </h3>
-                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                  Thanh trạng thái giọng nói cho biết SAYNTAX đang nghe hay đã dừng, nhận được lời nói gì và thực hiện lệnh nào.
-                </p>
-              </div>
-            </div>
-
-            {/* Bước 3 */}
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border-2 border-black bg-[#7df2c3] text-sm font-black text-black shadow-[1.5px_1.5px_0_#121212]">
-                3
-              </span>
-              <div className="space-y-1 min-w-0">
-                <h3 className="font-heading text-sm sm:text-base font-black uppercase tracking-wide text-black">
-                  Bước 3 — Bắt đầu học
-                </h3>
-                <p className="text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-                  Khi đã làm quen, hãy nói <span className="font-mono font-black text-black bg-white px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0_#121212]">&ldquo;Học thử&rdquo;</span> để khám phá các bài học. SAYNTAX sẽ hướng dẫn bạn tạo chương trình theo từng bước.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Dedicated guide link note */}
-          <div className="mt-4 pt-3.5 border-t border-black/10 text-xs font-medium text-zinc-700 leading-relaxed">
-            📖 Các câu lệnh và ví dụ chuyên sâu nằm trong{" "}
-            <Link href="/voice-guide" className="font-bold underline text-black hover:text-[#ff5f87]">
-              trang Hướng dẫn lệnh
-            </Link>{" "}
-            (nói &ldquo;Trợ giúp&rdquo; để mở).
-          </div>
-        </div>
+        {/* Cột phải: Khu vực hướng dẫn luôn có mặt */}
+        <FirstTimeGuidance />
       </section>
 
       {/* KHU VỰC 2 — HAI CÁCH HỌC */}

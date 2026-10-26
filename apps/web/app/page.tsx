@@ -57,18 +57,18 @@ export default function Home() {
         className="grid gap-6 lg:grid-cols-2 items-stretch"
       >
         {/* Cột trái: Giới thiệu SAYNTAX, thông điệp sản phẩm và CTA chính */}
-        <div className="flex flex-col justify-between rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 shadow-[4px_4px_0_#121212]">
+        <div className="flex flex-col gap-5 rounded-3xl border-2 border-black bg-[#fff6fb] p-6 sm:p-7 shadow-[4px_4px_0_#121212]">
           <div className="space-y-3.5">
             <span className="inline-block rounded-md border border-black bg-[#ffce47] px-2.5 py-1 text-xs font-black uppercase tracking-wider text-black shadow-[1.5px_1.5px_0_#121212]">
               Học lập trình không rào cản
             </span>
 
-            <h1 className="font-heading text-3xl sm:text-4xl lg:text-[2.65rem] font-black leading-[1.15] text-black tracking-tight">
-              Học lập trình bằng giọng nói tiếng Việt.
+            <h1 className="font-heading text-balance text-3xl sm:text-4xl lg:text-5xl font-black leading-[1.15] text-black tracking-tight">
+              Học lập trình bằng <span className="whitespace-nowrap">giọng nói</span> tiếng Việt.
             </h1>
 
             <p className="text-base sm:text-lg font-medium leading-relaxed text-zinc-800">
-              SAYNTAX giúp người mới học lập trình bằng giọng nói hoặc kéo thả khối lệnh.
+              SAYNTAX giúp bạn làm quen với lập trình bằng giọng nói hoặc kéo thả khối lệnh.
             </p>
 
             {/* Primary & Secondary CTAs close to introduction */}
@@ -80,46 +80,34 @@ export default function Home() {
                 Học thử ngay — Miễn phí →
               </Link>
               <Link
-                className="inline-flex min-h-12 items-center justify-center rounded-xl border-2 border-black bg-white px-5 py-2.5 text-sm sm:text-base font-black text-black shadow-[2px_2px_0_#121212] transition-transform hover:-translate-y-0.5 active:translate-y-0 focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+                className="inline-flex min-h-11 items-center text-sm font-bold text-black underline decoration-2 underline-offset-4 hover:text-[#9f2348] focus-visible:outline-4 focus-visible:outline-[#0052cc]"
                 href="/voice-guide"
               >
                 Xem hướng dẫn
               </Link>
             </div>
-
-            {/* Clear Voice Prompt & Mouse note */}
-            <div className="pt-1 text-xs sm:text-sm font-semibold text-zinc-800">
-              🎙️ Hãy nói <span className="font-mono font-black text-black bg-white px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0_#121212]">&ldquo;Học thử&rdquo;</span> để bắt đầu.
-              <span className="block mt-1 text-[11px] sm:text-xs font-medium text-zinc-600">
-                (Nút bấm dành cho người có thể sử dụng chuột, không phải điều kiện bắt buộc đối với người học bằng giọng nói).
-              </span>
-            </div>
           </div>
 
-          {/* Hands-Free Guarantee & Reassurance */}
-          <div className="mt-5 space-y-2.5 border-t border-black/10 pt-4">
-            <div className="rounded-xl border border-black/15 bg-white/70 p-2.5 text-xs sm:text-sm font-medium text-zinc-800 leading-snug">
-              <strong className="font-black text-black">💡 Điều khiển rảnh tay: </strong>
-              Người hỗ trợ bật micro ban đầu một lần. Sau đó, bạn có thể tự do điều khiển toàn bộ bằng giọng nói theo hướng dẫn từng bước.
-            </div>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-bold text-zinc-700">
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-[#0e6245] font-black">✓</span> Không cần tài khoản
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-[#0e6245] font-black">✓</span> Hoàn toàn bằng tiếng Việt
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="text-[#0e6245] font-black">✓</span> Không cần cài đặt
-              </span>
-            </div>
+          <div className="space-y-3 border-t border-black/15 pt-4">
+            <p className="text-sm leading-relaxed text-zinc-800">
+              <strong className="text-black">Nếu cần hỗ trợ ban đầu:</strong> người hỗ trợ có thể bật micro với sự đồng ý của bạn. Khi SAYNTAX đang nghe, bạn có thể điều khiển bằng giọng nói.
+            </p>
+            <ul aria-label="Thông tin học thử" className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs font-bold text-zinc-700">
+              <li>✓ Học thử không cần tài khoản</li>
+              <li>✓ Bằng tiếng Việt</li>
+              <li>✓ Không cần cài đặt</li>
+            </ul>
           </div>
         </div>
 
         {/* Cột phải: Khu vực hướng dẫn luôn có mặt */}
         <FirstTimeGuidance />
       </section>
+
+      <p data-learning-discovery className="-my-2 text-center text-sm leading-relaxed text-zinc-700">
+        <span className="font-bold text-black">↓ Khám phá hai cách học bên dưới</span>
+        <span className="mt-0.5 block text-xs">Nói “Cuộn xuống” để xem tiếp.</span>
+      </p>
 
       {/* KHU VỰC 2 — HAI CÁCH HỌC */}
       <section aria-labelledby="learning-methods-title" className="space-y-4">
@@ -171,7 +159,7 @@ export default function Home() {
               </div>
 
               <p className="mt-3.5 text-base font-medium leading-relaxed text-zinc-800">
-                Kéo các khối lệnh từ danh mục vào vùng làm việc và ghép nối như những mảnh ghép logo.
+                Kéo các khối lệnh từ danh mục vào vùng làm việc và ghép nối như những mảnh ghép.
                 Hình thành tư duy thuật toán logic, chính xác mà không bao giờ lo sai dấu chấm phẩy hay quy tắc gõ phức tạp.
               </p>
             </div>

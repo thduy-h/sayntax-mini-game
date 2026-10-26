@@ -40,9 +40,16 @@ export default function DemoLessonsPage() {
           Chọn bài học thử nghiệm
         </h1>
         <p className="mt-3 max-w-2xl text-sm font-medium leading-relaxed text-zinc-800 sm:text-base">
-          Trải nghiệm học lập trình bằng giọng nói tiếng Việt hoặc kéo thả Blockly. Tiến độ học thử sẽ được lưu an toàn trực tiếp trên trình duyệt của bạn.
+          Trải nghiệm học lập trình bằng giọng nói tiếng Việt hoặc kéo thả Blockly. Tiến độ được lưu trên trình duyệt này.
+        </p>
+
+        {/* Contextual voice guidance — inline hint ngắn gọn, không bắt thực hiện */}
+        <p className="mt-3 text-xs sm:text-sm font-medium text-zinc-800 leading-relaxed">
+          🎙️ Nói <span className="inline-block whitespace-nowrap rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">&ldquo;Bài 1&rdquo;</span> để mở bài học đầu tiên, hoặc nói <span className="inline-block whitespace-nowrap rounded-md border border-black bg-white px-2 py-0.5 font-mono text-xs font-black text-black shadow-[1px_1px_0_#121212]">&ldquo;Trợ giúp&rdquo;</span> để xem hướng dẫn.
         </p>
       </section>
+
+
 
       {/* Lesson Grid */}
       <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">

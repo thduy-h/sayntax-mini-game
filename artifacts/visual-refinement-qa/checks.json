@@ -1,0 +1,28 @@
+{
+  "branch": "gemini-ui",
+  "checks": {
+    "lint": "passed",
+    "typecheck": "passed",
+    "test": "passed",
+    "build": "passed"
+  },
+  "originalPedagogicalContent": {
+    "beforeSha256": "de2f364908b566332110ed2ea23de36eccec099f5c5bce4b575451d8c822d9dc",
+    "afterSha256": "de2f364908b566332110ed2ea23de36eccec099f5c5bce4b575451d8c822d9dc",
+    "preserved": true
+  },
+  "browser": {
+    "profiles": 6,
+    "otherLessons": 4,
+    "screenshots": 47,
+    "pageErrors": [],
+    "zoom": "Actual chrome.tabs.setZoom/getZoom",
+    "voice": "Input recognition mock, real executors; microphone/audio/ASR not verified"
+  },
+  "buildWarning": "Existing metadataBase fallback to localhost",
+  "limitations": [
+    "No real audio/microphone or ASR E2E",
+    "No screen-reader session or physical mobile",
+    "No automated baseline pixel diff"
+  ]
+}

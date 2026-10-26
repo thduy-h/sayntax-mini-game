@@ -44,7 +44,7 @@ assert.ok(lesson.includes("Nội dung ngắn, không cần cuộn."));
 assert.ok(lesson.includes("document.body.style.overflow = \"hidden\""));
 assert.ok(lesson.includes("aria-describedby=\"lesson-primer-desc\""));
 assert.ok(lesson.includes("Ôn lại kiến thức"));
-assert.ok(lesson.includes("Tiếp tục học →"));
+assert.ok(!lesson.includes("Tiếp tục học →"));
 assert.ok(lesson.includes("Đóng kiến thức nhanh"));
 assert.ok(lesson.includes("primerCanScrollDown"));
 assert.ok(lesson.includes("modalOpen: false"));

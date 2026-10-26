@@ -158,7 +158,7 @@ export const lessonsV2 = [
     databaseLessonId: "40000000-0000-0000-0000-000000000003",
     orderIndex: 3,
     stepCount: 5,
-    title: "Vòng lặp lặp lại",
+    title: "Vòng lặp cơ bản",
     summary: "Học cách đặt khối in vào bên trong vòng lặp để tiết kiệm thao tác.",
     description: "Bài đầu tiên giới thiệu thao tác 'đưa vào trong'. Học sinh lồng khối in trong khối lặp và điều chỉnh số lần lặp.",
     estimatedMinutes: 16,

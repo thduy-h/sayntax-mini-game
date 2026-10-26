@@ -53,8 +53,8 @@ export function GlobalVoiceControl() {
   } = useGlobalCommand();
 
   const [expanded, setExpanded] = useState(false);
-  const [guidanceResultId, setGuidanceResultId] = useState<number | null>(null);
   const hudRef = useRef<HTMLDivElement>(null);
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -83,18 +83,6 @@ export function GlobalVoiceControl() {
     setAnnouncement((current) => ({ id: current.id + 1, text: next }));
   }, []);
 
-  useEffect(() => {
-    const onGuidanceReady = (event: Event) => {
-      const resultId = (event as CustomEvent<{ resultId: number }>).detail?.resultId;
-      if (typeof resultId !== "number") return;
-      setGuidanceResultId(resultId);
-      announce("Đã cuộn trang. Bạn đã biết cách điều khiển SAYNTAX! Tiếp theo, hãy nói Học thử.");
-    };
-    window.addEventListener("scc:guidance-ready", onGuidanceReady);
-    return () => window.removeEventListener("scc:guidance-ready", onGuidanceReady);
-  }, [announce]);
-
-  const showGuidanceReady = guidanceResultId !== null && guidanceResultId === lastResultId;
 
   // Announce speech connection status changes
   useEffect(() => {
@@ -355,8 +343,8 @@ export function GlobalVoiceControl() {
               </div>
 
               {/* Dynamic Transcript / Latest Outcome in Compact Mode */}
-              <div className={`mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] text-xs font-semibold ${showGuidanceReady ? "whitespace-normal" : "truncate"}`}>
-                {showGuidanceReady ? "✓ Đã làm quen 3/3 · Hãy nói “Học thử”." : statusMeta.compactText}
+              <div className="mt-0.5 min-w-0 max-w-[190px] sm:max-w-[230px] text-xs font-semibold truncate">
+                {statusMeta.compactText}
               </div>
             </div>
           </div>
@@ -411,7 +399,6 @@ export function GlobalVoiceControl() {
             maxHeight: "min(80dvh, calc(100dvh - var(--global-command-bar-height, 0px) - 2rem))",
           }}
         >
-          {showGuidanceReady && <p className="mb-3 text-sm font-bold text-black">✓ Đã làm quen 3/3 · Hãy nói “Học thử”.</p>}
           {/* Header Row */}
           <div className="flex items-center justify-between gap-2 border-b-2 border-black/10 pb-2.5">
             <div className="flex items-center gap-2">

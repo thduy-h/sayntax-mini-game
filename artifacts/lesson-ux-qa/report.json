@@ -1,0 +1,64 @@
+{
+  "baseURL": "http://localhost:3000",
+  "checkedAt": "2026-10-26T07:32:24.655Z",
+  "profiles": [
+    {
+      "name": "desktop-1366",
+      "status": "PASS"
+    },
+    {
+      "name": "fhd-100",
+      "status": "PASS"
+    },
+    {
+      "name": "fhd-125",
+      "status": "PASS"
+    },
+    {
+      "name": "fhd-150",
+      "status": "PASS"
+    },
+    {
+      "name": "fhd-200",
+      "status": "PASS"
+    },
+    {
+      "name": "mobile-390",
+      "status": "PASS"
+    }
+  ],
+  "screenshots": [
+    "desktop-1366-01-demo-page.png",
+    "desktop-1366-02-knowledge-top.png",
+    "desktop-1366-03-knowledge-middle.png",
+    "desktop-1366-04-knowledge-bottom.png",
+    "desktop-1366-05-practice-mode.png",
+    "desktop-1366-06-knowledge-reopened-with-voice.png",
+    "fhd-100-01-demo-page.png",
+    "fhd-100-02-knowledge-top.png",
+    "fhd-100-05-practice-mode.png",
+    "fhd-100-06-knowledge-reopened-with-voice.png",
+    "fhd-125-01-demo-page.png",
+    "fhd-125-02-knowledge-top.png",
+    "fhd-125-05-practice-mode.png",
+    "fhd-125-06-knowledge-reopened-with-voice.png",
+    "fhd-150-01-demo-page.png",
+    "fhd-150-02-knowledge-top.png",
+    "fhd-150-03-knowledge-middle.png",
+    "fhd-150-04-knowledge-bottom.png",
+    "fhd-150-05-practice-mode.png",
+    "fhd-150-06-knowledge-reopened-with-voice.png",
+    "fhd-200-01-demo-page.png",
+    "fhd-200-02-knowledge-top.png",
+    "fhd-200-03-knowledge-middle.png",
+    "fhd-200-04-knowledge-bottom.png",
+    "fhd-200-05-practice-mode.png",
+    "fhd-200-06-knowledge-reopened-with-voice.png",
+    "mobile-390-01-demo-page.png",
+    "mobile-390-02-knowledge-top.png",
+    "mobile-390-03-knowledge-middle.png",
+    "mobile-390-04-knowledge-bottom.png",
+    "mobile-390-05-practice-mode.png",
+    "mobile-390-06-knowledge-reopened-with-voice.png"
+  ]
+}

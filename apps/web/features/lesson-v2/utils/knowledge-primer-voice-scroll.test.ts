@@ -34,14 +34,16 @@ assert.ok(source.includes("Đã mở kiến thức nhanh của bài học."));
 assert.ok(source.includes("Xem kiến thức"));
 
 // 6. UI & Accessibility Contracts
-assert.ok(source.includes('role="dialog"'));
-assert.ok(source.includes('aria-modal="true"'));
-assert.ok(source.includes('aria-labelledby="lesson-primer-title"'));
+assert.ok(source.includes('role="tabpanel"'));
+assert.ok(source.includes('data-knowledge-workspace'));
+assert.ok(source.includes('aria-labelledby="tab-knowledge"'));
 assert.ok(source.includes('aria-describedby="lesson-primer-desc"'));
 assert.ok(source.includes('aria-label="Đóng kiến thức nhanh"'));
 assert.ok(source.includes('h-11 w-11')); // 44x44px target
 assert.ok(source.includes('{hasStartedLesson ? "Ôn lại kiến thức" : "Trước khi bắt đầu"}'));
-assert.ok(source.includes('{hasStartedLesson ? "Tiếp tục học →" : "Bắt đầu bài học →"}'));
+assert.ok(!source.includes('Tiếp tục học →'));
+assert.ok(source.includes('data-knowledge-scroll-hint'));
+assert.ok(source.includes('aria-hidden={!primerCanScrollDown || !primerHintFits}'));
 assert.ok(source.includes('💡 Kiến thức nhanh'));
 assert.ok(source.includes('💡 Ôn lại kiến thức'));
 

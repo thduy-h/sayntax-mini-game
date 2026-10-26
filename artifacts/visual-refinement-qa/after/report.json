@@ -1,0 +1,822 @@
+{
+  "checkedAt": "2026-10-26T16:29:24.876Z",
+  "baseURL": "http://localhost:3000",
+  "profiles": [
+    {
+      "name": "desktop-1366",
+      "passed": true,
+      "actualZoom": 1,
+      "innerWidth": 1366,
+      "landing": {
+        "left": {
+          "x": 75,
+          "y": 140.671875,
+          "height": 518.5625,
+          "bottom": 659.234375,
+          "contentBottom": 629.234375
+        },
+        "right": {
+          "x": 695,
+          "y": 140.671875,
+          "height": 518.5625,
+          "bottom": 659.234375,
+          "contentBottom": 622.921875
+        },
+        "columns": "596px 596px"
+      },
+      "top": {
+        "top": 0,
+        "height": 471,
+        "content": 5413,
+        "panel": {
+          "x": 350.703125,
+          "y": 152.15625,
+          "width": 989.28125,
+          "height": 471,
+          "top": 152.15625,
+          "right": 1339.984375,
+          "bottom": 623.15625,
+          "left": 350.703125
+        },
+        "workspace": {
+          "x": 350.703125,
+          "y": 152.15625,
+          "width": 989.28125,
+          "height": 519,
+          "top": 152.15625,
+          "right": 1339.984375,
+          "bottom": 671.15625,
+          "left": 350.703125
+        },
+        "hint": {
+          "x": 689.640625,
+          "y": 633.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 633.15625,
+          "right": 1001.046875,
+          "bottom": 663.15625,
+          "left": 689.640625
+        },
+        "hud": {
+          "x": 990.671875,
+          "y": 684,
+          "width": 359.328125,
+          "height": 68,
+          "top": 684,
+          "right": 1350,
+          "bottom": 752,
+          "left": 990.671875
+        },
+        "outerScroll": 0,
+        "innerHeight": 768,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 3438,
+        "height": 471,
+        "content": 5413,
+        "panel": {
+          "x": 350.703125,
+          "y": 152.15625,
+          "width": 989.28125,
+          "height": 471,
+          "top": 152.15625,
+          "right": 1339.984375,
+          "bottom": 623.15625,
+          "left": 350.703125
+        },
+        "workspace": {
+          "x": 350.703125,
+          "y": 152.15625,
+          "width": 989.28125,
+          "height": 519,
+          "top": 152.15625,
+          "right": 1339.984375,
+          "bottom": 671.15625,
+          "left": 350.703125
+        },
+        "hint": {
+          "x": 689.640625,
+          "y": 633.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 633.15625,
+          "right": 1001.046875,
+          "bottom": 663.15625,
+          "left": 689.640625
+        },
+        "hud": {
+          "x": 967.46875,
+          "y": 684,
+          "width": 382.53125,
+          "height": 68,
+          "top": 684,
+          "right": 1350,
+          "bottom": 752,
+          "left": 967.46875
+        },
+        "outerScroll": 0,
+        "innerHeight": 768,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    },
+    {
+      "name": "fhd-100",
+      "passed": true,
+      "actualZoom": 1,
+      "innerWidth": 1920,
+      "landing": {
+        "left": {
+          "x": 352,
+          "y": 140.671875,
+          "height": 518.5625,
+          "bottom": 659.234375,
+          "contentBottom": 629.234375
+        },
+        "right": {
+          "x": 972,
+          "y": 140.671875,
+          "height": 518.5625,
+          "bottom": 659.234375,
+          "contentBottom": 622.921875
+        },
+        "columns": "596px 596px"
+      },
+      "top": {
+        "top": 0,
+        "height": 783,
+        "content": 5413,
+        "panel": {
+          "x": 566.71875,
+          "y": 152.15625,
+          "width": 1167.28125,
+          "height": 783,
+          "top": 152.15625,
+          "right": 1734,
+          "bottom": 935.15625,
+          "left": 566.71875
+        },
+        "workspace": {
+          "x": 566.71875,
+          "y": 152.15625,
+          "width": 1167.28125,
+          "height": 831,
+          "top": 152.15625,
+          "right": 1734,
+          "bottom": 983.15625,
+          "left": 566.71875
+        },
+        "hint": {
+          "x": 994.65625,
+          "y": 945.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 945.15625,
+          "right": 1306.0625,
+          "bottom": 975.15625,
+          "left": 994.65625
+        },
+        "hud": {
+          "x": 1544.671875,
+          "y": 996,
+          "width": 359.328125,
+          "height": 68,
+          "top": 996,
+          "right": 1904,
+          "bottom": 1064,
+          "left": 1544.671875
+        },
+        "outerScroll": 0,
+        "innerHeight": 1080,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 3438,
+        "height": 783,
+        "content": 5413,
+        "panel": {
+          "x": 566.71875,
+          "y": 152.15625,
+          "width": 1167.28125,
+          "height": 783,
+          "top": 152.15625,
+          "right": 1734,
+          "bottom": 935.15625,
+          "left": 566.71875
+        },
+        "workspace": {
+          "x": 566.71875,
+          "y": 152.15625,
+          "width": 1167.28125,
+          "height": 831,
+          "top": 152.15625,
+          "right": 1734,
+          "bottom": 983.15625,
+          "left": 566.71875
+        },
+        "hint": {
+          "x": 994.65625,
+          "y": 945.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 945.15625,
+          "right": 1306.0625,
+          "bottom": 975.15625,
+          "left": 994.65625
+        },
+        "hud": {
+          "x": 1521.46875,
+          "y": 996,
+          "width": 382.53125,
+          "height": 68,
+          "top": 996,
+          "right": 1904,
+          "bottom": 1064,
+          "left": 1521.46875
+        },
+        "outerScroll": 0,
+        "innerHeight": 1080,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    },
+    {
+      "name": "fhd-125",
+      "passed": true,
+      "actualZoom": 1.25,
+      "innerWidth": 1536,
+      "landing": {
+        "left": {
+          "x": 160,
+          "y": 139.8625030517578,
+          "height": 517.9750366210938,
+          "bottom": 657.8375396728516,
+          "contentBottom": 628.2375106811523
+        },
+        "right": {
+          "x": 780,
+          "y": 139.8625030517578,
+          "height": 517.9750366210938,
+          "bottom": 657.8375396728516,
+          "contentBottom": 620.7000274658203
+        },
+        "columns": "596px 596px"
+      },
+      "top": {
+        "top": 0,
+        "height": 567,
+        "content": 5402,
+        "panel": {
+          "x": 391.8000183105469,
+          "y": 152.9499969482422,
+          "width": 1117.7874755859375,
+          "height": 567,
+          "top": 152.9499969482422,
+          "right": 1509.5874938964844,
+          "bottom": 719.9499969482422,
+          "left": 391.8000183105469
+        },
+        "workspace": {
+          "x": 391.8000183105469,
+          "y": 152.9499969482422,
+          "width": 1117.7874755859375,
+          "height": 615,
+          "top": 152.9499969482422,
+          "right": 1509.5874938964844,
+          "bottom": 767.9499969482422,
+          "left": 391.8000183105469
+        },
+        "hint": {
+          "x": 795.1812744140625,
+          "y": 730.3500366210938,
+          "width": 311.01251220703125,
+          "height": 29.600000381469727,
+          "top": 730.3500366210938,
+          "right": 1106.1937866210938,
+          "bottom": 759.9500370025635,
+          "left": 795.1812744140625
+        },
+        "hud": {
+          "x": 1161.875,
+          "y": 780.7999877929688,
+          "width": 358.125,
+          "height": 67.20000457763672,
+          "top": 780.7999877929688,
+          "right": 1520,
+          "bottom": 847.9999923706055,
+          "left": 1161.875
+        },
+        "outerScroll": 0,
+        "innerHeight": 864,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 3432,
+        "height": 567,
+        "content": 5402,
+        "panel": {
+          "x": 391.8000183105469,
+          "y": 152.9499969482422,
+          "width": 1117.7874755859375,
+          "height": 567,
+          "top": 152.9499969482422,
+          "right": 1509.5874938964844,
+          "bottom": 719.9499969482422,
+          "left": 391.8000183105469
+        },
+        "workspace": {
+          "x": 391.8000183105469,
+          "y": 152.9499969482422,
+          "width": 1117.7874755859375,
+          "height": 615,
+          "top": 152.9499969482422,
+          "right": 1509.5874938964844,
+          "bottom": 767.9499969482422,
+          "left": 391.8000183105469
+        },
+        "hint": {
+          "x": 795.1812744140625,
+          "y": 730.3500366210938,
+          "width": 311.01251220703125,
+          "height": 29.600000381469727,
+          "top": 730.3500366210938,
+          "right": 1106.1937866210938,
+          "bottom": 759.9500370025635,
+          "left": 795.1812744140625
+        },
+        "hud": {
+          "x": 1138.6624755859375,
+          "y": 780.7999877929688,
+          "width": 381.3374938964844,
+          "height": 67.20000457763672,
+          "top": 780.7999877929688,
+          "right": 1519.9999694824219,
+          "bottom": 847.9999923706055,
+          "left": 1138.6624755859375
+        },
+        "outerScroll": 0,
+        "innerHeight": 864,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    },
+    {
+      "name": "fhd-150",
+      "passed": true,
+      "actualZoom": 1.5,
+      "innerWidth": 1280,
+      "landing": {
+        "left": {
+          "x": 32,
+          "y": 140.6666717529297,
+          "height": 518.2604370117188,
+          "bottom": 658.9271087646484,
+          "contentBottom": 628.9271087646484
+        },
+        "right": {
+          "x": 652,
+          "y": 140.6666717529297,
+          "height": 518.2604370117188,
+          "bottom": 658.9271087646484,
+          "contentBottom": 621.2500457763672
+        },
+        "columns": "596px 596px"
+      },
+      "top": {
+        "top": 0,
+        "height": 423,
+        "content": 5788,
+        "panel": {
+          "x": 330.10418701171875,
+          "y": 152.15625,
+          "width": 923.8958740234375,
+          "height": 423,
+          "top": 152.15625,
+          "right": 1254.0000610351562,
+          "bottom": 575.15625,
+          "left": 330.10418701171875
+        },
+        "workspace": {
+          "x": 330.10418701171875,
+          "y": 152.15625,
+          "width": 923.8958740234375,
+          "height": 471,
+          "top": 152.15625,
+          "right": 1254.0000610351562,
+          "bottom": 623.15625,
+          "left": 330.10418701171875
+        },
+        "hint": {
+          "x": 636.6823120117188,
+          "y": 585.8229370117188,
+          "width": 310.7395935058594,
+          "height": 29.33333396911621,
+          "top": 585.8229370117188,
+          "right": 947.4219055175781,
+          "bottom": 615.156270980835,
+          "left": 636.6823120117188
+        },
+        "hud": {
+          "x": 905.34375,
+          "y": 636,
+          "width": 358.65625,
+          "height": 68,
+          "top": 636,
+          "right": 1264,
+          "bottom": 704,
+          "left": 905.34375
+        },
+        "outerScroll": 0,
+        "innerHeight": 720,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 3783.333251953125,
+        "height": 423,
+        "content": 5788,
+        "panel": {
+          "x": 330.10418701171875,
+          "y": 152.15625,
+          "width": 923.8958740234375,
+          "height": 423,
+          "top": 152.15625,
+          "right": 1254.0000610351562,
+          "bottom": 575.15625,
+          "left": 330.10418701171875
+        },
+        "workspace": {
+          "x": 330.10418701171875,
+          "y": 152.15625,
+          "width": 923.8958740234375,
+          "height": 471,
+          "top": 152.15625,
+          "right": 1254.0000610351562,
+          "bottom": 623.15625,
+          "left": 330.10418701171875
+        },
+        "hint": {
+          "x": 636.6823120117188,
+          "y": 585.8229370117188,
+          "width": 310.7395935058594,
+          "height": 29.33333396911621,
+          "top": 585.8229370117188,
+          "right": 947.4219055175781,
+          "bottom": 615.156270980835,
+          "left": 636.6823120117188
+        },
+        "hud": {
+          "x": 882.1354370117188,
+          "y": 636,
+          "width": 381.8645935058594,
+          "height": 68,
+          "top": 636,
+          "right": 1264.0000305175781,
+          "bottom": 704,
+          "left": 882.1354370117188
+        },
+        "outerScroll": 0,
+        "innerHeight": 720,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    },
+    {
+      "name": "fhd-200",
+      "passed": true,
+      "actualZoom": 2,
+      "innerWidth": 960,
+      "landing": {
+        "left": {
+          "x": 24,
+          "y": 140.671875,
+          "height": 365.6484375,
+          "bottom": 506.3203125,
+          "contentBottom": 476.3203125
+        },
+        "right": {
+          "x": 24,
+          "y": 530.3203125,
+          "height": 486.25,
+          "bottom": 1016.5703125,
+          "contentBottom": 986.5703125
+        },
+        "columns": "912px"
+      },
+      "top": {
+        "top": 0,
+        "height": 244,
+        "content": 5846,
+        "panel": {
+          "x": 26.5,
+          "y": 151.15625,
+          "width": 907,
+          "height": 244,
+          "top": 151.15625,
+          "right": 933.5,
+          "bottom": 395.15625,
+          "left": 26.5
+        },
+        "workspace": {
+          "x": 26.5,
+          "y": 151.15625,
+          "width": 907,
+          "height": 292,
+          "top": 151.15625,
+          "right": 933.5,
+          "bottom": 443.15625,
+          "left": 26.5
+        },
+        "hint": {
+          "x": 324.296875,
+          "y": 405.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 405.15625,
+          "right": 635.703125,
+          "bottom": 435.15625,
+          "left": 324.296875
+        },
+        "hud": {
+          "x": 584.6796875,
+          "y": 456,
+          "width": 359.3203125,
+          "height": 68,
+          "top": 456,
+          "right": 944,
+          "bottom": 524,
+          "left": 584.6796875
+        },
+        "outerScroll": 133.5,
+        "innerHeight": 540,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 3812.5,
+        "height": 244,
+        "content": 5846,
+        "panel": {
+          "x": 26.5,
+          "y": 151.15625,
+          "width": 907,
+          "height": 244,
+          "top": 151.15625,
+          "right": 933.5,
+          "bottom": 395.15625,
+          "left": 26.5
+        },
+        "workspace": {
+          "x": 26.5,
+          "y": 151.15625,
+          "width": 907,
+          "height": 292,
+          "top": 151.15625,
+          "right": 933.5,
+          "bottom": 443.15625,
+          "left": 26.5
+        },
+        "hint": {
+          "x": 324.296875,
+          "y": 405.15625,
+          "width": 311.40625,
+          "height": 30,
+          "top": 405.15625,
+          "right": 635.703125,
+          "bottom": 435.15625,
+          "left": 324.296875
+        },
+        "hud": {
+          "x": 561.46875,
+          "y": 456,
+          "width": 382.53125,
+          "height": 68,
+          "top": 456,
+          "right": 944,
+          "bottom": 524,
+          "left": 561.46875
+        },
+        "outerScroll": 133.5,
+        "innerHeight": 540,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    },
+    {
+      "name": "mobile-390",
+      "passed": true,
+      "actualZoom": 1,
+      "innerWidth": 390,
+      "landing": {
+        "left": {
+          "x": 16,
+          "y": 115.109375,
+          "height": 587.5,
+          "bottom": 702.609375,
+          "contentBottom": 676.609375
+        },
+        "right": {
+          "x": 16,
+          "y": 726.609375,
+          "height": 618.5,
+          "bottom": 1345.109375,
+          "contentBottom": 1319.109375
+        },
+        "columns": "358px"
+      },
+      "top": {
+        "top": 0,
+        "height": 502,
+        "content": 9901,
+        "panel": {
+          "x": 14,
+          "y": 205.703125,
+          "width": 362,
+          "height": 502,
+          "top": 205.703125,
+          "right": 376,
+          "bottom": 707.703125,
+          "left": 14
+        },
+        "workspace": {
+          "x": 14,
+          "y": 205.703125,
+          "width": 362,
+          "height": 550,
+          "top": 205.703125,
+          "right": 376,
+          "bottom": 755.703125,
+          "left": 14
+        },
+        "hint": {
+          "x": 39.296875,
+          "y": 717.703125,
+          "width": 311.40625,
+          "height": 30,
+          "top": 717.703125,
+          "right": 350.703125,
+          "bottom": 747.703125,
+          "left": 39.296875
+        },
+        "hud": {
+          "x": 105.328125,
+          "y": 768,
+          "width": 272.671875,
+          "height": 64,
+          "top": 768,
+          "right": 378,
+          "bottom": 832,
+          "left": 105.328125
+        },
+        "outerScroll": 126,
+        "innerHeight": 844,
+        "hintInsideContent": false
+      },
+      "middle": {
+        "top": 6530,
+        "height": 502,
+        "content": 9901,
+        "panel": {
+          "x": 14,
+          "y": 205.703125,
+          "width": 362,
+          "height": 502,
+          "top": 205.703125,
+          "right": 376,
+          "bottom": 707.703125,
+          "left": 14
+        },
+        "workspace": {
+          "x": 14,
+          "y": 205.703125,
+          "width": 362,
+          "height": 550,
+          "top": 205.703125,
+          "right": 376,
+          "bottom": 755.703125,
+          "left": 14
+        },
+        "hint": {
+          "x": 39.296875,
+          "y": 717.703125,
+          "width": 311.40625,
+          "height": 30,
+          "top": 717.703125,
+          "right": 350.703125,
+          "bottom": 747.703125,
+          "left": 39.296875
+        },
+        "hud": {
+          "x": 94.25,
+          "y": 768,
+          "width": 283.75,
+          "height": 64,
+          "top": 768,
+          "right": 378,
+          "bottom": 832,
+          "left": 94.25
+        },
+        "outerScroll": 126,
+        "innerHeight": 844,
+        "hintInsideContent": false
+      },
+      "voiceScroll": true,
+      "keyboardScroll": true,
+      "singleMicSession": true,
+      "expandedHud": true
+    }
+  ],
+  "screenshots": [
+    "desktop-1366-landing.png",
+    "desktop-1366-knowledge-top.png",
+    "desktop-1366-knowledge-program-visual.png",
+    "desktop-1366-knowledge-middle.png",
+    "desktop-1366-knowledge-bottom.png",
+    "desktop-1366-practice.png",
+    "desktop-1366-knowledge-expanded-voice.png",
+    "fhd-100-landing.png",
+    "fhd-100-knowledge-top.png",
+    "fhd-100-knowledge-program-visual.png",
+    "fhd-100-knowledge-middle.png",
+    "fhd-100-knowledge-bottom.png",
+    "fhd-100-practice.png",
+    "fhd-100-knowledge-expanded-voice.png",
+    "fhd-125-landing.png",
+    "fhd-125-knowledge-top.png",
+    "fhd-125-knowledge-program-visual.png",
+    "fhd-125-knowledge-middle.png",
+    "fhd-125-knowledge-bottom.png",
+    "fhd-125-practice.png",
+    "fhd-125-knowledge-expanded-voice.png",
+    "fhd-150-landing.png",
+    "fhd-150-knowledge-top.png",
+    "fhd-150-knowledge-program-visual.png",
+    "fhd-150-knowledge-middle.png",
+    "fhd-150-knowledge-bottom.png",
+    "fhd-150-practice.png",
+    "fhd-150-knowledge-expanded-voice.png",
+    "fhd-200-landing.png",
+    "fhd-200-knowledge-top.png",
+    "fhd-200-knowledge-program-visual.png",
+    "fhd-200-knowledge-middle.png",
+    "fhd-200-knowledge-bottom.png",
+    "fhd-200-practice.png",
+    "fhd-200-knowledge-expanded-voice.png",
+    "mobile-390-landing.png",
+    "mobile-390-landing-full.png",
+    "mobile-390-knowledge-top.png",
+    "mobile-390-knowledge-program-visual.png",
+    "mobile-390-knowledge-middle.png",
+    "mobile-390-knowledge-bottom.png",
+    "mobile-390-practice.png",
+    "mobile-390-knowledge-expanded-voice.png",
+    "print-output-v2-primer.png",
+    "repeat-loops-v2-primer.png",
+    "if-basics-v2-primer.png",
+    "variables-basics-v2-primer.png"
+  ],
+  "errors": [],
+  "zoom": "Actual browser tab zoom via QA-only extension chrome.tabs.setZoom/getZoom.",
+  "voice": "SpeechRecognition input mock; actual Global Voice routing and workspace executor; real audio/ASR not verified.",
+  "otherLessons": [
+    {
+      "slug": "print-output-v2",
+      "passed": true,
+      "illustration": true,
+      "noArtificialOverflow": true
+    },
+    {
+      "slug": "repeat-loops-v2",
+      "passed": true,
+      "illustration": true,
+      "noArtificialOverflow": true
+    },
+    {
+      "slug": "if-basics-v2",
+      "passed": true,
+      "illustration": true,
+      "noArtificialOverflow": true
+    },
+    {
+      "slug": "variables-basics-v2",
+      "passed": true,
+      "illustration": true,
+      "noArtificialOverflow": true
+    }
+  ]
+}

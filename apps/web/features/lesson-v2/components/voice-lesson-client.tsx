@@ -63,6 +63,7 @@ import { nextLessonHint, resolveLessonCommandOutcome, unknownCommandRecovery } f
 import { resolveAuthoritativeEditTarget } from "../utils/lesson-edit-target";
 import { completedStepAnnouncement, completedStepResult, completedStepWithFeedback, type CompletedStepResult } from "../utils/lesson-step-transition";
 import { LESSON_PRIMERS } from "../utils/lesson-primer";
+import { KnowledgePrimerContent } from "./knowledge-primer-content";
 import { planStepNavigation, willReplaceWorkspace, workspaceContentSignature } from "../utils/step-navigation";
 import {
   calculateWorkspacePanTarget,
@@ -552,6 +553,7 @@ export function VoiceLessonClient({
   const blockIdToDisplayIdRef = useRef<Record<string, string>>({});
   const completionModalRef = useRef<HTMLDivElement | null>(null);
   const primerRef = useRef<HTMLDivElement | null>(null);
+  const primerViewportRef = useRef<HTMLDivElement | null>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const textCommandHandlerRef = useRef<(command: string) => GlobalCommandExecutionResult>((command) => ({
     command,
@@ -598,6 +600,10 @@ export function VoiceLessonClient({
   const [isPrimerOpen, setIsPrimerOpen] = useState(false);
   const [hasStartedLesson, setHasStartedLesson] = useState(false);
   const [primerCanScrollDown, setPrimerCanScrollDown] = useState(false);
+  const [primerHasOverflow, setPrimerHasOverflow] = useState(false);
+  const [primerViewportHeight, setPrimerViewportHeight] = useState<number>();
+  const [primerViewportWidth, setPrimerViewportWidth] = useState<number>();
+  const [primerHintFits, setPrimerHintFits] = useState(true);
   const prevStepIndexRef = useRef(currentStepIndex);
   const stepAsideRef = useRef<HTMLElement | null>(null);
   const {
@@ -632,16 +638,87 @@ export function VoiceLessonClient({
 
   const checkPrimerScroll = useCallback(() => {
     const el = primerRef.current;
-    if (!el) return;
-    const canScroll = el.scrollTop + el.clientHeight < el.scrollHeight - 16;
+    if (!el) {
+      setPrimerCanScrollDown(false);
+      setPrimerHasOverflow(false);
+      return;
+    }
+    // Measure intrinsic content against the full workspace, so the floating
+    // hint's safe inset cannot manufacture overflow for a short lesson.
+    const availableHeight = primerViewportRef.current?.clientHeight ?? el.clientHeight;
+    const hasOverflow = el.scrollHeight > availableHeight + 8;
+    const canScroll = hasOverflow && el.scrollTop + el.clientHeight < el.scrollHeight - 10;
+    setPrimerHasOverflow(hasOverflow);
     setPrimerCanScrollDown(canScroll);
   }, []);
 
   useEffect(() => {
-    if (!isPrimerOpen) return;
-    const timer = window.setTimeout(checkPrimerScroll, 120);
-    return () => window.clearTimeout(timer);
+    if (!isPrimerOpen) {
+      setPrimerCanScrollDown(false);
+      return;
+    }
+    const el = primerRef.current;
+    if (!el) return;
+
+    checkPrimerScroll();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(() => {
+        checkPrimerScroll();
+      });
+      ro.observe(el);
+      if (el.firstElementChild) {
+        ro.observe(el.firstElementChild);
+      }
+    }
+
+    const onResize = () => checkPrimerScroll();
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener("resize", onResize);
+    };
   }, [isPrimerOpen, checkPrimerScroll]);
+
+  useEffect(() => {
+    if (!isPrimerOpen) return;
+    const viewport = primerViewportRef.current;
+    if (!viewport) return;
+    const hud = document.querySelector<HTMLElement>("[data-global-voice-hud]");
+    const measure = () => {
+      const bounds = viewport.getBoundingClientRect();
+      const top = Math.max(0, bounds.top);
+      const hudBounds = hud?.getBoundingClientRect();
+      const bottom = Math.min(window.innerHeight - 12, hudBounds?.top ?? window.innerHeight);
+      const aboveHud = bottom - top - 12;
+      const besideHud = hudBounds ? hudBounds.left - bounds.left - 16 : 0;
+      // Read beside an expanded corner HUD when there is a usable column.
+      // On narrow screens its details act as an overlay: suppress the hint
+      // until the existing collapse control restores unobscured reading space.
+      const canReadBesideHud = aboveHud < 120 && besideHud >= 340;
+      setPrimerViewportWidth(canReadBesideHud ? Math.floor(besideHud) : undefined);
+      setPrimerHintFits(aboveHud >= 120 || canReadBesideHud);
+      const available = canReadBesideHud
+        ? window.innerHeight - top - 24
+        : aboveHud >= 120 ? aboveHud : window.innerHeight - top - 96;
+      setPrimerViewportHeight(Math.max(120, Math.floor(available)));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (viewport.parentElement) observer.observe(viewport.parentElement);
+    if (hud) observer.observe(hud);
+    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, { passive: true });
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [isPrimerOpen]);
 
   function openPrimer() {
     previousFocusRef.current = document.activeElement as HTMLElement | null;
@@ -3123,109 +3200,50 @@ export function VoiceLessonClient({
 
         {isPrimerOpen && primer && (
           <div
-            ref={primerRef}
-            id="panel-knowledge"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="lesson-primer-title"
-            aria-describedby="lesson-primer-desc"
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#fffdf3] p-4 sm:p-6 text-black space-y-4 focus-visible:outline-none"
-            tabIndex={-1}
-            onScroll={checkPrimerScroll}
+            ref={primerViewportRef}
+            data-knowledge-workspace
+            className={`relative flex min-h-0 flex-1 flex-col overflow-hidden bg-[#fffdf3] ${primerHasOverflow ? "pb-12" : ""}`}
+            style={{ maxHeight: primerViewportHeight, maxWidth: primerViewportWidth }}
           >
-            <div id="lesson-primer-desc" className="max-w-3xl space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-black/15 pb-2">
-                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-black" id="lesson-primer-title">
-                  {hasStartedLesson ? "Ôn lại kiến thức" : "Trước khi bắt đầu"}
-                </h2>
-                <span className="rounded-md border border-black/20 bg-white px-2.5 py-1 font-mono text-xs font-bold text-zinc-700">
-                  {lesson.title}
-                </span>
+            <div
+              ref={primerRef}
+              id="panel-knowledge"
+              role="tabpanel"
+              aria-labelledby="tab-knowledge"
+              aria-describedby="lesson-primer-desc"
+              className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain p-4 text-black focus-visible:outline focus-visible:-outline-offset-2 focus-visible:outline-[#0052cc] sm:p-6"
+              tabIndex={0}
+              onScroll={checkPrimerScroll}
+            >
+              <div className="mx-auto max-w-4xl space-y-6 pb-4">
+                <header className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-black uppercase tracking-tight text-black sm:text-2xl" id="lesson-primer-title">
+                      {hasStartedLesson ? "Ôn lại kiến thức" : "Trước khi bắt đầu"}
+                    </h2>
+                    <span className="rounded-md border border-black/20 bg-white px-2.5 py-1 font-mono text-sm font-bold text-zinc-700">
+                      {lesson.title}
+                    </span>
+                  </div>
+                  <p id="lesson-primer-desc" className="text-base leading-7 text-zinc-800">
+                    Đọc từng phần theo nhịp của bạn. Nói “Cuộn xuống” để đọc tiếp; nói “Thực hành” khi sẵn sàng thử.
+                  </p>
+                </header>
+                <KnowledgePrimerContent primer={primer} />
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 text-sm leading-relaxed">
-                <div className="rounded-xl border-2 border-black bg-white p-3.5 shadow-[2px_2px_0_#121212]">
-                  <dt className="text-[11px] font-black uppercase tracking-wider text-zinc-500">Khái niệm</dt>
-                  <dd className="mt-1 font-semibold text-black">{primer.concept}</dd>
-                </div>
-                <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3.5 shadow-[2px_2px_0_#121212]">
-                  <dt className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Dùng để làm gì?</dt>
-                  <dd className="mt-1 font-semibold text-black">{primer.purpose}</dd>
-                </div>
-                <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3.5 shadow-[2px_2px_0_#121212]">
-                  <dt className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Ví dụ</dt>
-                  <dd className="mt-1.5 rounded-lg border border-black/20 bg-white px-2.5 py-1.5 font-mono text-xs font-bold text-black">{primer.example}</dd>
-                </div>
-                <div className="rounded-xl border-2 border-black bg-[#fff0a8] p-3.5 shadow-[2px_2px_0_#121212]">
-                  <dt className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Trong bài này</dt>
-                  <dd className="mt-1 font-semibold text-black">{primer.goal}</dd>
-                </div>
-              </div>
-
-              {lesson.slug === "start-and-sequence-v2" && (
-                <div className="space-y-3 pt-1">
-                  <div className="rounded-xl border-2 border-black bg-[#fff6fb] p-3.5 shadow-[2px_2px_0_#121212]">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-[#9f2348]">Chương trình là gì?</p>
-                    <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                      Chương trình là tập hợp các chỉ dẫn từng bước để máy tính biết phải làm gì:
-                    </p>
-                    <div className="mt-2 rounded-lg border border-black/15 bg-white p-2 font-mono text-xs font-bold text-black">
-                      Bắt đầu &rarr; In &ldquo;Xin chào&rdquo; &rarr; Màn hình hiển thị: Xin chào
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl border-2 border-black bg-[#e7fff3] p-3.5 shadow-[2px_2px_0_#121212]">
-                      <p className="text-[11px] font-black uppercase tracking-wider text-[#0e6245]">Khối lệnh & Cách kết nối</p>
-                      <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                        Mỗi khối đại diện cho một lệnh. Bạn kết nối các khối bằng cách ghép ngàm từ trên xuống dưới — máy tính sẽ chạy lần lượt từng khối theo thứ tự.
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border-2 border-black bg-[#ffefb8] p-3.5 shadow-[2px_2px_0_#121212]">
-                      <p className="text-[11px] font-black uppercase tracking-wider text-[#7a5c00]">Vì sao cần bấm &ldquo;Chạy&rdquo;?</p>
-                      <p className="mt-1 text-xs font-medium leading-relaxed text-zinc-800">
-                        Xếp khối xong chỉ là bản thiết kế. Bấm nút <strong>Chạy</strong> (hoặc nói &ldquo;chạy chương trình&rdquo;) để máy tính thực hiện các lệnh và hiển thị kết quả.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border-2 border-black bg-[#f0f6ff] p-3.5 shadow-[2px_2px_0_#121212]">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-[#0052cc]">Hai cách tạo chương trình</p>
-                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-zinc-800">
-                      <div className="rounded-lg border border-black/15 bg-white p-2.5">
-                        <span className="font-black text-black">🧩 Kéo thả Blockly</span><br />
-                        Kéo khối từ danh sách thả vào vùng làm việc. Không cần microphone.
-                      </div>
-                      <div className="rounded-lg border border-black/15 bg-white p-2.5">
-                        <span className="font-black text-black">🎙️ Giọng nói tiếng Việt</span><br />
-                        Bật micro, nói câu lệnh (ví dụ: &ldquo;Thêm khối bắt đầu&rdquo;), khối tự động ghép.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {primerCanScrollDown && (
-              <div className="flex items-center justify-center gap-1.5 rounded-lg border border-black/20 bg-[#fff0a8] py-1.5 px-3 text-xs font-bold text-black shadow-[2px_2px_0_#121212] max-w-sm mx-auto">
-                <span>↓ Còn nội dung bên dưới</span>
-                <span className="font-normal text-zinc-700">(Nói &ldquo;Cuộn xuống&rdquo;)</span>
-              </div>
-            )}
-
-            <div className="pt-2 pb-32 sm:pb-36 space-y-2 max-w-md mx-auto">
-              <Button
-                className="w-full min-h-[48px] rounded-xl border-2 border-black bg-[#7df2c3] py-3.5 text-sm font-black uppercase tracking-wider text-black shadow-[4px_4px_0_#121212] transition-transform hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_#121212]"
-                onClick={hasStartedLesson ? closePrimer : startLessonFromPrimer}
-                type="button"
+            {primerHasOverflow && (
+              <p
+                data-knowledge-scroll-hint
+                role="note"
+                aria-hidden={!primerCanScrollDown || !primerHintFits}
+                className={`pointer-events-none absolute bottom-2 left-1/2 w-max max-w-[calc(100%-1.5rem)] -translate-x-1/2 rounded-full border border-black bg-[#fff5cc] px-3 py-1.5 text-center text-xs leading-4 text-black shadow-[1px_1px_0_#121212] ${primerCanScrollDown && primerHintFits ? "" : "invisible"}`}
               >
-                {hasStartedLesson ? "Tiếp tục học →" : "Bắt đầu bài học →"}
-              </Button>
-              <p className="text-center text-xs font-semibold text-zinc-600">
-                Hoặc nói: <span className="font-mono font-bold text-black">&ldquo;{hasStartedLesson ? "Tiếp tục" : "Bắt đầu bài học"}&rdquo;</span> · <span className="font-mono font-bold text-black">&ldquo;Cuộn xuống&rdquo;</span>
+                <strong>↓ Còn nội dung bên dưới</strong>
+                <span> · Nói “Cuộn xuống”</span>
               </p>
-            </div>
+            )}
           </div>
         )}
 
@@ -3420,8 +3438,16 @@ export function VoiceLessonClient({
             <span className="rounded-lg border-2 border-black bg-[#fff6a8] px-2.5 py-1 text-xs font-black uppercase text-black shadow-[2px_2px_0_#121212]">
               Bước {currentStepIndex + 1}/{lesson.steps.length}{isChallenge ? " · Thử thách" : ""}
             </span>
-            <Button size="sm" type="button" variant="outline" onClick={() => setIsPrimerOpen(true)} className="border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0_#121212] hover:bg-[#fff0a8]">
-              Xem kiến thức
+            <Button
+              size="sm"
+              type="button"
+              variant="outline"
+              onClick={isPrimerOpen ? (hasStartedLesson ? closePrimer : startLessonFromPrimer) : openPrimer}
+              className={`border-2 border-black text-xs font-bold shadow-[2px_2px_0_#121212] transition-colors ${
+                isPrimerOpen ? "bg-[#fff0a8] text-black hover:bg-[#ffce47]" : "bg-white text-black hover:bg-[#fff0a8]"
+              }`}
+            >
+              {isPrimerOpen ? "🧩 Vào thực hành" : "💡 Xem kiến thức"}
             </Button>
           </div>
           <div className="mt-3 h-2.5 w-full rounded-full border-2 border-black bg-white p-0.5 shadow-[2px_2px_0_#121212]">
@@ -3448,9 +3474,9 @@ export function VoiceLessonClient({
                       handleTranscriptCommand(sampleUtterance, "text");
                     }}
                     className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-[#fff0a8] px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212] hover:bg-[#ffce47] hover:translate-x-0.5 hover:translate-y-0.5 transition-all text-left"
-                    title="[DEV] Nhấn để giả lập câu lệnh giọng nói"
+                    title="Nhấn để giả lập câu lệnh giọng nói"
                   >
-                    [DEV] 🎙️ &ldquo;{sampleUtterance}&rdquo;
+                    🎙️ &ldquo;{sampleUtterance}&rdquo;
                   </button>
                 ) : (
                   <span className="inline-flex items-center gap-1 rounded-lg border-2 border-black bg-white px-2.5 py-1 text-xs font-mono font-black text-black shadow-[2px_2px_0_#121212]">
@@ -3466,7 +3492,7 @@ export function VoiceLessonClient({
 
           <div className="mt-3 rounded-xl border-2 border-black bg-[#fffdf3] p-2.5 text-xs font-bold text-black shadow-[2px_2px_0_#121212]">
             <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 block">Đang thao tác</span>
-            <span className="mt-0.5 block truncate">🎯 {selectedBlockSummary ?? "Chưa chọn khối nào (bấm vào khối để chọn)"}</span>
+            <span className="mt-0.5 block break-words font-semibold text-zinc-900 leading-snug">🎯 {selectedBlockSummary ?? "Chưa chọn khối nào (bấm vào khối để chọn)"}</span>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">

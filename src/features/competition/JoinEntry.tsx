@@ -22,6 +22,25 @@ export default function JoinEntry() {
       "arena-join-room",
       { action: "resolve", code },
     )
+      .catch(async (e: unknown) => {
+        // V2 deployments predate resolve; inspect is non-registering and needs
+        // no name, recovery credential or team capability. Never retry a join.
+        if (!(e instanceof ArenaApiError) || e.code !== "invalid_team_name")
+          throw e;
+        try {
+          const info = await invokeArena<{ competitionId?: string }>(
+            "arena-join-room",
+            { mode: "competition", action: "inspect", code },
+          );
+          if (!isCompetitionId(info.competitionId))
+            throw new Error("invalid_contract");
+          return { mode: "competition", competitionId: info.competitionId };
+        } catch (inspectionError) {
+          if (inspectionError instanceof ArenaApiError && inspectionError.code === "not_found")
+            return { mode: "workshop" };
+          throw inspectionError;
+        }
+      })
       .then((value) => {
         if (
           value.mode === "competition" &&

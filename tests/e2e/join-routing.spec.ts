@@ -137,3 +137,23 @@ test("full room renders an actionable eight-team message", async ({ page }) => {
   await page.getByRole("button", { name: /Vào phòng thi đấu/i }).click();
   await expect(page.getByRole("alert")).toHaveText("Phòng đã đủ 8 đội.");
 });
+
+test("code-only competition link supports deployed V2 inspect without registering a team", async ({ page }) => {
+  const inputs: Record<string, unknown>[] = [];
+  const competitionId = "90000000-0000-0000-0000-000000000001";
+  await page.route("**/functions/v1/**", async route => {
+    const input = route.request().postDataJSON();
+    inputs.push(input);
+    if (input.action === "resolve")
+      return route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({error:"invalid_team_name"}) });
+    if (input.mode === "competition" && input.action === "inspect")
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({competitionId, name:"Cuộc thi kiểm thử", stage:1, status:"NOT_STARTED"}) });
+    throw new Error("Opening a join link must not register a team");
+  });
+  await page.goto('/join/53RX3Q');
+  await expect(page.getByRole('button', {name:'Đăng ký đội', exact:true})).toBeVisible();
+  expect(inputs.some(i => i.action === 'inspect')).toBe(true);
+  expect(inputs.every(i => i.action === 'resolve' || i.action === 'inspect')).toBe(true);
+  await page.reload();
+  await expect(page.getByRole('button', {name:'Đăng ký đội', exact:true})).toBeVisible();
+});

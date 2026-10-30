@@ -38,6 +38,21 @@ async function run() {
   assert.deepEqual(await cloud.json(), { text: "xin chào", provider: "groq" });
 
   resetASRRateLimitForTests();
+  const explicitRequest = request();
+  explicitRequest.headers.set("X-ASR-Provider", "groq");
+  const explicit = await handleASRTranscription(explicitRequest, {
+    env: { ...base, ASR_MODE: "local", GROQ_API_KEY: "private-groq-key" },
+    fetch: async (url) => {
+      assert.equal(String(url), "https://api.groq.com/openai/v1/audio/transcriptions");
+      return Response.json({ text: "học thử" });
+    },
+  });
+  assert.deepEqual(await explicit.json(), { text: "học thử", provider: "groq" });
+  const missingKeyRequest = request();
+  missingKeyRequest.headers.set("X-ASR-Provider", "groq");
+  assert.equal((await handleASRTranscription(missingKeyRequest, { env: base })).status, 503);
+
+  resetASRRateLimitForTests();
   const local = await handleASRTranscription(request(), {
     env: { ...base, ASR_MODE: "local", LOCAL_ASR_URL: "http://127.0.0.1:8000/", LOCAL_ASR_TOKEN: "local-secret" },
     fetch: async (url, init) => {
@@ -115,7 +130,7 @@ async function run() {
     },
     selectedDeviceId: () => "",
   });
-  await manager.initialize();
+  await manager.initialize("server");
   serverCallbacks?.onError?.({ code: "upstream_unavailable", message: "", recoverable: true });
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(browserStarts, 1);

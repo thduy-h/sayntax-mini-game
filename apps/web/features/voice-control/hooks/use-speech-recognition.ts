@@ -13,6 +13,7 @@ const DUPLICATE_FINAL_WINDOW_MS = 1200;
 function voiceErrorMessage(error: ASRError) {
   if (error.code === "no_speech") return "Không nghe rõ, thử lại. Bạn vẫn có thể kéo thả khối.";
   if (error.code === "permission_denied") return "Micro chưa được cấp quyền. Bạn vẫn có thể kéo thả khối.";
+  if (error.code === "not_supported") return "Trình duyệt không hỗ trợ Web Speech API. Hãy chọn Groq hoặc kéo thả khối.";
   return "Không thể nhận dạng giọng nói. Bạn vẫn có thể kéo thả khối.";
 }
 
@@ -46,6 +47,7 @@ export function useSpeechRecognition() {
   const lastFinalSignatureRef = useRef("");
   const lastFinalAtRef = useRef(0);
   const finalResultSequenceRef = useRef(0);
+  const [recognitionProvider, setRecognitionProvider] = useState<"browser" | "server">("browser");
   const [alternatives, setAlternatives] = useState<SpeechAlternativeResult[]>([]);
   const [asrState, setAsrState] = useState<ASRState>("checking");
   const [audioInputs, setAudioInputs] = useState<AudioInputOption[]>([]);
@@ -159,6 +161,14 @@ export function useSpeechRecognition() {
     };
   }, []);
 
+  async function selectRecognitionProvider(provider: "browser" | "server") {
+    if (asrState === "checking" || asrState === "listening" || asrState === "starting" || asrState === "processing") return;
+    setErrorMessage(null);
+    setInterimTranscript("");
+    setRecognitionProvider(provider);
+    await managerRef.current?.selectEngine(provider);
+  }
+
   function selectMicrophone(deviceId: string) {
     selectedMicrophoneIdRef.current = deviceId;
     setSelectedMicrophoneId(deviceId);
@@ -209,6 +219,8 @@ export function useSpeechRecognition() {
     isSupported: engineType !== "unavailable",
     microphoneStatus,
     refreshMicrophones,
+    recognitionProvider,
+    selectRecognitionProvider,
     retryASR,
     selectedMicrophoneId,
     selectMicrophone,

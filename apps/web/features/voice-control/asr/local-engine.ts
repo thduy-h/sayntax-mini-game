@@ -207,6 +207,7 @@ export class ServerASREngine implements ASREngine {
           try {
             response = await fetch("/api/asr/transcribe", {
               body: form,
+              headers: { "X-ASR-Provider": "groq" },
               method: "POST",
               signal: this.controller.signal,
             });

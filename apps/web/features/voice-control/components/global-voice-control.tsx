@@ -429,6 +429,26 @@ export function GlobalVoiceControl() {
             </Button>
           </div>
 
+          <div className="mt-3 space-y-2">
+            <label htmlFor={`${uniqueId}-provider`} className="block text-xs font-bold">Nhận dạng giọng nói</label>
+            <select
+              id={`${uniqueId}-provider`}
+              value={speech.recognitionProvider}
+              disabled={speech.isListening || speech.isStarting}
+              onChange={(event) => void speech.selectRecognitionProvider(event.target.value as "browser" | "server")}
+              className="min-h-11 w-full rounded-xl border-2 border-black bg-white px-2 text-sm font-semibold focus-visible:outline-4 focus-visible:outline-[#0052cc]"
+            >
+              <option value="browser">1. Web Speech API (mặc định)</option>
+              <option value="server">2. Groq · Whisper</option>
+            </select>
+            <p className="text-xs leading-relaxed text-zinc-700">
+              {speech.recognitionProvider === "browser"
+                ? "Dùng dịch vụ nhận dạng của trình duyệt (Chrome hoặc Edge). Micro sử dụng thiết bị mặc định của trình duyệt."
+                : "Âm thanh được gửi qua máy chủ SAYNTAX tới Groq. Cần cấu hình Groq trên máy chủ; nếu dịch vụ gián đoạn, hệ thống thử nhận dạng bằng trình duyệt."}
+            </p>
+            <p className="text-xs text-zinc-700">Đang dùng: {speech.engineLabel}. Dừng micro trước khi đổi lựa chọn.</p>
+          </div>
+
           {/* Privacy Disclosure Warning (if unacknowledged) */}
           {!voicePrivacyAcknowledged && (
             <div className="mt-3 rounded-2xl border-2 border-black bg-[#fff6a8] p-3 text-xs shadow-[2px_2px_0_#121212]">
@@ -557,7 +577,7 @@ export function GlobalVoiceControl() {
               id={`${uniqueId}-mic-select`}
               aria-label="Chọn microphone để thu âm giọng nói"
               className="block w-full min-h-9 rounded-xl border-2 border-black bg-white px-2.5 py-1 text-xs font-semibold text-black focus-visible:outline-4 focus-visible:outline-[#0052cc]"
-              disabled={speech.isListening || speech.isStarting}
+              disabled={speech.recognitionProvider === "browser" || speech.isListening || speech.isStarting}
               onChange={(e) => speech.selectMicrophone(e.target.value)}
               onFocus={() => {
                 void speech.refreshMicrophones();

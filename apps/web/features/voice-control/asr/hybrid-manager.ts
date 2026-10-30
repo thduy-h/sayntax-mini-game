@@ -21,6 +21,7 @@ export class HybridASRManager {
   private engineType: ASREngineType = "unavailable";
   private serverEngine: ASREngine;
   private state: ASRState = "checking";
+  private preferredEngine: "browser" | "server" = "browser";
 
   constructor(options: HybridASRManagerOptions) {
     this.callbacks = options.callbacks;
@@ -32,25 +33,27 @@ export class HybridASRManager {
       ?? new ServerASREngine({ selectedDeviceId: options.selectedDeviceId }, serverCallbacks);
   }
 
-  async initialize() {
+  async initialize(preferredEngine = this.preferredEngine) {
+    this.preferredEngine = preferredEngine;
     this.setState("checking");
-    if (this.serverEngine.isSupported()) {
-      this.setActiveEngine("server");
-      this.setState("stopped");
-      return;
-    }
-    if (this.browserEngine.isSupported()) {
-      this.setActiveEngine("browser");
+    const engine = preferredEngine === "browser" ? this.browserEngine : this.serverEngine;
+    if (engine.isSupported()) {
+      this.setActiveEngine(preferredEngine);
       this.setState("stopped");
       return;
     }
     this.setActiveEngine("unavailable");
     this.callbacks.onError?.({
       code: "not_supported",
-      message: "Trình duyệt chưa hỗ trợ nhận dạng giọng nói. Em vẫn có thể dùng thanh Nhập lệnh.",
+      message: "Trình duyệt chưa hỗ trợ nhận dạng giọng nói. Bạn có thể chọn Groq hoặc kéo thả khối.",
       recoverable: false,
     });
     this.setState("unavailable");
+  }
+
+  async selectEngine(engine: "browser" | "server") {
+    await this.stop();
+    await this.initialize(engine);
   }
 
   async retryPrimary() {
@@ -78,6 +81,7 @@ export class HybridASRManager {
   private wrapCallbacks(engine: "server" | "browser"): ASREngineCallbacks {
     return {
       onError: (error) => {
+        if (this.activeEngine !== (engine === "server" ? this.serverEngine : this.browserEngine)) return;
         if (engine === "server" && shouldFallbackToBrowser(error)) {
           if (this.browserEngine.isSupported()) {
             this.setActiveEngine("browser");
@@ -93,12 +97,17 @@ export class HybridASRManager {
         this.callbacks.onError?.(error);
       },
       onFinalResult: (result) => {
-        if (result.engine === "cloud") this.publishEngine("cloud", "Nhận dạng giọng nói SAYNTAX");
+        if (this.activeEngine !== (engine === "server" ? this.serverEngine : this.browserEngine)) return;
+        if (result.engine === "cloud") this.publishEngine("cloud", "Groq · Whisper");
         if (result.engine === "local") this.publishEngine("local", "Nhận dạng giọng nói SAYNTAX");
         this.callbacks.onFinalResult?.(result);
       },
-      onInterimResult: this.callbacks.onInterimResult,
-      onStateChange: (state) => this.setState(state),
+      onInterimResult: (text) => {
+        if (this.activeEngine === (engine === "server" ? this.serverEngine : this.browserEngine)) this.callbacks.onInterimResult?.(text);
+      },
+      onStateChange: (state) => {
+        if (this.activeEngine === (engine === "server" ? this.serverEngine : this.browserEngine)) this.setState(state);
+      },
     };
   }
 
@@ -109,7 +118,7 @@ export class HybridASRManager {
 
   private setActiveEngine(type: "server" | "browser" | "unavailable") {
     this.activeEngine = type === "server" ? this.serverEngine : type === "browser" ? this.browserEngine : null;
-    const label = type === "server" ? "Nhận dạng giọng nói SAYNTAX" : type === "browser" ? "Nhận dạng của trình duyệt" : "Không khả dụng";
+    const label = type === "server" ? "Groq · Whisper" : type === "browser" ? "Nhận dạng của trình duyệt" : "Không khả dụng";
     this.publishEngine(type, label);
     logASR(`Selected engine: ${type}`);
   }

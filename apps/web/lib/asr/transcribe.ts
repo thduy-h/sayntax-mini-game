@@ -88,7 +88,10 @@ export async function handleASRTranscription(
   request: Request,
   options: { env?: Environment; fetch?: typeof fetch; now?: number } = {},
 ): Promise<Response> {
-  const config = readASRConfig(options.env);
+  const provider = request.headers.get("X-ASR-Provider");
+  if (provider && provider !== "groq") return json({ error: "Nhà cung cấp không hợp lệ." }, 400);
+  const env = options.env ?? process.env;
+  const config = readASRConfig(provider === "groq" ? { ...env, ASR_MODE: "cloud" } : env);
   if (!config) return json({ error: "ASR chưa được cấu hình.", fallback: true }, 503);
   if (config.mode === "cloud" && !config.groqApiKey) {
     return json({ error: "ASR cloud chưa được cấu hình.", fallback: true }, 503);

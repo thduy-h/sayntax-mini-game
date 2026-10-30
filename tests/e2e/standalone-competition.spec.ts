@@ -1,0 +1,35 @@
+import { expect, test } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+
+test("standalone reuses MC, team and presentation screens without backend calls", async ({page}, info) => {
+  const requests: string[] = [];
+  page.on('request', r => { if (r.url().includes('/functions/v1/')) requests.push(r.url()); });
+  await page.goto('/competition/preview');
+  await expect(page.getByText('STANDALONE · XEM THỬ GIAO DIỆN', {exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'Hiển thị Demo phiên 1',exact:true}).click();
+  await page.getByRole('button', {name:'Bắt đầu phiên 1',exact:true}).click();
+  await expect(page.getByText('STAGE_1_ACTIVE', {exact:true})).toBeVisible();
+  const directory = `artifacts/ui-review/standalone-${info.project.name}`;
+  await mkdir(directory, {recursive:true});
+  await page.screenshot({path:`${directory}/mc.png`, fullPage:true});
+  await page.getByRole('button', {name:'Màn hình đội',exact:true}).click();
+  await expect(page.getByRole('heading', {name:'Phiên 1 · Accessibility Unlock'})).toBeVisible();
+  await expect(page.getByRole('button', {name:'Bắt đầu phiên 1',exact:true})).toHaveCount(0);
+  await page.screenshot({path:`${directory}/team.png`, fullPage:true});
+  await page.getByRole('button', {name:'Màn hình trình chiếu',exact:true}).click();
+  await expect(page.getByText('PHIÊN 1 · THỬ THÁCH 1/6 · CHỈ XEM')).toBeVisible();
+  await page.screenshot({path:`${directory}/presentation.png`, fullPage:true});
+  await page.getByRole('button', {name:'Màn hình MC',exact:true}).click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', {name:'Chốt phiên 1',exact:true}).click();
+  await page.getByRole('button', {name:'Hiển thị Demo phiên 2',exact:true}).click();
+  await page.getByRole('button', {name:'Bắt đầu phiên 2',exact:true}).click();
+  await page.getByRole('button', {name:'Màn hình đội',exact:true}).click();
+  await expect(page.getByRole('heading', {name:'Phiên 2 · Robot Commands'})).toBeVisible();
+  await expect(page.getByRole('grid')).toBeVisible();
+  await page.screenshot({path:`${directory}/robot.png`, fullPage:true});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(requests).toEqual([]);
+  await page.reload();
+  await expect(page.getByText('NOT_STARTED', {exact:true})).toBeVisible();
+});

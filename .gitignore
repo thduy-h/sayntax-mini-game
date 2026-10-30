@@ -23,3 +23,9 @@ tsconfig.tsbuildinfo
 supabase/.temp/
 
 .vercel
+test-results/
+playwright-report/
+
+# Local seeded browser review artifacts (regenerate via Playwright).
+artifacts/ui-review/
+.local-audit/

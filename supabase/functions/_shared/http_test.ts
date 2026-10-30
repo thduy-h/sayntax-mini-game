@@ -1,0 +1,4 @@
+import { assertEquals, assertThrows } from "jsr:@std/assert@1";
+import { allowedOrigin, corsHeaders } from "./http.ts";
+Deno.test("CORS accepts only the configured exact origin", { permissions: { env: true } }, () => { Deno.env.set("ARENA_ALLOWED_ORIGIN", "https://arena.sayntax.vn"); const allowed = new Request("https://edge.test", { headers: { origin: "https://arena.sayntax.vn" } }); assertEquals(allowedOrigin(allowed), "https://arena.sayntax.vn"); assertEquals(corsHeaders(allowed)["access-control-allow-origin"], "https://arena.sayntax.vn"); const denied = new Request("https://edge.test", { headers: { origin: "https://evil.example" } }); assertThrows(() => allowedOrigin(denied), Error, "origin_forbidden"); });
+Deno.test("CORS fails closed without configuration", { permissions: { env: true } }, () => { Deno.env.delete("ARENA_ALLOWED_ORIGIN"); assertThrows(() => allowedOrigin(new Request("https://edge.test")), Error, "server_origin_not_configured"); });

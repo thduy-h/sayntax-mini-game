@@ -1,26 +1,35 @@
-# SAYNTAX deployment
+# Deployment
 
-Use separate Supabase projects and Vercel Preview/Production environments. GitHub connects to Vercel with **Root Directory = repository root**, Node.js **22**, npm **10.9.9 or 11**, `npm ci`, `npm run build --workspace @shecancode/web`, and output `apps/web/.next` (already in `vercel.json`). Keep the project Root Directory at the repository root so npm can install local workspaces. Next.js uses its default `.next` output.
+## Competition V2 — current local candidate (2026-10-30)
 
-Set the variables in [`.env.example`](../.env.example) in the matching Vercel environment. `NEXT_PUBLIC_SITE_URL` is that deployment's HTTPS origin and must also be allowed as the Supabase Auth redirect `/auth/callback`. `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are client values. `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_ALLOWLIST_EMAILS`, and all Groq/ASR values are server values. Do not set local ASR variables in Vercel. Never commit pulled env files.
+The V2 deployment procedure below supersedes historical baseline-only instructions. No automatic push/publish. Keep verify_jwt=true and existing exact-origin CORS. Approved migration precedes seven redeploys and frontend publication. Hosted eight-team verification is required before production GO.
 
-## Staging
+[Competition V2 guide](competition-v2.md) contains the authoritative architecture, scoring, deployment gates, rollback and rehearsal instructions. Historical audit entries below describe earlier candidates.
 
-1. Create a staging Supabase project; configure its Auth site URL and redirect URL.
-2. From the repo root, with Supabase CLI credentials for **staging**: `supabase link --project-ref <staging-project-ref>` then `supabase db push --include-seed`. Confirm the linked project before pushing. Migrations run in timestamp order: initial schema, then V2 progress. Seed adds course, V1 reference content, five V2 lesson references with 25 steps, and role models; existing IDs are untouched on rerun. Do not use `db reset` on a remote project.
-3. Set staging values from `.env.example` in Vercel **Preview**. Pull them to an ignored local file and run `DEPLOY_ENV_FILE=.env.staging.local npm run check:staging-env` (for example, `vercel env pull .env.staging.local --environment=preview`).
-4. Deploy the GitHub branch to Vercel Preview.
-5. Run `check:staging-env` against the pulled Preview env after any env change.
-6. Run `SMOKE_BASE_URL=https://<staging-host> npm run smoke` with and without a student auth cookie; verify `/api/health` returns `{"status":"ok"}`, all five lessons, persistence after reload, student/admin isolation, cross-user denial, and admin KPI counts.
-7. With a short Vietnamese audio file and a staging Groq key, run `ASR_MODE=cloud SMOKE_BASE_URL=https://<staging-host> ASR_AUDIO_FILE=<file> npm run smoke:asr`; check text fallback manually. This live call incurs provider usage.
-8. Run `LOAD_BASE_URL=https://<staging-host> LOAD_CONCURRENCY=60 npm run load:smoke`; review success rate, latency, and critical 5xx.
+Cloudflare Pages uses build command `npm run build`, output directory `dist`, and Node 22. Set only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`; never place a service-role key in the browser build. `public/_redirects` supports direct join URLs without router port forwarding.
 
-## Production
+The workshop backend consists of the reviewed `arena` schema migration and seven `arena-*` Edge Functions. Follow `docs/shared-supabase-migration.md` for the migration-history safety gate, exact function deployment command, exact-origin CORS secret, API schema setting, verification queries, and rollback procedure. Run the full staging rehearsal before enabling a production workshop.
 
-1. Confirm all staging checks and the 60 concurrent smoke are acceptable.
-2. Create a separate production Supabase project. Set production Auth URLs and Vercel **Production** values from `.env.example`. Pull and validate: `vercel env pull .env.production.local --environment=production` then `DEPLOY_ENV_FILE=.env.production.local npm run check:production-env`.
-3. With credentials for **production**, verify the project ref, then run `supabase link --project-ref <production-project-ref>` and `supabase db push --include-seed`. Never run a remote database reset.
-4. Deploy the approved GitHub commit to Vercel Production.
-5. Run public, authenticated, access-control, persistence, ASR, and text-fallback smoke checks as above; inspect logs for critical 5xx.
-6. Attach the production domain, update `NEXT_PUBLIC_SITE_URL` and Supabase Auth redirect URL to that domain, redeploy, and repeat smoke checks.
-7. Accept only when: build passes; five lessons are reachable; authenticated persistence works and survives reload; students cannot access admin; cross-user access is denied; admin KPI counts are correct; real Groq ASR and text fallback work; staging 60 concurrent smoke is acceptable; no critical 5xx remain.
+## Vercel SPA routing
+
+Deploy the repository root as a Vite application: install `npm ci`, build `npm run build`, output `dist`. The root `vercel.json` declares these settings and rewrites nested URLs to `/index.html`. Existing static assets are served by Vercel's filesystem handling. `public/_redirects` applies to Cloudflare Pages; Vercel uses `vercel.json` instead. No Next.js workspace build/output setting should override this Vite configuration.
+
+React uses state-based views, with an explicit startup handler for `/join/:roomCode`; it does not require a router package. Direct navigation and refresh enter the player form, prefill the room code, then call the existing `arena-join-room` function only after a player submits a team name. A successful join canonicalizes the path and persists the existing session identity for refresh. QR, displayed URL and clipboard share the same validated `window.location.origin` URL; Supabase's origin is never used as the frontend join origin. This supports both the Vercel domain and a custom frontend domain.
+
+Room codes follow the database contract: six A–Z/2–9 characters, normalized to uppercase. `/join/ABC123` opens the application with a recoverable validation message because `1` is outside that alphabet. Use a real generated code such as `ABC234` to test a successful join. Missing/malformed codes can be corrected in the same form. Full rooms show an eight-team error. The unchanged backend groups missing, expired and locked/closed rooms under `not_found`; the UI explains all three possibilities and directs the player to the MC. The client cannot determine which state caused that response without changing the backend contract.
+
+Local verification:
+
+```bash
+npm run lint
+npm test
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+For an existing system Chromium/Edge installation, set `PLAYWRIGHT_EXECUTABLE_PATH` to its executable. Playwright builds production assets with synthetic Supabase configuration and serves them through Vite preview; tests run desktop and 390×844 touch/mobile viewports, including direct links, refresh, QR bitmap contents, clipboard, API request bodies, session recovery and denial messages. Backend responses are mocked, with no production room/team writes. Unit tests validate the Vercel rewrite configuration; local preview is not the Vercel edge runtime.
+
+After an authorized frontend deployment, verify `/`, the MC dashboard and a copied real `/join/:roomCode` link directly in a new mobile session, then refresh and join. Verify assets return their normal content types and the existing Supabase request succeeds. No Vercel deployment, project-setting change or Supabase backend change is performed by these local checks.
+
+Join-routing verification on 2026-10-30: TypeScript/lint passed; 14 Vitest tests passed; 22 Playwright tests passed across desktop/mobile against the local production build with mocked Edge responses; production build and whitespace checks passed. The mobile join screen was also inspected visually. Supabase source/SQL files were verified byte-identical to the published checkpoint. This evidence does not claim the revised fallback is already deployed on Vercel or that new production room writes were tested.

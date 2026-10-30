@@ -1,25 +1,17 @@
 # Architecture
 
-## Monorepo
+## Competition V3 — local correction (2026-10-31)
 
-- `apps/web`: Next.js App Router application
-- `packages/ui`: shared UI primitives
-- `packages/shared-types`: domain and API types
-- `packages/voice-parser`: browser transcript normalization and parsing logic
-- `packages/block-engine`: workspace state helpers and execution engine
-- `packages/lesson-engine`: lesson progression and completion logic
-- `supabase/`: SQL migrations and seed data
-- `docs/`: product, flow, and API reference
+V3 extends existing competition_stages.active_index with current-item timestamps, no duplicate challenge tables. A shared demo selector and canonical Stage1 join-code alias sit above the unchanged two internal rooms. State and atomic submission RPCs enforce the same current item for every role.
 
-## Runtime Design
+Current operation/security/deployment gate: [V3 guide](competition-v3.md). V2 sections below describe the prior release.
 
-- Next.js handles the web UI, server actions, and route handlers
-- Supabase provides auth, database access, and storage
-- Blockly runs client-side in the lesson workspace
-- Web Speech API runs in the browser and feeds the rule-based parser
-- Shared packages isolate core logic from the web app
+## Competition V2 — current local candidate (2026-10-30)
 
-## Future Extension
+V2 adds a competition domain above the existing rooms, two independent stage rooms and stable competition_team_id. The deployed baseline migration is unchanged. See the V2 guide for lock ordering, invoker-only RPC dispatch, capabilities and immutable snapshots.
 
-The current B-lite structure keeps domain logic out of UI files so an `apps/api` service can be introduced later without rewriting lesson, block, or voice logic.
+[Competition V2 guide](competition-v2.md) contains the authoritative architecture, scoring, deployment gates, rollback and rehearsal instructions. Historical audit entries below describe earlier candidates.
 
+The Vite entrypoint composes `App` and feature views. Pure game rules live in `src/lib/gameLogic.ts`; React components consume deterministic traces from `runRobot`. Accessibility content is structured data with safe preview metadata. Supabase is an optional adapter: empty credentials always select standalone mode.
+
+Robot levels are validated at module load with BFS over `(x, y, direction)`. Turns cost one command. Procedural maps use a seeded PRNG and a bounded 80-attempt loop.

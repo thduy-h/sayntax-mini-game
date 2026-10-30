@@ -1,0 +1,1 @@
+export function tokenIsValid(record: { hash: string; expiresAt: string; revokedAt?: string | null }, presentedHash: string, now = new Date()) { return record.hash === presentedHash && !record.revokedAt && new Date(record.expiresAt) > now; }

@@ -1,0 +1,4 @@
+import { createClient } from "npm:@supabase/supabase-js@2.99.0";
+export function admin() { const url = Deno.env.get("SUPABASE_URL"); const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"); if (!url || !key) throw new Error("server_supabase_not_configured"); return createClient(url, key, { db: { schema: "arena" }, auth: { autoRefreshToken: false, persistSession: false } }); }
+export async function sha256(value: string): Promise<string> { const bytes = new TextEncoder().encode(value); const digest = await crypto.subtle.digest("SHA-256", bytes); return [...new Uint8Array(digest)].map((x) => x.toString(16).padStart(2, "0")).join(""); }
+export function token(request: Request, header: string): string { const value = request.headers.get(header); if (!value || value.length < 16 || value.length > 200) throw new Error("missing_token"); return value; }

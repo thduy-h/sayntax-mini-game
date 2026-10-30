@@ -1,0 +1,16 @@
+project_id = "sayntax-arena-local"
+
+[functions.arena-create-room]
+verify_jwt = true
+[functions.arena-join-room]
+verify_jwt = true
+[functions.arena-manage-room]
+verify_jwt = true
+[functions.arena-start-round]
+verify_jwt = true
+[functions.arena-submit-accessibility]
+verify_jwt = true
+[functions.arena-submit-robot]
+verify_jwt = true
+[functions.arena-get-state]
+verify_jwt = true

@@ -1,28 +1,40 @@
 {
-  "name": "shecancode-voice",
-  "version": "0.1.0",
+  "name": "sayntax-game-arena",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "version": "1.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "npm run dev --workspace @shecancode/web",
-    "build": "npm run build --workspace @shecancode/web",
-    "lint": "npm run lint --workspace @shecancode/web",
-    "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present && node --import tsx apps/web/lib/operations/operations.test.ts && node --import tsx scripts/lesson-seed-mapping.test.ts",
-    "check:staging-env": "node scripts/staging-config-check.mjs",
-    "check:production-env": "node scripts/staging-config-check.mjs production",
-    "smoke": "node scripts/release-smoke.mjs",
-    "smoke:asr": "node scripts/asr-smoke.mjs",
-    "load:smoke": "node scripts/load-smoke.mjs"
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run src/lib/*.test.ts",
+    "lint": "tsc --noEmit",
+    "test:e2e": "playwright test",
+    "test:edge": "npx --yes deno test --node-modules-dir=none --allow-env supabase/functions/_shared/*_test.ts",
+    "test:migration": "nix shell nixpkgs#postgresql_16 -c bash scripts/test-arena-migration.sh",
+    "test:transactions": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-transactions.sh",
+    "test:competition:v3": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-competition-v3.sh",
+    "test:competition": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-competition.sh"
   },
-  "engines": {
-    "node": ">=22.0.0",
-    "npm": ">=10.9.9 <12"
+  "dependencies": {
+    "@supabase/supabase-js": "^2.99.0",
+    "lucide-react": "^0.468.0",
+    "motion": "^12.23.24",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
-    "tsx": "^4.19.2"
+    "@playwright/test": "^1.64.1",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.4.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^5.0.5"
   }
 }

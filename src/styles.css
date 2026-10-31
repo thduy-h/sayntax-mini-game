@@ -4798,3 +4798,48 @@ select:focus-visible {
   gap: 10px;
 }
 
+
+/* V5 live teaching, verified scores and manually paced award ceremony. */
+.live-demo-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.live-demo-grid > *, .live-demo-queue, .score-level { min-width: 0; }
+.live-demo-queue { border: 2px solid currentColor; padding: 16px; }
+.live-demo-queue ol { list-style: none; padding: 0; margin: 0; max-height: 360px; overflow: auto; }
+.live-demo-queue li { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 44px; padding: 8px; border-bottom: 1px solid #6668; overflow-wrap: anywhere; }
+.live-demo-queue li.current-command { background: #b7f5d0; color: #101c27; font-weight: 800; outline: 2px solid currentColor; outline-offset: -2px; }
+.queue-edit { display: flex; flex-shrink: 0; gap: 4px; }
+.queue-edit button { min-width: 44px; min-height: 44px; border: 1px solid currentColor; background: transparent; color: inherit; }
+.robot-official-scoring { border: 2px solid currentColor; padding: 16px; margin-block: 20px; }
+.robot-official-scoring .button { margin: 6px 8px 6px 0; }
+.score-breakdown { border: 2px solid currentColor; padding: 18px; margin-block: 20px; overflow-wrap: anywhere; }
+.score-breakdown summary { cursor: pointer; font-weight: 800; font-size: 1.15rem; min-height: 44px; }
+.score-level-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.score-level { border-top: 3px solid currentColor; padding-block: 8px; }
+.score-level dl { margin: 0; }
+.score-level dl > div { display: flex; gap: 12px; justify-content: space-between; padding-block: 6px; border-bottom: 1px solid #8885; }
+.score-level dt { flex: 1; }
+.score-level dd { margin: 0; text-align: right; font-weight: 700; }
+.award-ceremony { background: #060b19; color: #f5f2e8; border: 3px solid #b7f5d0; padding: clamp(22px, 4vw, 64px); min-height: 70vh; overflow-wrap: anywhere; }
+.award-ceremony h1 { font-size: clamp(2rem, 4.6vw, 4.5rem); line-height: 1.08; max-width: 18ch; margin-block: 24px; color: #f5f2e8; }
+.ceremony-kicker, .champion-mark { color: #b7f5d0; }
+.champion-announcement { border-block: 3px solid #b7f5d0; padding-block: 24px; margin-block: 24px; }
+.champion-announcement h2 { font-size: clamp(2rem, 4vw, 4rem); line-height: 1.1; color: #b7f5d0; }
+.champion-mark { font-size: 2.5rem; }
+.champion-score { font-size: clamp(3rem, 6vw, 6rem); font-variant-numeric: tabular-nums; }
+.champion-score small { font-size: .3em; }
+.ceremony-ranking { list-style: none; padding: 0; }
+.ceremony-ranking li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) minmax(0, 1.5fr) auto; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid #f5f2e844; }
+.ceremony-ranking li > * { min-width: 0; }
+.ceremony-ranking li b { font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) {
+  .live-demo-grid, .score-level-list { grid-template-columns: minmax(0, 1fr); }
+  .live-demo-queue { padding: 10px; }
+  .ceremony-ranking li { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .ceremony-ranking li > span:nth-of-type(2) { grid-column: 2; font-size: .85rem; }
+  .ceremony-ranking li b { grid-column: 3; grid-row: 1 / 3; }
+  .award-ceremony { padding: 20px 14px; }
+  .robot-official-scoring .button { width: 100%; margin-inline: 0; white-space: normal; }
+}
+@media (prefers-reduced-motion: reduce) { .award-ceremony *, .live-robot-demo * { animation: none !important; transition: none !important; } }
+.award-ceremony > .eyebrow,
+.award-ceremony .score-breakdown h3,
+.award-ceremony .score-breakdown h4 { color: #b7f5d0; }

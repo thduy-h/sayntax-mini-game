@@ -14,7 +14,9 @@
     "test:migration": "nix shell nixpkgs#postgresql_16 -c bash scripts/test-arena-migration.sh",
     "test:transactions": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-transactions.sh",
     "test:competition:v3": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-competition-v3.sh",
-    "test:competition": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-competition.sh"
+    "test:competition": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-competition.sh",
+    "typecheck": "tsc -b --pretty false",
+    "test:competition:v5": "nix shell nixpkgs#postgresql_17 -c bash scripts/test-arena-transactions.sh --competition-v5"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.0",

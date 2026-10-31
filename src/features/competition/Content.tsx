@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Command, MapDefinition, Question } from "./types";
+import type { Command, MapDefinition, Question, RobotLevelSummary } from "./types";
 import { simulate } from "./robotEngine";
 import { AccessibilityChallengeVisual } from "../../components/AccessibilityChallengeVisual";
 
@@ -212,16 +212,22 @@ export function RobotPlayer({
   busy,
   score,
   demo = false,
+  level,
+  strategic = false,
 }: {
   demo?: boolean;
+  level?: RobotLevelSummary;
+  strategic?: boolean;
   map: MapDefinition;
-  onSubmit: (commands: Command[]) => Promise<void>;
+  onSubmit: (commands: Command[], optimization?: boolean) => Promise<void>;
   busy: boolean;
   score?: number | null;
 }) {
+  const [optimizing, setOptimizing] = useState(false);
   const [commands, setCommands] = useState<Command[]>([]),
     [step, setStep] = useState(0),
     [running, setRunning] = useState(false);
+  useEffect(() => { setOptimizing(false); }, [level?.officialRuns]);
   const trace = useMemo(() => simulate(map, commands), [map, commands]);
   const current = trace[Math.min(step, trace.length - 1)];
   useEffect(() => {
@@ -243,8 +249,8 @@ export function RobotPlayer({
       <p>
         {demo
           ? "Luyện tập · 0 XP thi đấu"
-          : `Điểm tốt nhất đã xác minh: ${score ?? 0}/100`}{" "}
-        · Tối đa 24 lệnh · Có thể thử lại.
+          : strategic ? `Điểm chính thức: ${level?.finalScore ?? 0}/100 · ${level?.officialRuns ?? 0} lượt chạy` : `Điểm tốt nhất đã xác minh: ${score ?? 0}/100`}{" "}
+        · Tối đa 24 lệnh · Chỉnh sửa và debug từng bước không mất điểm.
       </p>
       <RobotMap map={map} position={current} direction={current.direction} />
       <p role="status">
@@ -272,7 +278,7 @@ export function RobotPlayer({
         ))}
       </div>
       <div className="competition-actions">
-        <button
+        {!strategic && <button
           className="button button-primary"
           disabled={!commands.length || busy}
           onClick={() => {
@@ -281,7 +287,7 @@ export function RobotPlayer({
           }}
         >
           {running ? "Tạm dừng" : "Chạy thử / Tiếp tục"}
-        </button>
+        </button>}
         <button
           className="button button-ghost"
           disabled={running || busy || step >= trace.length - 1}
@@ -314,16 +320,28 @@ export function RobotPlayer({
           Xóa hết
         </button>
       </div>
-      <button
+      {strategic ? <section className="robot-official-scoring" aria-label="Điểm Robot chính thức">
+        <p><strong>{level?.finalScore ?? 0}/100</strong> · Điểm nền {level?.bestBaseScore ?? 0} − phí tối ưu {level?.penalty ?? 0}</p>
+        {level?.successful && <>
+          <p>Lời giải đầu: {level.firstCommands} lệnh · Tốt nhất: {level.bestCommands} lệnh · Tối ưu lại {level.optimizationAttempts}/2 lượt.</p>
+          {level.isOptimal ? <p>Đã đạt lời giải tối ưu. Giữ kết quả, không cần trả phí tối ưu thêm.</p>
+            : <button className="button button-ghost" disabled={busy || running || level.optimizationAttempts >= 2 || optimizing} onClick={() => setOptimizing(true)}>Tối ưu lại</button>}
+          {optimizing && <p role="alert">Lượt chạy chính thức tiếp theo trừ 5 điểm, kể cả thất bại. Chỉ chỉnh sửa không mất điểm.</p>}
+        </>}
+        <button className="button button-primary" disabled={busy || running || !commands.length || Boolean(level?.successful && !optimizing)} onClick={() => {
+          setStep(0); setRunning(true);
+          void onSubmit(commands, Boolean(level?.successful && optimizing));
+        }}>{level?.successful ? "Chạy tối ưu chính thức (−5 điểm)" : "Chạy chính thức"}</button>
+        {optimizing && <button className="button button-ghost" disabled={busy || running} onClick={() => setOptimizing(false)}>Giữ lời giải hiện tại</button>}
+      </section> : <button
         className="button button-primary"
         disabled={busy || running || !current.goal}
         onClick={() => void onSubmit(commands)}
-      >
-        {demo ? "So sánh lời giải demo" : "Gửi chương trình"}
-      </button>
+      >{demo ? "So sánh lời giải demo" : "Gửi chương trình"}</button>}
       <p>
         {demo
           ? "Demo chỉ chạy trên thiết bị, không gửi bài và không có điểm thi đấu. Tới đích rồi bấm So sánh lời giải demo để xem cách tối ưu."
+          : strategic ? "Điểm nền hoàn thành 60–100: mỗi lệnh dư trừ 8. Sau thành công đầu tiên, tối đa 2 lượt tối ưu, mỗi lượt trừ 5 kể cả thất bại; điểm cuối có thể còn 50. Thất bại trước thành công đầu không trừ điểm. Không thưởng tốc độ."
           : "Đạt đích: ít nhất 60 điểm; mỗi lệnh dư trừ 8 điểm; tối đa 100. Không có điểm tốc độ. Lời giải mẫu chỉ mở sau khi chốt phiên."}
       </p>
     </article>

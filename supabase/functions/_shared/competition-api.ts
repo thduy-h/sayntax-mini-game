@@ -24,6 +24,8 @@ const safeErrors = [
   "stage_closed",
   "configuration_frozen",
   "invalid_transition",
+  "stale_demo_version",
+  "ceremony_required",
   "no_teams",
   "tie_unresolved",
   "tie_answers_pending",
@@ -205,7 +207,7 @@ export async function competitionControl(
   start = false,
 ) {
   const hash = await sha256(token(request, "x-mc-token"));
-  await rateLimit(admin(), `competition-manage:${hash}`, 90, 60);
+  await rateLimit(admin(), `competition-manage:${hash}`, 180, 60);
   const action = start
     ? "start_stage"
     : requireString(input.action, "action", 40);
@@ -228,10 +230,14 @@ export async function competitionControl(
     p_action: action,
     p_stage: stageNo,
     p_config:
-      action === "configure" ? competitionConfig(stageNo!, input.config)
+      action === "configure" ? competitionConfig(stageNo!, input.config, true)
       : action === "set_a11y_view" ? {
         viewMode: requireString(input.viewMode, "view_mode", 6),
         viewScope: requireString(input.viewScope, "view_scope", 200),
+      } : action === "robot_demo" ? demoControl(input.demo)
+      : action === "ceremony" ? {
+        phase: requireString(input.phase, "phase", 20),
+        expectedPhase: requireString(input.expectedPhase, "phase", 20),
       } : null,
     p_index: ["challenge", "advance_challenge", "close_challenge"].includes(
       action,
@@ -274,14 +280,14 @@ export async function competitionState(
     await rateLimit(
       admin(),
       `competition-presentation:${hash}:${clientAddress(request)}`,
-      300,
+      900,
       60,
     );
   }
   await rateLimit(
     admin(),
     `competition-state:${hash}`,
-    role === "presentation" ? 600 : 60,
+    role === "presentation" ? 900 : 120,
     60,
   );
   const state = await rpc("competition_state", {
@@ -302,6 +308,10 @@ export async function competitionState(
                 optimalCommands: shortestCommands(ROBOT_LEVELS[levelId]),
               }));
       }
+  for (const explanation of state.scoreExplanations ?? [])
+    for (const level of explanation.robot ?? [])
+      if (level.optimalCommands == null && Object.hasOwn(ROBOT_LEVELS, level.itemId))
+        level.optimalCommands = shortestCommands(ROBOT_LEVELS[level.itemId]).length;
   if (state.tie?.active) state.tie.challenge = tieQuestion(state.tie.attempt);
   return json(state);
 }
@@ -310,7 +320,7 @@ export function verifyCompetitionSubmission(
   input: Record<string, unknown>,
   round: { content_version: string; config: Record<string, unknown> },
 ) {
-  if (round.content_version !== COMPETITION_VERSION)
+  if (![COMPETITION_VERSION, "competition-v5-1"].includes(round.content_version))
     throw new Error("round_content_mismatch");
   const item = requireString(input.itemId, "item_id", 40);
   const ids =
@@ -325,11 +335,16 @@ export function verifyCompetitionSubmission(
       payload: { answerId },
     };
   }
+  if (round.content_version === "competition-v5-1" && (!Array.isArray(input.commands) || input.commands.length === 0)) throw new Error("invalid_commands");
   const r = competitionRobotScore(item, input.commands);
   return {
     successful: r.successful,
     score: r.score,
-    payload: { commands: input.commands },
+    payload: round.content_version === "competition-v5-1" ? {
+      commands: input.commands,
+      optimization: input.optimization === true,
+      verification: { commandsUsed: r.executed, optimalCommands: r.optimalCommands },
+    } : { commands: input.commands },
   };
 }
 export async function submitTie(
@@ -349,4 +364,14 @@ export async function submitTie(
     p_attempt: attempt,
   });
   return json(result);
+}
+
+function demoControl(value: unknown) {
+  if (!value || typeof value !== "object") throw new Error("invalid_demo");
+  const input = value as Record<string, unknown>;
+  const version = input.version;
+  if (!Number.isSafeInteger(version) || Number(version) < 0) throw new Error("invalid_demo_version");
+  const op = requireString(input.op, "demo_action", 12);
+  if (!["queue", "run", "resume", "pause", "step", "reset", "explain"].includes(op)) throw new Error("invalid_demo_action");
+  return { version, op, ...(op === "queue" ? { commands: input.commands } : {}) };
 }

@@ -20,7 +20,7 @@ export async function submit(request: Request, game: "accessibility" | "robot") 
   if (!team || team.join_token_hash !== hash) throw new Error("forbidden");
   const { data: round } = await db.from("rounds").select("room_id,game,config,content_version").eq("id", roundId).single();
   if (!round || round.room_id !== team.room_id || round.game !== game) throw new Error("round_not_running");
-  const verified = round.content_version==="competition-v2-1" ? verifyCompetitionSubmission(game,input,round) : verifySubmission(game, input, round);
+  const verified = ["competition-v2-1","competition-v5-1"].includes(round.content_version) ? verifyCompetitionSubmission(game,input,round) : verifySubmission(game, input, round);
   const { data: result, error } = await db.rpc("process_submission", {
     p_round_id: roundId, p_team_id: teamId, p_token_hash: hash, p_game: game,
     p_item_id: itemId, p_idempotency_key: key, p_payload: verified.payload,
@@ -28,7 +28,7 @@ export async function submit(request: Request, game: "accessibility" | "robot") 
     p_content_version: round.content_version, p_config: round.config,
   });
   if (error || !result) {
-    const safe = ["forbidden", "round_not_running", "round_content_mismatch", "item_not_in_round", "invalid_idempotency_reuse", "invalid_verified_submission","stage_closed"];
+    const safe = ["forbidden", "round_not_running", "round_content_mismatch", "item_not_in_round", "invalid_idempotency_reuse", "invalid_verified_submission","stage_closed","inactive_challenge","optimization_required","optimization_limit","already_optimal","invalid_optimization"];
     throw new Error(safe.find((code) => error?.message?.includes(code)) ?? "submission_failed");
   }
   return json(result, result.verified || result.accepted ? 200 : 422);

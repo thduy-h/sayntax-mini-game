@@ -10,4 +10,8 @@ unset PGSERVICE PGSERVICEFILE PGPASSFILE
 export PGOPTIONS='-c statement_timeout=15000 -c lock_timeout=10000'
 pg_ctl -D "$ARENA_PG_ROOT/cluster" -o "-p $PGPORT -h 127.0.0.1 -k $ARENA_PG_ROOT" -l "$ARENA_PG_ROOT/postgres.log" start >/dev/null
 createdb "$PGDATABASE"
-python3 tests/database/transactions.py "$@"
+if [[ "${1:-}" == "--v5-focused" ]]; then
+ python3 -u tests/database/v5_harness.py
+else
+ python3 -u tests/database/transactions.py "$@"
+fi

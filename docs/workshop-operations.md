@@ -1,5 +1,7 @@
 # Hướng dẫn MC
 
+> 2026-11-01 V5 update: V5 keeps the projector open throughout: MC live demo, two independent official stages, then private results until the manually operated end-of-workshop ceremony. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V2 — current local candidate (2026-10-30)
 
 Use the Vietnamese eight-team procedure below: Workshop1 → Accessibility10 minutes → provisional → Workshop2 (browsers may close) → restore same teams → Robot15 minutes → finalized results/tie resolution → one winner. Keep the MC browser session and save team recovery cards.

@@ -1,5 +1,7 @@
 # Shared Supabase architecture
 
+> 2026-11-01 V5 update: New V5 competitions use canonical attempt-ledger optimization fees, versioned shared demo state and separate finalization/publication; legacy competitions retain their original rules. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V2 — current local candidate (2026-10-30)
 
 V2 is additive to the already-deployed Arena schema. Six competition tables and two foreign-key columns stay in arena. No main website objects or project settings change. Legacy room gameplay stays supported behind wrappers.

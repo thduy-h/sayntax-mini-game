@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Prompt, QuestionPlayer, RobotPlayer, MapPrompt } from "./Content";
-import type { Command, MapDefinition, Question } from "./types";
+import { LiveRobotDemo, type DemoOperation } from "./V5";
+import type { Command, MapDefinition, Question, RobotDemoState } from "./types";
 
 export const DEMO_QUESTION: Question = {
   id: "demo-contrast-button",
@@ -43,8 +44,14 @@ export function Demo({
   viewMode,
   onViewModeChange,
   onClose,
+  robotDemo,
+  onRobotDemo,
+  busy = false,
 }: {
   stage: number;
+  robotDemo?: RobotDemoState;
+  onRobotDemo?: (op: DemoOperation, commands?: Command[]) => void;
+  busy?: boolean;
   readOnly?: boolean;
   canControlViewMode?: boolean;
   viewMode?: "before" | "after";
@@ -154,7 +161,7 @@ export function Demo({
             Robot bắt đầu tại (0,2), nhìn sang Đông. Cờ tại (2,1); các khối đen
             là tường. Đi thẳng đổi ô; Rẽ trái/phải chỉ đổi hướng.
           </p>
-          {readOnly ? (
+          {robotDemo ? <LiveRobotDemo state={robotDemo} onAction={onRobotDemo} busy={busy} /> : readOnly ? (
             <MapPrompt map={DEMO_MAP} />
           ) : (
             <RobotPlayer
@@ -164,7 +171,7 @@ export function Demo({
               onSubmit={async () => setResult(true)}
             />
           )}
-          {(result || readOnly) && (
+          {!robotDemo && (result || readOnly) && (
             <p role="status">
               Lời giải demo tối ưu: Đi thẳng → Rẽ trái → Đi thẳng → Rẽ phải → Đi
               thẳng (5 lệnh). Thử thêm lệnh hoặc gặp tường để quan sát khác

@@ -1,5 +1,7 @@
 # Gameplay
 
+> 2026-11-01 V5 update: New V5 competitions use six Accessibility questions and four Robot levels, equal50/50 weighting and up to two explicit Robot optimizations at5 points each. Legacy/practice rules remain unchanged. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local correction (2026-10-31)
 
 V3 synchronizes the current question/map across MC, all teams and presentation. Teams cannot select challenges. MC opens a separate zero-score demo, starts the stage, then closes/advances each item. One persistent join QR covers both stages. Practice remains unchanged.

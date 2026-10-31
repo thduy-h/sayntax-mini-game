@@ -1,5 +1,7 @@
 # Release audit — current atomic submission candidate
 
+> 2026-11-01 V5 update: Latest V5 verdict is local verification passed / production NO-GO pending approved release and hosted rehearsal. Earlier audit conclusions below are historical. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local patch, production approval gate (2026-10-31)
 
 MC-authoritative challenge synchronization, dedicated zero-score demos and one persistent join QR are implemented locally. V1/V2 SQL unchanged; new V3 SHA-256 `40bb2fb472529aa968e0536e3ae6fa4494145d49110700350a92cc940fa07e0b`. Actual checks:32 Vitest,19 Deno,40 Playwright, seven Edge type checks, TypeScript, build, npm audit0, PostgreSQL16/17 concurrency/security/restore/rollback and20 inspected UI screenshots. Browser transport is mocked; database connections are real but disposable/local. No production action or push performed.

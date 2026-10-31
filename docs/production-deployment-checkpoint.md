@@ -1,5 +1,7 @@
 ## Pending cross-device BEFORE/AFTER patch (2026-11-01)
 
+> 2026-11-01 V5 update: V5 remains local-only. Use the isolated two-migration release bundle; do not apply older draft migrations or publish from this checkpoint. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 Implemented locally; production unchanged. See [display sync audit and deployment gate](a11y-display-sync.md). Requires one additive migration and a minimal arena-manage-room redeploy from the reviewed 4/3 bundle, followed by frontend release. Do not apply unrelated root V4/QR/state-projection drafts. New migration checksum: `37ff1dfc2603b88357255ab42bdc75e9459c4c299191a4d00e87996108febacb`.
 
 # Controlled production deployment checkpoint — 2026-10-30

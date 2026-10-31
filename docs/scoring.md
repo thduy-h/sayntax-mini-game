@@ -1,5 +1,7 @@
 # Scoring
 
+> 2026-11-01 V5 update: V5 changes Robot retry scoring and ranking only for newly created V5 competitions. The exact formula, base60 versus final50 floor, tie policy and canonical explanation are documented in the V5 review. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local correction (2026-10-31)
 
 V3 keeps100/50/0 Accessibility, highest verified Robot completion per map and equal50/50 normalization. Only the server-active open item can be submitted. Skipped/unanswered items count zero. Default150s/question and300s/map; overall10/15-minute limits remain. Demo makes no official submission and awards zero competition XP.

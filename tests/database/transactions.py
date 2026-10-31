@@ -328,12 +328,15 @@ print('PASS all local transaction integration assertions; no unresolved lock wai
 if '--competition' in sys.argv:
     exec((ROOT / 'tests/database/competition.py').read_text())
 
-if any(flag in sys.argv for flag in ['--competition-v3', '--state-projection', '--a11y-display']):
+if any(flag in sys.argv for flag in ['--competition-v3', '--state-projection', '--a11y-display', '--competition-v5']):
     exec((ROOT / 'tests/database/competition.py').read_text())
     exec((ROOT / 'tests/database/competition_v3.py').read_text())
 
 if '--state-projection' in sys.argv:
     exec((ROOT / 'tests/database/state_projection.py').read_text())
 
-if "--a11y-display" in sys.argv:
+if "--a11y-display" in sys.argv or "--competition-v5" in sys.argv:
     exec((ROOT / "tests/database/a11y_display.py").read_text())
+
+if "--competition-v5" in sys.argv:
+    exec((ROOT / "tests/database/competition_v5.py").read_text())

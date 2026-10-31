@@ -29,9 +29,9 @@ Deno.test(
       const cfg = competitionConfig(1, {
         scenarioIds: [
           id,
-          ...["contrast", "keyboard", "captions", "language"]
+          ...["contrast", "keyboard", "captions", "language", "touch", "color", "navigation"]
             .filter((x) => x !== id)
-            .slice(0, 3),
+            .slice(0, 5),
         ],
       });
       const q = cfg.questions![0];
@@ -54,7 +54,7 @@ Deno.test(
   },
 );
 Deno.test(
-  "frozen preset reproducible and limits exactly four questions / three curated maps",
+  "frozen preset reproducible and limits exactly six questions / four curated maps",
   () => {
     assertEquals(competitionConfig(1, {}), competitionConfig(1, {}));
     assertEquals(competitionConfig(2, {}), competitionConfig(2, {}));
@@ -63,7 +63,7 @@ Deno.test(
     const maps = competitionConfig(2, {}).maps!;
     assertEquals(
       maps.map((m) => m.id),
-      ["6", "4", "7"],
+      ["1", "2", "6", "4"],
     );
     for (const m of maps) {
       assert(!Object.hasOwn(m, "par"));
@@ -81,6 +81,7 @@ Deno.test(
         successful: true,
         score: 100,
         executed: path.length,
+        optimalCommands: path.length,
       });
       assertEquals(path.length, map.par);
     }
@@ -142,13 +143,14 @@ Deno.test(
       successful: true,
       score: 92,
       executed: 13,
+      optimalCommands: 12,
     });
   },
 );
 Deno.test(
   "submission ignores client XP, par and client map; validates frozen IDs/version",
   () => {
-    const config = competitionConfig(1, {});
+    const config = competitionConfig(1, { scenarioIds: ["contrast", "keyboard", "captions", "language", "color", "time"] });
     const result = verifyCompetitionSubmission(
       "accessibility",
       { itemId: "contrast", answerId: "o2", xp: 999 },
@@ -231,7 +233,7 @@ Deno.test(
         data = {
           room_id: "room",
           game: "accessibility",
-          config: competitionConfig(1, {}),
+          config: competitionConfig(1, { scenarioIds: ["contrast", "keyboard", "captions", "language", "color", "time"] }),
           content_version: "competition-v2-1",
         };
       else if (path.endsWith("/process_submission")) {
@@ -267,7 +269,7 @@ Deno.test(
       const write = calls.find((c) => c.path.endsWith("/process_submission"))!;
       assertEquals(write.payload.p_score, 100);
       assertEquals(write.payload.p_content_version, "competition-v2-1");
-      assertEquals(write.payload.p_config, competitionConfig(1, {}));
+      assertEquals(write.payload.p_config, competitionConfig(1, { scenarioIds: ["contrast", "keyboard", "captions", "language", "color", "time"] }));
       assertEquals(
         calls.filter((c) => c.path.includes("/rpc/")).map((c) => c.path),
         ["/rest/v1/rpc/consume_rate_limit", "/rest/v1/rpc/process_submission"],

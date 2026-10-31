@@ -1,5 +1,7 @@
 # Shared Supabase security — atomic submission release
 
+> 2026-11-01 V5 update: V5 retains invoker RPCs, fixed search paths and browser-role denial; unpublished ceremony results and demo mutations are enforced server-side. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local correction (2026-10-31)
 
 V3 retains SECURITY INVOKER, pg_catalog search paths, service-only RPC access, zero browser schema/table/RPC grants and JWT verification. Current item/open state/deadlines are rechecked after locks; MC progression has a compare-and-set index. Recovery rotates/revokes both room sessions; public code-resolution never creates teams. Spectators receive prompt/map and aggregate counts only.

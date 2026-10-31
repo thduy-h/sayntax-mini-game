@@ -31,6 +31,7 @@ import type {
 } from "./types";
 import { isCompetitionId } from "./contracts";
 import { Demo } from "./Demo";
+import { AwardCeremony, CeremonyControls, ScoreBreakdown } from "./V5";
 import { MapPrompt, Prompt, QuestionPlayer, RobotPlayer } from "./Content";
 import { resolveStageChallenge } from "./canonicalQuestions";
 
@@ -64,6 +65,11 @@ const labels = [
 ];
 const errors: Record<string, string> = {
   display_sync_unavailable: "Backend chưa hỗ trợ đồng bộ Trước/Sau giữa thiết bị. Cần áp dụng bản cập nhật đồng bộ hiển thị.",
+  stale_demo_version: "Demo vừa thay đổi từ phiên MC khác. Đã tải lại, hãy thực hiện lại thao tác.",
+  optimization_required: "Chọn Tối ưu lại để bắt đầu lượt chạy có phí sau thành công đầu tiên.",
+  optimization_limit: "Đã dùng hết hai lượt tối ưu cho cấp này.",
+  already_optimal: "Đã đạt lời giải tối ưu; không cần chạy có phí thêm.",
+  ceremony_required: "Dùng bảng điều khiển trao giải để công bố kết quả theo từng bước.",
   inactive_challenge:
     "Thử thách này đã đóng hoặc chưa được MC mở. Đang chờ thử thách hiện tại.",
   teams_pending:
@@ -133,15 +139,16 @@ function Deadline({
   );
 }
 export function Leaderboard({ state }: { state: CompetitionState }) {
-  const final = state.competition.status === "FINALIZED";
+  const final = state.competition.status === "FINALIZED" || state.resultsState === "RESULTS_READY";
   const winner = state.leaderboard?.find(
     (t) => t.teamId === state.competition.winnerTeamId,
   );
   return (
     <section className="panel competition-section">
       <h2>
-        {final
-          ? "Bảng xếp hạng CHÍNH THỨC"
+        {state.role === "mc" && state.resultsState === "RESULTS_READY"
+          ? "Kết quả đã chốt · RIÊNG MC · Chưa công bố"
+          : final ? "Bảng xếp hạng CHÍNH THỨC"
           : "Bảng xếp hạng TẠM THỜI · PROVISIONAL"}
       </h2>
       <p>
@@ -331,7 +338,7 @@ export default function CompetitionPortal({
     };
   }, [state?.competition?.id, competitionId]);
 
-  const activeDemoStage = state?.demoStage ?? localDemoStage;
+  const activeDemoStage = state?.rulesVersion === "v5" ? state.demoStage : state?.demoStage ?? localDemoStage;
 
   const [name, setName] = useState(""),
     [credential, setCredential] = useState(""),
@@ -420,6 +427,7 @@ export default function CompetitionPortal({
     if (!identity && !isPresentation) return;
     let disposed = false,
       running = false;
+    let pollInterval = 5000;
     let timer: number;
     const poll = async () => {
       if (disposed || running) return;
@@ -433,7 +441,8 @@ export default function CompetitionPortal({
         const next = await fetchState();
         if (!disposed && sequence === requestSequence.current && next) {
           setState(next);
-          setConnection("Đã kết nối · Cập nhật mỗi 5 giây");
+          pollInterval = next.demoStage === 2 && next.robotDemo ? 1000 : 5000;
+          setConnection(pollInterval === 1000 ? "Đã kết nối · Demo trực tiếp mỗi giây" : "Đã kết nối · Cập nhật mỗi 5 giây");
           setError(null);
         }
       } catch (e) {
@@ -445,7 +454,7 @@ export default function CompetitionPortal({
         }
       } finally {
         running = false;
-        if (!disposed) timer = window.setTimeout(() => void poll(), 5000);
+        if (!disposed) timer = window.setTimeout(() => void poll(), pollInterval);
       }
     };
     void poll();
@@ -580,18 +589,16 @@ export default function CompetitionPortal({
     );
     await refresh();
   };
-  const submitRobot = async (item: string, commands: Command[]) => {
+  const submitRobot = async (item: string, commands: Command[], optimization = false) => {
     if (!identity || !state) return;
     const stage = state.stages.find((s) => s.stageNo === 2);
     if (!stage?.roundId) return;
-    const digest = await crypto.subtle.digest(
-      "SHA-256",
-      new TextEncoder().encode(commands.join(",")),
-    );
-    const key = [...new Uint8Array(digest)]
-      .map((x) => x.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, 24);
+    const pendingKey = `arena-official-run:${stage.roundId}:${state.own?.teamId ?? identity.teamId}:${item}`;
+    const payload = JSON.stringify({ commands, optimization });
+    let pending: { payload: string; key: string } | null = null;
+    try { pending = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null"); } catch { /* regenerate invalid local retry cache */ }
+    const key = pending?.payload === payload ? pending.key : crypto.randomUUID();
+    sessionStorage.setItem(pendingKey, JSON.stringify({ payload, key }));
     await invokeArena(
       "arena-submit-robot",
       {
@@ -599,10 +606,12 @@ export default function CompetitionPortal({
         teamId: state.own?.teamId ?? identity.teamId,
         itemId: item,
         commands,
-        idempotencyKey: `${stage.roundId}:${state.own?.teamId ?? identity.teamId}:${item}:${key}`,
+        optimization,
+        idempotencyKey: key,
       },
       headers(identity),
     );
+    sessionStorage.removeItem(pendingKey);
     await refresh();
   };
   const submitTie = async (answer: string) => {
@@ -852,8 +861,12 @@ export default function CompetitionPortal({
                   stage={activeDemoStage}
                   canControlViewMode={true}
                   viewMode={a11yViewMode}
+                  robotDemo={state.robotDemo}
+                  busy={busy}
+                  onRobotDemo={(op, commands) => void run(() => control("robot_demo", { demo: { version: state.robotDemo?.version, op, commands } }))}
                   onViewModeChange={setA11yViewMode}
                   onClose={() => {
+                    if (state.rulesVersion === "v5") void run(() => control("end_demo"));
                     setLocalDemoStage(null);
                     try {
                       const compId = state.competition.id;
@@ -1001,7 +1014,7 @@ export default function CompetitionPortal({
           {state.role === "team" && (
             <>
               {activeDemoStage && (
-                <Demo key={activeDemoStage} stage={activeDemoStage} viewMode={a11yViewMode} />
+                <Demo key={activeDemoStage} stage={activeDemoStage} viewMode={a11yViewMode} robotDemo={state.robotDemo} />
               )}
               <section className="competition-section panel">
                 <h2>{state.own?.name}</h2>
@@ -1049,8 +1062,8 @@ export default function CompetitionPortal({
                 onAnswer={(item, answer) =>
                   run(() => submitAnswer(item, answer))
                 }
-                onRobot={(item, commands) =>
-                  run(() => submitRobot(item, commands))
+                onRobot={(item, commands, optimization) =>
+                  run(() => submitRobot(item, commands, optimization))
                 }
               />
             </>
@@ -1081,20 +1094,21 @@ export default function CompetitionPortal({
                   ) : null}
                 </section>
               )}
-              <Leaderboard state={state} />
+              <div className="competition-results" aria-label={state.role === "mc" ? "Kết quả riêng MC" : "Kết quả của đội"}>
+                <Leaderboard state={state} />
+                {state.scoreExplanations?.map(e => <ScoreBreakdown key={e.teamId} explanation={e} />)}
+              </div>
               {state.stages
                 .filter((s) => s.status === "finalized")
                 .map((s) => (
                   <Review key={s.stageNo} stage={s} />
                 ))}
               {state.role === "mc" &&
-                state.competition.status === "STAGE_2_FINALIZED" && (
+                (state.competition.status === "STAGE_2_FINALIZED" || (state.rulesVersion === "v5" && state.competition.status === "FINALIZED")) && (
                   <section className="competition-section panel">
                     <h2>Chốt kết quả chung cuộc</h2>
                     <p>
-                      Hòa điểm: xét số câu Accessibility đạt 100, rồi số màn
-                      Robot tối ưu. Nếu còn hòa, dùng sudden death, không dùng
-                      tốc độ.
+                      {state.rulesVersion === "v5" ? "Luật V5: điểm tổng → số cấp Robot tối ưu → ít lượt chạy Robot chính thức → số câu Accessibility hoàn hảo → sudden death. Không xét tốc độ." : "Hòa điểm: Accessibility hoàn hảo → Robot tối ưu → sudden death."}
                     </p>
                     <div className="competition-actions">
                       <button
@@ -1119,17 +1133,11 @@ export default function CompetitionPortal({
                       >
                         Chốt sudden death
                       </button>
-                      <button
+                      {state.rulesVersion === "v5" ? <CeremonyControls state={state} busy={busy} onControl={(action, extra) => void run(() => control(action, extra))} /> : <button
                         className="button button-primary"
-                        disabled={
-                          busy ||
-                          state.tie?.active ||
-                          state.tie?.candidates.length !== 1
-                        }
+                        disabled={busy || state.tie?.active || state.tie?.candidates.length !== 1}
                         onClick={() => void run(() => control("publish"))}
-                      >
-                        Công bố đội chiến thắng
-                      </button>
+                      >Công bố đội chiến thắng</button>}
                     </div>
                   </section>
                 )}
@@ -1188,14 +1196,14 @@ export function AdminStage({
       <h2>{s.stageNo === 1 ? "Accessibility Unlock" : "Robot Commands"}</h2>
       <p>
         Trạng thái: {s.status} ·{" "}
-        {s.stageNo === 1 ? "600 XP → 50 điểm" : "400 điểm → 50 điểm"}
+        {(totalItems ?? (s.stageNo === 1 ? 6 : 4)) * 100} {s.stageNo === 1 ? "XP" : "điểm"} → 50 điểm
       </p>
       <Deadline
         deadline={s.status === "active" ? s.deadlineAt : null}
         serverNow={state.serverNow}
       />
       <details>
-        <summary>Cấu hình {s.stageNo === 1 ? "6 câu hỏi" : "4 màn"}</summary>
+        <summary>Cấu hình {totalItems ?? (s.stageNo === 1 ? 6 : 4)} {s.stageNo === 1 ? "câu hỏi" : "màn"}</summary>
         <fieldset disabled={busy || s.status !== "pending"}>
           {(s.stageNo === 1
             ? questionIds
@@ -1206,7 +1214,7 @@ export function AdminStage({
                 type="checkbox"
                 checked={ids.includes(id)}
                 disabled={
-                  !ids.includes(id) && ids.length >= (s.stageNo === 1 ? 6 : 4)
+                  !ids.includes(id) && ids.length >= (totalItems ?? (s.stageNo === 1 ? 6 : 4))
                 }
                 onChange={() =>
                   setIds((prev) =>
@@ -1222,7 +1230,7 @@ export function AdminStage({
           <p>Thứ tự: {ids.join(" → ")}</p>
           <button
             className="button button-ghost"
-            disabled={ids.length !== (s.stageNo === 1 ? 6 : 4)}
+            disabled={ids.length !== (totalItems ?? (s.stageNo === 1 ? 6 : 4))}
             onClick={() =>
               void onControl("configure", {
                 stage: s.stageNo,
@@ -1323,6 +1331,7 @@ export function AdminStage({
               type="button"
               className="button button-ghost"
               onClick={() => {
+                if (state.rulesVersion === "v5") void onControl("end_demo", {});
                 setLocalDemoShown(false);
                 onSetLocalDemoStage?.(null);
                 try {
@@ -1428,7 +1437,7 @@ export function Participant({
   state: CompetitionState;
   busy: boolean;
   onAnswer: (item: string, answer: string) => Promise<void>;
-  onRobot: (item: string, commands: Command[]) => Promise<void>;
+  onRobot: (item: string, commands: Command[], optimization?: boolean) => Promise<void>;
   viewMode?: "before" | "after";
 }) {
   if (!stage) return null;
@@ -1493,7 +1502,9 @@ export function Participant({
             score={
               state.own?.submissions.find((x) => x.itemId === item.id)?.score
             }
-            onSubmit={(commands) => onRobot(item.id, commands)}
+            strategic={state.rulesVersion === "v5"}
+            level={state.robotLevels?.find(r => r.itemId === item.id)}
+            onSubmit={(commands, optimization) => onRobot(item.id, commands, optimization)}
           />
         ))}
     </section>
@@ -1733,6 +1744,7 @@ export function Presentation({
 }) {
   const stage = state.stages.find((s) => s.status === "active");
   const isFinalized = state.competition.status === "FINALIZED";
+  const ceremony = state.rulesVersion === "v5" && ["STAGE_2_FINALIZED", "FINALIZED"].includes(state.competition.status);
   const urlRoomCode =
     typeof window !== "undefined"
       ? new URLSearchParams(window.location.search).get("code") || ""
@@ -1779,11 +1791,11 @@ export function Presentation({
     };
   }, [state.competition.id]);
 
-  const effectiveDemoStage = state.demoStage ?? (!stage ? localDemoStage : null);
+  const effectiveDemoStage = state.rulesVersion === "v5" ? state.demoStage : state.demoStage ?? (!stage ? localDemoStage : null);
   const presentationItem = stage ? resolveStageChallenge(stage) : null;
 
   // 1. Landing state when competition is NOT started or between stages without active challenge
-  if (!effectiveDemoStage && !stage && !isFinalized) {
+  if (!effectiveDemoStage && !stage && !isFinalized && !ceremony) {
     return (
       <PresentationLandingScreen
         state={state}
@@ -1797,7 +1809,7 @@ export function Presentation({
   return (
     <div className="presentation-split-layout">
       <main className="presentation-main-stage">
-        {effectiveDemoStage ? (
+        {ceremony ? <AwardCeremony state={state} /> : effectiveDemoStage ? (
           <div className="competition-presentation panel">
             <span className="eyebrow accent">MÀN HÌNH MINH HỌA · TRÌNH CHIẾU MC</span>
             <span className="competition-state brand-status-live" style={{ marginLeft: "12px" }}>
@@ -1806,6 +1818,7 @@ export function Presentation({
             <Demo
               key={effectiveDemoStage}
               stage={effectiveDemoStage}
+              robotDemo={state.robotDemo}
               readOnly
               canControlViewMode={false}
               viewMode={viewMode}

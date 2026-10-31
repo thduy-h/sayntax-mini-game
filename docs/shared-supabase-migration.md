@@ -1,5 +1,7 @@
 # Shared Supabase deployment runbook
 
+> 2026-11-01 V5 update: V5 adds new migrations without editing applied SQL. The release bundle preserves the deployed V3 version and excludes the older V4/QR/projection drafts. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local correction (2026-10-31)
 
 New additive local-only migration `20261031010000_arena_competition_v3.sql`, SHA-256 `40bb2fb472529aa968e0536e3ae6fa4494145d49110700350a92cc940fa07e0b`. V1/V2 deployed migrations remain unchanged. No new endpoint/schema/settings/env required. Prepare coordinated migration, seven shared-source function redeployments and paired frontend only after review/approval; avoid an active workshop. Verification: `supabase/verification-competition-v3.sql`; guarded rollback: `supabase/rollback/20261031010000_arena_competition_v3.rollback.sql`. No remote migration-list or dry-run was performed for this patch.

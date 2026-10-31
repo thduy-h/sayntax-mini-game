@@ -1,5 +1,7 @@
 # Eight-team workshop rehearsal
 
+> 2026-11-01 V5 update: Rehearse V5 with eight synthetic teams and separate MC/projector/phone contexts: shared demo, paid optimization, recovery, private results, ties and manual ceremony reveal. See [Competition V5 release review](competition-v5-release.md) for current rules, verification, screenshots and deployment gates.
+
 ## Competition V3 — local correction (2026-10-31)
 
 V3 rehearsal: scan the same QR from8 devices, save cards, reject ninth registration; show Accessibility demo and confirm0 attempts/XP; start question1; all devices/presentation must agree. Forge future/past item submissions and confirm denial. MC waits for8/8 or deadline, closes/advances through4 questions, finalizes. After workshop break use the SAME QR, restore on fresh devices and verify same8 team IDs. Show Robot demo (zero XP), start15-minute stage, advance3 maps, retry safely, finalize/publish one winner. Verify presentation has no submit controls or answer/solver fields, offline recovery and main-site smoke. Hosted rehearsal remains pending; use only approved test rooms.

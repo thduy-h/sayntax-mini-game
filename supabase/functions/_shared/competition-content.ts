@@ -192,7 +192,7 @@ question(
   "Cấu trúc ổn định giảm việc tìm lại mỗi khi chuyển trang. Tìm kiếm hỗ trợ nhưng không thay thế điều hướng dễ dự đoán.",
 );
 
-export function competitionConfig(stage: number, input: unknown) {
+export function competitionConfig(stage: number, input: unknown, allowLegacy = false) {
   const value =
     input && typeof input === "object"
       ? (input as Record<string, unknown>)
@@ -202,8 +202,8 @@ export function competitionConfig(stage: number, input: unknown) {
     const ids = value.scenarioIds ?? DEFAULT_QUESTIONS;
     if (
       !Array.isArray(ids) ||
-      ids.length !== 6 ||
-      new Set(ids).size !== 6 ||
+      (![6, ...(allowLegacy ? [4] : [])].includes(ids.length)) ||
+      new Set(ids).size !== ids.length ||
       ids.some((id) => typeof id !== "string" || !Object.hasOwn(entries, id))
     )
       throw new Error("invalid_scenario_ids");
@@ -215,8 +215,8 @@ export function competitionConfig(stage: number, input: unknown) {
     ? value.levelIds.map(String)
     : DEFAULT_LEVELS;
   if (
-    ids.length !== 4 ||
-    new Set(ids).size !== 4 ||
+    (![4, ...(allowLegacy ? [3] : [])].includes(ids.length)) ||
+    new Set(ids).size !== ids.length ||
     ids.some((id) => !Object.hasOwn(ROBOT_LEVELS, id))
   )
     throw new Error("invalid_level_ids");
@@ -227,7 +227,7 @@ export function competitionConfig(stage: number, input: unknown) {
       return {
         id,
         // Friendly sequence name — never exposes raw level ID to participants
-        name: `Màn ${seqIndex + 1}/4`,
+        name: `Màn ${seqIndex + 1}/${ids.length}`,
         width: 6,
         height: 6,
         start: l.start,
@@ -329,6 +329,7 @@ export function competitionRobotScore(item: string, commands: unknown) {
         )
       : 0,
     executed,
+    optimalCommands: shortestCommands(level).length,
   };
 }
 

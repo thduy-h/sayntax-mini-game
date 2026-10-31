@@ -52,6 +52,8 @@ export type CompetitionState = {
   role: "mc" | "team" | "presentation";
   serverNow: string;
   demoStage?: number | null;
+  a11yViewMode?: "before" | "after";
+  a11yViewScope?: string | null;
   joinCode?: string;
   teamsCount?: number;
   competition: {

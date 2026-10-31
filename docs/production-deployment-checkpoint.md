@@ -1,4 +1,17 @@
+## Pending cross-device BEFORE/AFTER patch (2026-11-01)
+
+Implemented locally; production unchanged. See [display sync audit and deployment gate](a11y-display-sync.md). Requires one additive migration and a minimal arena-manage-room redeploy from the reviewed 4/3 bundle, followed by frontend release. Do not apply unrelated root V4/QR/state-projection drafts. New migration checksum: `37ff1dfc2603b88357255ab42bdc75e9459c4c299191a4d00e87996108febacb`.
+
 # Controlled production deployment checkpoint — 2026-10-30
+
+## Latest production operation — Competition V3 4/3 synchronization hotfix
+
+Explicit user approval: “deploy, áp dụng”. Exact original V3 SQL applied by MCP under actual version **20261031191004**, name `arena_competition_v3_sync_hotfix`, SHA-256 `40bb2fb472529aa968e0536e3ae6fa4494145d49110700350a92cc940fa07e0b`. Only `arena-manage-room` redeployed to platform revision 4 with JWT verification true; its old content/scoring preset was preserved. Six other functions remain revision 3. No 6/4 upgrade, setting change, website object change, frontend deployment or history repair.
+
+Scoped Arena backup/restore rehearsal passed (13 tables/227 rows and old Edge source; not a full website/project backup). Postflight state for the authorized room reports 2/2 submitted, four Accessibility questions and three Robot levels; score invariant and grants checks passed. Website public/Auth metadata fingerprint stayed `e60e27a2932f1aca92739eed7f95f2bc`. Existing Stage 1 deadline elapsed normally; no time/score/state reset was performed. Hosted MC/participant rehearsal remains required; no overall production GO is claimed.
+
+Details, recovery evidence and migration-history checkout warning: [MC control hotfix](mc-control-fix.md). Original filename `20261031010000_arena_competition_v3.sql` is the source for the applied timestamp, not another production migration to apply. Earlier checkpoint statements are historical.
+
 
 ## Competition V3 — local patch, production approval gate (2026-10-31)
 

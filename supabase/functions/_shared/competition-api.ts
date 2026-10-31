@@ -228,7 +228,11 @@ export async function competitionControl(
     p_action: action,
     p_stage: stageNo,
     p_config:
-      action === "configure" ? competitionConfig(stageNo!, input.config) : null,
+      action === "configure" ? competitionConfig(stageNo!, input.config)
+      : action === "set_a11y_view" ? {
+        viewMode: requireString(input.viewMode, "view_mode", 6),
+        viewScope: requireString(input.viewScope, "view_scope", 200),
+      } : null,
     p_index: ["challenge", "advance_challenge", "close_challenge"].includes(
       action,
     )

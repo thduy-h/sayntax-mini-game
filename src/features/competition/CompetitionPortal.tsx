@@ -32,7 +32,6 @@ import type {
 import { isCompetitionId } from "./contracts";
 import { Demo } from "./Demo";
 import { MapPrompt, Prompt, QuestionPlayer, RobotPlayer } from "./Content";
-import { useA11ySync } from "../../lib/a11ySync";
 import { resolveStageChallenge } from "./canonicalQuestions";
 
 const questionIds = [
@@ -64,6 +63,7 @@ const labels = [
   "Điều hướng",
 ];
 const errors: Record<string, string> = {
+  display_sync_unavailable: "Backend chưa hỗ trợ đồng bộ Trước/Sau giữa thiết bị. Cần áp dụng bản cập nhật đồng bộ hiển thị.",
   inactive_challenge:
     "Thử thách này đã đóng hoặc chưa được MC mở. Đang chờ thử thách hiện tại.",
   teams_pending:
@@ -291,7 +291,8 @@ export default function CompetitionPortal({
     [error, setError] = useState<string | null>(null),
     [connection, setConnection] = useState("Đang kết nối"),
     [busy, setBusy] = useState(false);
-  const [a11yViewMode, setA11yViewMode] = useA11ySync("before");
+  // Production display state comes from the authenticated backend, across devices.
+  const a11yViewMode = state?.a11yViewMode ?? "before";
   const [localDemoStage, setLocalDemoStage] = useState<number | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -512,6 +513,18 @@ export default function CompetitionPortal({
     }
     if (action === "presentation_revoke") setPresentationUrl("");
     await refresh();
+  };
+  const setA11yViewMode = (mode: "before" | "after") => {
+    if (identity?.role !== "mc") return;
+    void run(async () => {
+      if (!state?.a11yViewScope) {
+        throw new ArenaApiError("display_sync_unavailable");
+      }
+      await control("set_a11y_view", {
+        viewMode: mode,
+        viewScope: state.a11yViewScope,
+      });
+    });
   };
   const copy = (text: string) =>
     run(async () => {
@@ -988,7 +1001,7 @@ export default function CompetitionPortal({
           {state.role === "team" && (
             <>
               {activeDemoStage && (
-                <Demo key={activeDemoStage} stage={activeDemoStage} />
+                <Demo key={activeDemoStage} stage={activeDemoStage} viewMode={a11yViewMode} />
               )}
               <section className="competition-section panel">
                 <h2>{state.own?.name}</h2>

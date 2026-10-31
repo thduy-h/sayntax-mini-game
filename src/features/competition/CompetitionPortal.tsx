@@ -797,7 +797,6 @@ export default function CompetitionPortal({
                 <Demo
                   key={state.demoStage}
                   stage={state.demoStage}
-                  readOnly
                   canControlViewMode={true}
                   viewMode={a11yViewMode}
                   onViewModeChange={setA11yViewMode}
@@ -1102,6 +1101,11 @@ export function AdminStage({
     [demoShown, setDemoShown] = useState(() => state.demoStage === s.stageNo);
 
   const content = s.stageNo === 1 ? s.config?.questions : s.config?.maps;
+  const totalItems = s.totalItems ?? content?.length;
+  const registeredTeams = state.teams?.length;
+  const synchronized = Boolean(s.progress) && typeof s.itemDeadline === "string" &&
+    (registeredTeams === undefined || s.progress?.total === registeredTeams);
+
   const allowed =
     s.stageNo === 1
       ? state.competition.status === "NOT_STARTED"
@@ -1249,9 +1253,16 @@ export function AdminStage({
         <>
           <h3>
             Thử thách {s.activeIndex + 1}/
-            {s.totalItems ?? (s.stageNo === 1 ? 6 : 4)}
+            {totalItems ?? "?"}
           </h3>
-          <Progress stage={s} />
+          <Progress stage={s} registeredTeams={state.teams?.length} />
+          {!synchronized && (
+            <p role="alert">
+              Backend chưa cung cấp trạng thái điều khiển từng thử thách. Cần cập nhật
+              migration và Edge Functions tương thích trước khi chuyển câu;
+              không thể suy ra lượt nộp từ danh sách đội.
+            </p>
+          )}
           <Deadline
             deadline={s.itemDeadline ?? null}
             label="Còn lại thử thách"
@@ -1267,7 +1278,7 @@ export function AdminStage({
           <div className="competition-actions">
             <button
               className="button button-ghost"
-              disabled={busy || Boolean(s.itemFinalizedAt)}
+              disabled={busy || !synchronized || Boolean(s.itemFinalizedAt)}
               onClick={() =>
                 void onControl("close_challenge", {
                   stage: s.stageNo,
@@ -1279,7 +1290,7 @@ export function AdminStage({
             </button>
             <button
               className="button button-primary"
-              disabled={busy || s.activeIndex >= (s.stageNo === 1 ? 5 : 3)}
+              disabled={busy || !synchronized || !totalItems || s.activeIndex >= totalItems - 1}
               onClick={() =>
                 void onControl("advance_challenge", {
                   stage: s.stageNo,
@@ -1767,16 +1778,17 @@ export function Presentation({
   );
 }
 
-function Progress({ stage }: { stage: Stage }) {
+function Progress({ stage, registeredTeams }: { stage: Stage; registeredTeams?: number }) {
+  if (!stage.progress || (registeredTeams !== undefined && stage.progress.total !== registeredTeams)) return (
+    <p className="competition-progress" role="status">
+      {registeredTeams === undefined ? "" : `Đã đăng ký ${registeredTeams} đội · `}
+      Chưa nhận được tiến độ nộp bài từ backend.
+    </p>
+  );
   return (
     <p className="competition-progress" role="status">
-      Đã nộp {stage.progress?.submitted ?? 0}/{stage.progress?.total ?? 0} đội ·
-      Đang chờ{" "}
-      {Math.max(
-        0,
-        (stage.progress?.total ?? 0) - (stage.progress?.submitted ?? 0),
-      )}{" "}
-      đội
+      Đã nộp {stage.progress.submitted}/{stage.progress.total} đội · Đang chờ{" "}
+      {Math.max(0, stage.progress.total - stage.progress.submitted)} đội
     </p>
   );
 }

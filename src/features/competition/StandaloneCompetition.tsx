@@ -182,7 +182,6 @@ export default function StandaloneCompetition() {
           {state.demoStage && (
             <Demo
               stage={state.demoStage}
-              readOnly
               canControlViewMode={true}
               viewMode={a11yViewMode}
               onViewModeChange={setA11yViewMode}

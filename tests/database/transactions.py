@@ -328,6 +328,9 @@ print('PASS all local transaction integration assertions; no unresolved lock wai
 if '--competition' in sys.argv:
     exec((ROOT / 'tests/database/competition.py').read_text())
 
-if '--competition-v3' in sys.argv:
+if '--competition-v3' in sys.argv or '--state-projection' in sys.argv:
     exec((ROOT / 'tests/database/competition.py').read_text())
     exec((ROOT / 'tests/database/competition_v3.py').read_text())
+
+if '--state-projection' in sys.argv:
+    exec((ROOT / 'tests/database/state_projection.py').read_text())

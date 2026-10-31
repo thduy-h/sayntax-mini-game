@@ -27,5 +27,5 @@ test-results/
 playwright-report/
 
 # Local seeded browser review artifacts (regenerate via Playwright).
-artifacts/ui-review/
+artifacts/
 .local-audit/

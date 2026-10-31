@@ -1,5 +1,7 @@
 # Competition V5 — local release review
 
+> Deployment update 2026-11-01: user approved; both migrations and all7 Edge Functions deployed and hosted8-team API rehearsal passed. See [approved deployment record](competition-v5-deployment.md). Earlier local-only status below is historical.
+
 Review date: 2026-11-01. Implementation and local verification only. No production connection, SQL apply, Edge deployment, Vercel publication, environment, JWT or CORS change was performed. Push target is `competition-v5-review`, with automatic Vercel deployment disabled for that branch. Includes the pending BEFORE/AFTER synchronization commit.
 
 ## Root causes and resulting behavior

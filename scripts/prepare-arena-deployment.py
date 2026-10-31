@@ -33,7 +33,11 @@ out = Path(tempfile.mkdtemp(prefix='sayntax-arena-deploy-'))
 manifest = []
 for source in sources:
     # MCP assigned this actual deployment version; never apply the same V3 SQL twice.
-    target_name = '20261031191004_arena_competition_v3_sync_hotfix.sql' if source.name == '20261031010000_arena_competition_v3.sql' else source.name
+    target_name = {
+        '20261031010000_arena_competition_v3.sql': '20261031191004_arena_competition_v3_sync_hotfix.sql',
+        '20261101020000_arena_a11y_display_sync.sql': '20261031201122_arena_a11y_display_sync.sql',
+        '20261101030000_arena_competition_v5.sql': '20261031201129_arena_competition_v5.sql',
+    }.get(source.name, source.name)
     target = out / 'supabase/migrations' / target_name
     shutil.copy2(source, target)
     if source.read_bytes() != target.read_bytes():

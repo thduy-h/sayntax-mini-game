@@ -1,5 +1,7 @@
 # BEFORE/AFTER across participant devices — 2026-11-01
 
+> Deployment update 2026-11-01: user approved; both migrations and all7 Edge Functions deployed and hosted8-team API rehearsal passed. See [approved deployment record](competition-v5-deployment.md). Earlier local-only status below is historical.
+
 Status: implemented and verified locally; NOT deployed. No production queries or writes were made for this patch.
 
 The original `useA11ySync` uses localStorage/BroadcastChannel. It reaches tabs in one browser profile, not other phones. Production CompetitionPortal now reads `a11yViewMode` and `a11yViewScope` from the authenticated state endpoint. MC writes `set_a11y_view` through arena-manage-room; participant/presentation receive it on existing five-second polling. No extra polling or privileged participant controls. Standalone keeps its local preview hook.

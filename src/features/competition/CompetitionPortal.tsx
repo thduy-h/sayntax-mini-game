@@ -460,10 +460,15 @@ export default function CompetitionPortal({
   ) => {
     if (!identity) return;
     const result = await controlCompetition(identity, action, extra);
-    if (result.presentationToken)
+    if (result.presentationToken) {
+      const activeCode =
+        state?.joinCode ||
+        state?.stages.find((s) => s.stageNo === 1)?.roomCode ||
+        "";
       setPresentationUrl(
-        presentationLink(competitionId, result.presentationToken),
+        presentationLink(competitionId, result.presentationToken, activeCode),
       );
+    }
     if (action === "presentation_revoke") setPresentationUrl("");
     await refresh();
   };
@@ -1582,12 +1587,17 @@ export function Presentation({
 }) {
   const stage = state.stages.find((s) => s.status === "active");
   const isFinalized = state.competition.status === "FINALIZED";
+  const urlRoomCode =
+    typeof window !== "undefined"
+      ? new URLSearchParams(window.location.search).get("code") || ""
+      : "";
   const roomCode =
     state.joinCode ||
     state.stages.find((s) => s.stageNo === 1)?.roomCode ||
+    urlRoomCode ||
     "";
   const teamsCount =
-    state.teams?.length ?? (state.stages[0]?.progress?.total ?? 0);
+    state.teamsCount ?? state.teams?.length ?? (state.stages[0]?.progress?.total ?? 0);
 
   // 1. Landing state when competition is NOT started or between stages without active challenge
   if (!state.demoStage && !stage && !isFinalized) {

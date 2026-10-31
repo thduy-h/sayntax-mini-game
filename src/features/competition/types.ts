@@ -53,6 +53,7 @@ export type CompetitionState = {
   serverNow: string;
   demoStage?: number | null;
   joinCode?: string;
+  teamsCount?: number;
   competition: {
     id: string;
     name: string;

@@ -102,8 +102,8 @@ export function isLocalDevUrl(url: string): boolean {
 
 export const joinLink = (_id: string, code: string) =>
   `${resolvePublicJoinOrigin()}/join/${encodeURIComponent(code)}`;
-export const presentationLink = (id: string, token: string) =>
-  `${resolvePublicJoinOrigin()}/present/${id}#token=${encodeURIComponent(token)}`;
+export const presentationLink = (id: string, token: string, code?: string) =>
+  `${resolvePublicJoinOrigin()}/present/${id}${code ? `?code=${encodeURIComponent(code)}` : ""}#token=${encodeURIComponent(token)}`;
 export function downloadCard(text: string) {
   const url = URL.createObjectURL(
     new Blob([text], { type: "text/plain;charset=utf-8" }),

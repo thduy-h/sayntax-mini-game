@@ -3268,9 +3268,9 @@ select:focus-visible {
 .leaderboard-card-name { font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .leaderboard-card-scores { display:flex; gap:12px; font-size:0.875rem; margin-top:4px; flex-wrap:wrap; color:var(--muted,#555); }
 .leaderboard-card-scores strong { font-weight:900; color:var(--text,#121212); }
-/* Show cards always; hide table on mobile, hide cards on desktop */
+/* Show cards always; hide cards on desktop */
 @media(min-width:700px) { .leaderboard-cards { display:none; } }
-@media(max-width:699px) { .leaderboard-table-wrap { display:none !important; } }
+@media(max-width:699px) { .leaderboard-table-wrap { overflow-x:auto; } }
 
 /* V4: Team ID recovery hint */
 .competition-team-id-hint { font-size:0.85rem; color:var(--muted,#555); margin-top:4px; margin-bottom:8px; }
@@ -4769,3 +4769,32 @@ select:focus-visible {
     height: auto;
   }
 }
+
+/* Demo Active Banner (MC Dashboard) */
+.demo-active-banner {
+  margin-top: 14px;
+  padding: 14px 18px;
+  background: #f0fdf4;
+  border: 2.5px solid #121212;
+  box-shadow: 4px 4px 0 #121212;
+  border-radius: 4px;
+}
+.demo-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #121212;
+  margin-bottom: 4px;
+}
+.demo-active-banner p {
+  margin: 4px 0 12px;
+  font-size: 0.875rem;
+  color: #2e3832;
+  line-height: 1.5;
+}
+.demo-banner-actions {
+  display: flex;
+  gap: 10px;
+}
+

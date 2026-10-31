@@ -53,6 +53,7 @@ export function Demo({
   const [result, setResult] = useState(false);
   return (
     <section
+      id="competition-demo-section"
       className="competition-section panel competition-demo"
       aria-label={stage === 1 ? "Accessibility Demo" : "Robot Demo"}
     >
@@ -82,7 +83,16 @@ export function Demo({
                 question={DEMO_QUESTION}
                 answer={answer}
                 busy={false}
-                confirmation="Đã chọn đáp án demo."
+                confirmation="Đã chọn đáp án demo. Giải pháp: đổi màu chữ sang màu tối bảo đảm tương phản chữ/nền ít nhất 4.5:1 đạt chuẩn WCAG AA."
+                review={
+                  answer
+                    ? {
+                        itemId: DEMO_QUESTION.id,
+                        explanation:
+                          "Giải pháp: đổi màu chữ sang màu tối bảo đảm tương phản chữ/nền ít nhất 4.5:1 đạt chuẩn WCAG AA.",
+                      }
+                    : undefined
+                }
                 onAnswer={async (value) => {
                   setAnswer(value);
                   if (value === "contrast" && canControlViewMode) {
@@ -146,6 +156,19 @@ export function Demo({
             </p>
           )}
         </>
+      )}
+      {canControlViewMode && (
+        <div style={{ marginTop: "18px", borderTop: "2px dashed #121212", paddingTop: "12px" }}>
+          <button
+            type="button"
+            className="button button-ghost"
+            onClick={() => {
+              document.querySelector(".competition-stages")?.scrollIntoView({ behavior: "smooth" });
+            }}
+          >
+            ⬇ Cuộn xuống danh sách phiên thi (Bắt đầu phiên {stage})
+          </button>
+        </div>
       )}
     </section>
   );

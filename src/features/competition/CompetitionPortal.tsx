@@ -33,6 +33,7 @@ import { isCompetitionId } from "./contracts";
 import { Demo } from "./Demo";
 import { MapPrompt, Prompt, QuestionPlayer, RobotPlayer } from "./Content";
 import { useA11ySync } from "../../lib/a11ySync";
+import { resolveStageChallenge } from "./canonicalQuestions";
 
 const questionIds = [
   "contrast",
@@ -940,7 +941,7 @@ export default function CompetitionPortal({
               <section className="competition-section panel">
                 <h2>{state.own?.name}</h2>
                 <p className="competition-team-id-hint">
-                  Mã phục hồi: <code>{state.own?.competitionTeamId?.slice(-8).toUpperCase()}</code>
+                  <span>ID đội: {state.own?.competitionTeamId}</span>
                   <small> (dùng cho MC khi cần xác minh danh tính)</small>
                 </p>
                 {cardCredential && (
@@ -1172,7 +1173,20 @@ export function AdminStage({
           disabled={busy || !allowed || s.status !== "pending"}
           onClick={() => {
             setDemoShown(true);
+            try {
+              const bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
+              bc.postMessage({ type: "show_demo", stage: s.stageNo });
+              localStorage.setItem(
+                `sayntax-demo-${state.competition.id}`,
+                JSON.stringify({ stage: s.stageNo, timestamp: Date.now() }),
+              );
+            } catch {
+              // ignore
+            }
             void onControl("show_demo", { stage: s.stageNo });
+            setTimeout(() => {
+              document.getElementById("competition-demo-section")?.scrollIntoView({ behavior: "smooth" });
+            }, 100);
           }}
         >
           {demoShown ? "▶ Demo đã hiển thị" : "Hiển thị Demo phiên " + s.stageNo}
@@ -1181,7 +1195,16 @@ export function AdminStage({
           className="button button-primary"
           disabled={busy || !allowed || s.status !== "pending" || !demoShown}
           title={!demoShown ? "Phải hiển thị Demo trước khi bắt đầu phiên thi" : undefined}
-          onClick={() => void onControl("start_stage", { stage: s.stageNo })}
+          onClick={() => {
+            try {
+              const bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
+              bc.postMessage({ type: "clear_demo" });
+              localStorage.removeItem(`sayntax-demo-${state.competition.id}`);
+            } catch {
+              // ignore
+            }
+            void onControl("start_stage", { stage: s.stageNo });
+          }}
         >
           Bắt đầu phiên {s.stageNo}
         </button>
@@ -1200,6 +1223,28 @@ export function AdminStage({
           Chốt phiên {s.stageNo}
         </button>
       </div>
+      {demoShown && s.status === "pending" && (
+        <div className="demo-active-banner" role="status">
+          <div className="demo-banner-header">
+            <span className="dot dot-green" />
+            <strong>⚡ Demo phiên {s.stageNo} đang phát sóng trực tiếp!</strong>
+          </div>
+          <p>
+            Khung Demo đang hiển thị ở phần trên màn hình MC, đồng thời xuất hiện trên Máy chiếu và Thiết bị đội thi.
+          </p>
+          <div className="demo-banner-actions">
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                document.getElementById("competition-demo-section")?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              ⬆ Cuộn lên xem &amp; điều khiển Demo
+            </button>
+          </div>
+        </div>
+      )}
       {s.status === "active" && (
         <>
           <h3>
@@ -1300,7 +1345,7 @@ export function Participant({
         </p>
       </section>
     );
-  const item = stage.challenge;
+  const item = resolveStageChallenge(stage);
   const closed =
     Boolean(stage.itemFinalizedAt) ||
     Date.parse(stage.itemDeadline ?? stage.deadlineAt ?? "") <=
@@ -1469,9 +1514,9 @@ export function PresentationLandingScreen({
           <div className="landing-brand-strip">
             <span className="brand-logo-tag">SAYNTAX</span>
             <span className="brand-sub-tag">GAME ARENA</span>
-            <span className="brand-status-live">
+            <span className="brand-status-live competition-state">
               <span className="live-pulse-dot" />
-              LIVE WORKSHOP
+              LIVE WORKSHOP · {state.competition.status}
             </span>
           </div>
 
@@ -1599,8 +1644,45 @@ export function Presentation({
   const teamsCount =
     state.teamsCount ?? state.teams?.length ?? (state.stages[0]?.progress?.total ?? 0);
 
+  const [localDemoStage, setLocalDemoStage] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const stored = localStorage.getItem(`sayntax-demo-${state.competition.id}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Date.now() - parsed.timestamp < 3600000) return parsed.stage;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !state.competition.id) return;
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
+      bc.onmessage = (event) => {
+        if (event.data?.type === "show_demo") {
+          setLocalDemoStage(event.data.stage);
+        } else if (event.data?.type === "clear_demo") {
+          setLocalDemoStage(null);
+        }
+      };
+    } catch {
+      // ignore
+    }
+    return () => {
+      bc?.close();
+    };
+  }, [state.competition.id]);
+
+  const effectiveDemoStage = state.demoStage ?? (!stage ? localDemoStage : null);
+  const presentationItem = stage ? resolveStageChallenge(stage) : null;
+
   // 1. Landing state when competition is NOT started or between stages without active challenge
-  if (!state.demoStage && !stage && !isFinalized) {
+  if (!effectiveDemoStage && !stage && !isFinalized) {
     return (
       <PresentationLandingScreen
         state={state}
@@ -1614,12 +1696,15 @@ export function Presentation({
   return (
     <div className="presentation-split-layout">
       <main className="presentation-main-stage">
-        {state.demoStage ? (
+        {effectiveDemoStage ? (
           <div className="competition-presentation panel">
             <span className="eyebrow accent">MÀN HÌNH MINH HỌA · TRÌNH CHIẾU MC</span>
+            <span className="competition-state brand-status-live" style={{ marginLeft: "12px" }}>
+              <span className="live-pulse-dot" /> {state.competition.status}
+            </span>
             <Demo
-              key={state.demoStage}
-              stage={state.demoStage}
+              key={effectiveDemoStage}
+              stage={effectiveDemoStage}
               readOnly
               canControlViewMode={false}
               viewMode={viewMode}
@@ -1627,6 +1712,9 @@ export function Presentation({
           </div>
         ) : isFinalized ? (
           <div className="presentation-final-board">
+            <span className="competition-state brand-status-live">
+              <span className="live-pulse-dot" /> {state.competition.status}
+            </span>
             <Leaderboard state={state} />
           </div>
         ) : stage ? (
@@ -1635,6 +1723,9 @@ export function Presentation({
               <span className="eyebrow accent">
                 PHIÊN {stage.stageNo} · THỬ THÁCH {stage.activeIndex + 1}/
                 {stage.totalItems ?? (stage.stageNo === 1 ? 6 : 4)} · CHỈ XEM
+              </span>
+              <span className="competition-state brand-status-live" style={{ marginLeft: "12px" }}>
+                <span className="live-pulse-dot" /> {state.competition.status}
               </span>
               <Deadline deadline={stage.deadlineAt} serverNow={state.serverNow} />
             </div>
@@ -1646,19 +1737,19 @@ export function Presentation({
               </div>
             )}
 
-            {stage.challenge &&
-              ("options" in stage.challenge ? (
+            {presentationItem &&
+              ("options" in presentationItem ? (
                 <Prompt
-                  question={stage.challenge}
+                  question={presentationItem}
                   isClosed={Boolean(stage.itemFinalizedAt || stage.status === "finalized")}
                   review={stage.review?.find(
-                    (r) => r.itemId === (stage.challenge as Question).id,
+                    (r) => r.itemId === (presentationItem as Question).id,
                   )}
                   canControlViewMode={false}
                   viewMode={viewMode}
                 />
               ) : (
-                <MapPrompt map={stage.challenge} />
+                <MapPrompt map={presentationItem} />
               ))}
           </section>
         ) : null}

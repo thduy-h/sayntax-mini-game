@@ -292,6 +292,46 @@ export default function CompetitionPortal({
     [connection, setConnection] = useState("Đang kết nối"),
     [busy, setBusy] = useState(false);
   const [a11yViewMode, setA11yViewMode] = useA11ySync("before");
+  const [localDemoStage, setLocalDemoStage] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const compId = isCompetitionId(competitionId) ? competitionId : "";
+      if (compId) {
+        const stored = localStorage.getItem(`sayntax-demo-${compId}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Date.now() - parsed.timestamp < 3600000) return parsed.stage;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
+
+  useEffect(() => {
+    const compId = state?.competition?.id || (isCompetitionId(competitionId) ? competitionId : "");
+    if (typeof window === "undefined" || !compId) return;
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel(`sayntax-comp-${compId}`);
+      bc.onmessage = (event) => {
+        if (event.data?.type === "show_demo") {
+          setLocalDemoStage(event.data.stage);
+        } else if (event.data?.type === "clear_demo") {
+          setLocalDemoStage(null);
+        }
+      };
+    } catch {
+      // ignore
+    }
+    return () => {
+      bc?.close();
+    };
+  }, [state?.competition?.id, competitionId]);
+
+  const activeDemoStage = state?.demoStage ?? localDemoStage;
+
   const [name, setName] = useState(""),
     [credential, setCredential] = useState(""),
     [cardCredential, setCardCredential] = useState(""),
@@ -793,13 +833,24 @@ export default function CompetitionPortal({
                 Đội đã đăng ký: {state.teams?.length ?? 0}/8 · MC chỉ quản lý và
                 xem nội dung, không nộp bài.
               </p>
-              {state.demoStage && (
+              {activeDemoStage && (
                 <Demo
-                  key={state.demoStage}
-                  stage={state.demoStage}
+                  key={activeDemoStage}
+                  stage={activeDemoStage}
                   canControlViewMode={true}
                   viewMode={a11yViewMode}
                   onViewModeChange={setA11yViewMode}
+                  onClose={() => {
+                    setLocalDemoStage(null);
+                    try {
+                      const compId = state.competition.id;
+                      const bc = new BroadcastChannel(`sayntax-comp-${compId}`);
+                      bc.postMessage({ type: "clear_demo" });
+                      localStorage.removeItem(`sayntax-demo-${compId}`);
+                    } catch {
+                      // ignore
+                    }
+                  }}
                 />
               )}
               <div className="competition-stages">
@@ -811,6 +862,8 @@ export default function CompetitionPortal({
                     busy={busy}
                     viewMode={a11yViewMode}
                     onViewModeChange={setA11yViewMode}
+                    activeDemoStage={activeDemoStage}
+                    onSetLocalDemoStage={setLocalDemoStage}
                     onControl={(action, extra) =>
                       run(() => control(action, extra))
                     }
@@ -934,8 +987,8 @@ export default function CompetitionPortal({
           )}
           {state.role === "team" && (
             <>
-              {state.demoStage && (
-                <Demo key={state.demoStage} stage={state.demoStage} />
+              {activeDemoStage && (
+                <Demo key={activeDemoStage} stage={activeDemoStage} />
               )}
               <section className="competition-section panel">
                 <h2>{state.own?.name}</h2>
@@ -1082,6 +1135,8 @@ export function AdminStage({
   onControl,
   viewMode,
   onViewModeChange,
+  activeDemoStage,
+  onSetLocalDemoStage,
 }: {
   stage: Stage;
   state: CompetitionState;
@@ -1089,16 +1144,18 @@ export function AdminStage({
   onControl: (action: string, extra: Record<string, unknown>) => Promise<void>;
   viewMode?: "before" | "after";
   onViewModeChange?: (mode: "before" | "after") => void;
+  activeDemoStage?: number | null;
+  onSetLocalDemoStage?: (stage: number | null) => void;
 }) {
   const [ids, setIds] = useState<string[]>(() =>
       s.stageNo === 1
         ? (s.config?.scenarioIds ?? [])
         : (s.config?.levelIds ?? []),
     ),
-    [preview, setPreview] = useState(false),
-    // Gate: MC must show the demo before the stage can start.
-    // Once demoShown is true it persists for the component lifetime.
-    [demoShown, setDemoShown] = useState(() => state.demoStage === s.stageNo);
+    [preview, setPreview] = useState(false);
+  const isDemoActiveForThisStage = (activeDemoStage ?? state.demoStage) === s.stageNo;
+  const [localDemoShown, setLocalDemoShown] = useState(() => isDemoActiveForThisStage);
+  const demoShown = isDemoActiveForThisStage || localDemoShown;
 
   const content = s.stageNo === 1 ? s.config?.questions : s.config?.maps;
   const totalItems = s.totalItems ?? content?.length;
@@ -1176,7 +1233,8 @@ export function AdminStage({
           className="button button-ghost"
           disabled={busy || !allowed || s.status !== "pending"}
           onClick={() => {
-            setDemoShown(true);
+            setLocalDemoShown(true);
+            onSetLocalDemoStage?.(s.stageNo);
             try {
               const bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
               bc.postMessage({ type: "show_demo", stage: s.stageNo });
@@ -1200,6 +1258,8 @@ export function AdminStage({
           disabled={busy || !allowed || s.status !== "pending" || !demoShown}
           title={!demoShown ? "Phải hiển thị Demo trước khi bắt đầu phiên thi" : undefined}
           onClick={() => {
+            setLocalDemoShown(false);
+            onSetLocalDemoStage?.(null);
             try {
               const bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
               bc.postMessage({ type: "clear_demo" });
@@ -1245,6 +1305,23 @@ export function AdminStage({
               }}
             >
               ⬆ Cuộn lên xem &amp; điều khiển Demo
+            </button>
+            <button
+              type="button"
+              className="button button-ghost"
+              onClick={() => {
+                setLocalDemoShown(false);
+                onSetLocalDemoStage?.(null);
+                try {
+                  const bc = new BroadcastChannel(`sayntax-comp-${state.competition.id}`);
+                  bc.postMessage({ type: "clear_demo" });
+                  localStorage.removeItem(`sayntax-demo-${state.competition.id}`);
+                } catch {
+                  // ignore
+                }
+              }}
+            >
+              ✕ Ẩn Demo
             </button>
           </div>
         </div>

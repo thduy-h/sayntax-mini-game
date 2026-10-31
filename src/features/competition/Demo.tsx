@@ -42,12 +42,14 @@ export function Demo({
   canControlViewMode = false,
   viewMode,
   onViewModeChange,
+  onClose,
 }: {
   stage: number;
   readOnly?: boolean;
   canControlViewMode?: boolean;
   viewMode?: "before" | "after";
   onViewModeChange?: (mode: "before" | "after") => void;
+  onClose?: () => void;
 }) {
   const [answer, setAnswer] = useState<string | null>(null);
   const [result, setResult] = useState(false);
@@ -57,12 +59,26 @@ export function Demo({
       className="competition-section panel competition-demo"
       aria-label={stage === 1 ? "Accessibility Demo" : "Robot Demo"}
     >
-      <span className="eyebrow accent">DEMO / PRACTICE — NOT SCORED</span>
-      <h2>
-        {stage === 1
-          ? "Thử trước khi thi · Accessibility"
-          : "Thử trước khi thi · Robot"}
-      </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "8px" }}>
+        <div>
+          <span className="eyebrow accent">DEMO / PRACTICE — NOT SCORED</span>
+          <h2 style={{ margin: "4px 0" }}>
+            {stage === 1
+              ? "Thử trước khi thi · Accessibility"
+              : "Thử trước khi thi · Robot"}
+          </h2>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            className="button button-ghost"
+            style={{ fontSize: "0.85rem", padding: "6px 12px" }}
+            onClick={onClose}
+          >
+            ✕ Ẩn Demo này
+          </button>
+        )}
+      </div>
       <p>
         Ví dụ riêng, không thuộc đề thi. 0 XP thi đấu · Không lưu lượt chơi · Có
         thể thử lại nhiều lần.

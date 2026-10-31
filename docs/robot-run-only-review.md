@@ -63,3 +63,7 @@ Local evidence logs are under `.local-audit/robot-run-*.log`, excluded from Git.
 ## Verdict
 
 Local implementation and regression: GO. Backend behavior: verified against disposable PG17 plus Deno Edge tests; multi-browser UI transport is mocked, explicitly not a real hosted deployment claim. Production: CONDITIONAL GO for a future separately reviewed migration + coherent seven-function/frontend release and a fresh private-map competition. No production operation or main-branch push was performed for this correction. Original physical iOS Safari behavior remains unverified. The historical public-map disclosure cannot be repaired retroactively.
+
+## Subsequent approval
+
+The user subsequently approved production release with “rồi duyệt”. See [the approved deployment record](robot-run-only-deployment.md) for actual migration mapping, backups, source comparisons and hosted verification. The local-only statements above describe the state before that later approval.

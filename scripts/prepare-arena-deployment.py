@@ -48,6 +48,7 @@ for source in sources:
         '20261101020000_arena_a11y_display_sync.sql': '20261031201122_arena_a11y_display_sync.sql',
         '20261101030000_arena_competition_v5.sql': '20261031201129_arena_competition_v5.sql',
         '20261101040000_arena_colorblind_sync.sql': '20261031203037_arena_colorblind_sync.sql',
+        '20261101050000_arena_robot_run_only.sql': '20261031232058_arena_robot_run_only.sql',
     }.get(source.name, source.name)
     target = out / 'supabase/migrations' / target_name
     shutil.copy2(source, target)

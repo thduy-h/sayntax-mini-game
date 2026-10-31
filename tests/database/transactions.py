@@ -340,3 +340,9 @@ if "--a11y-display" in sys.argv or "--competition-v5" in sys.argv:
 
 if "--competition-v5" in sys.argv:
     exec((ROOT / "tests/database/competition_v5.py").read_text())
+
+if "--competition-v5" in sys.argv:
+    exec((ROOT / "tests/database/colorblind_sync.py").read_text())
+
+if "--competition-v5" in sys.argv:
+    exec((ROOT / "tests/database/robot_run_only.py").read_text())

@@ -11,8 +11,14 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--main-repo', type=Path, default=Path('/home/thduy-h/Documents/TD/SAYNTAX'))
 parser.add_argument('--function-source', type=Path, help='Explicit reviewed function directory; use the deployed 4/3 hotfix bundle for this release')
 parser.add_argument('--a11y-display', action='store_true', help='Include only the reviewed cross-device BEFORE/AFTER patch after deployed V3')
+parser.add_argument('--run-only', action='store_true', help='Include pending local-only Robot execution correction; implies vision and V5')
+parser.add_argument('--vision', action='store_true', help='Include deployed MC color-vision synchronization after V5')
 parser.add_argument('--v5', action='store_true', help='Prepare V5 with pending display sync, excluding superseded V4/QR/state drafts')
 args = parser.parse_args()
+if args.run_only:
+    args.vision = True
+if args.vision:
+    args.v5 = True
 if args.v5:
     args.a11y_display = True
 if args.a11y_display and not args.function_source:
@@ -25,6 +31,10 @@ if args.a11y_display:
     sources.append(root / 'supabase/migrations/20261101020000_arena_a11y_display_sync.sql')
 if args.v5:
     sources.append(root / 'supabase/migrations/20261101030000_arena_competition_v5.sql')
+if args.vision:
+    sources.append(root / 'supabase/migrations/20261101040000_arena_colorblind_sync.sql')
+if args.run_only:
+    sources.append(root / 'supabase/migrations/20261101050000_arena_robot_run_only.sql')
 for source in sources:
     if not source.is_file() or not source.stat().st_size:
         raise SystemExit(f'Missing or empty original SQL: {source}')
@@ -37,6 +47,7 @@ for source in sources:
         '20261031010000_arena_competition_v3.sql': '20261031191004_arena_competition_v3_sync_hotfix.sql',
         '20261101020000_arena_a11y_display_sync.sql': '20261031201122_arena_a11y_display_sync.sql',
         '20261101030000_arena_competition_v5.sql': '20261031201129_arena_competition_v5.sql',
+        '20261101040000_arena_colorblind_sync.sql': '20261031203037_arena_colorblind_sync.sql',
     }.get(source.name, source.name)
     target = out / 'supabase/migrations' / target_name
     shutil.copy2(source, target)

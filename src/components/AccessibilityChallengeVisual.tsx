@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
+import { AccessibilityDisplayContext } from "../lib/accessibilityDisplay";
 import {
   Keyboard as KeyboardIcon,
   Eye,
@@ -233,7 +234,13 @@ export function AccessibilityChallengeVisual({
   const [tabIndex, setTabIndex] = useState(1);
   const [touchResult, setTouchResult] = useState<string | null>(null);
   const [captionsOn, setCaptionsOn] = useState(false);
-  const [colorblindSim, setColorblindSim] = useState(false);
+  const sharedDisplay = useContext(AccessibilityDisplayContext);
+  const [localColorblindSim, setLocalColorblindSim] = useState(false);
+  const colorblindSim = sharedDisplay?.colorblindSim ?? localColorblindSim;
+  const setColorblindSim = (enabled: boolean) => {
+    if (sharedDisplay) sharedDisplay.onColorblindSimChange?.(enabled);
+    else setLocalColorblindSim(enabled);
+  };
   const [extendedTime, setExtendedTime] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(105);
   const [activeNavPage, setActiveNavPage] = useState("Trang chủ");
@@ -541,6 +548,8 @@ export function AccessibilityChallengeVisual({
               <button
                 type="button"
                 className={`sim-tool-btn ${colorblindSim ? "active" : ""}`}
+                aria-pressed={colorblindSim}
+                disabled={Boolean(sharedDisplay && (!sharedDisplay.onColorblindSimChange || sharedDisplay.busy))}
                 onClick={() => setColorblindSim(!colorblindSim)}
               >
                 <Palette size={14} />

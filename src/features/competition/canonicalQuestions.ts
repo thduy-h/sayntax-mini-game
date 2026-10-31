@@ -9,8 +9,6 @@ export const DEFAULT_QUESTIONS = [
   "navigation",
 ] as const;
 
-export const DEFAULT_LEVELS = ["1", "2", "6", "4"] as const;
-
 export const CANONICAL_QUESTIONS: Record<string, Question> = {
   contrast: {
     id: "contrast",
@@ -306,53 +304,6 @@ export const CANONICAL_QUESTIONS: Record<string, Question> = {
   },
 };
 
-export const CANONICAL_LEVELS: Record<string, MapDefinition> = {
-  "1": {
-    id: "1",
-    name: "Màn 1/4 · Bước đầu làm quen",
-    width: 6,
-    height: 6,
-    start: { x: 0, y: 4 },
-    goal: { x: 4, y: 4 },
-    walls: ["2,3"],
-    initialDirection: 1,
-    maxCommands: 24,
-  },
-  "2": {
-    id: "2",
-    name: "Màn 2/4 · Cú rẽ định mệnh",
-    width: 6,
-    height: 6,
-    start: { x: 0, y: 4 },
-    goal: { x: 4, y: 1 },
-    walls: ["2,4", "2,3", "2,2"],
-    initialDirection: 1,
-    maxCommands: 24,
-  },
-  "6": {
-    id: "6",
-    name: "Màn 3/4 · Bức tường lệch",
-    width: 6,
-    height: 6,
-    start: { x: 1, y: 1 },
-    goal: { x: 4, y: 5 },
-    walls: ["1,2", "2,2", "3,2", "3,4"],
-    initialDirection: 2,
-    maxCommands: 24,
-  },
-  "4": {
-    id: "4",
-    name: "Màn 4/4 · Cửa ngõ xanh",
-    width: 6,
-    height: 6,
-    start: { x: 0, y: 0 },
-    goal: { x: 5, y: 2 },
-    walls: ["2,0", "2,1", "4,2"],
-    initialDirection: 1,
-    maxCommands: 24,
-  },
-};
-
 export function resolveStageChallenge(
   stage: Stage | undefined | null,
 ): Question | MapDefinition | null {
@@ -399,17 +350,8 @@ export function resolveStageChallenge(
     }
   }
 
-  if (stage.stageNo === 2) {
-    const activeLevelId =
-      stage.activeItemId ??
-      stage.config?.levelIds?.[stage.activeIndex] ??
-      DEFAULT_LEVELS[stage.activeIndex] ??
-      DEFAULT_LEVELS[0];
-
-    if (activeLevelId && activeLevelId in CANONICAL_LEVELS) {
-      return CANONICAL_LEVELS[activeLevelId];
-    }
-  }
+  // Robot maps must come from the authorized frozen stage projection.
+  // Never substitute a known public practice map when the backend prompt is absent.
 
   return null;
 }

@@ -3,6 +3,8 @@ import { clientAddress, json, requireString } from "./http.ts";
 import { rateLimit } from "./rate.ts";
 import {
   competitionConfig,
+  freezeOfficialRobotConfig,
+  frozenRobotLevel,
   COMPETITION_VERSION,
   competitionAnswer,
   competitionRobotScore,
@@ -82,7 +84,7 @@ export async function createCompetition(
     p_code1: code(),
     p_code2: code(),
     p_config1: competitionConfig(1, input.config1),
-    p_config2: competitionConfig(2, input.config2),
+    p_config2: freezeOfficialRobotConfig(input.config2),
   });
   return json({ ...result, mcToken });
 }
@@ -201,6 +203,11 @@ export async function competitionJoin(
   });
   return json({ ...result, mode: "competition", teamToken });
 }
+async function configurationForCompetition(competitionId: string, stageNo: number, input: unknown) {
+  const { data, error } = await admin().from("competitions").select("rules_version").eq("id", competitionId).single();
+  if (error || !data) throw new Error("not_found");
+  return stageNo === 2 && data.rules_version === "v5" ? freezeOfficialRobotConfig(input) : competitionConfig(stageNo, input, true);
+}
 export async function competitionControl(
   request: Request,
   input: Record<string, unknown>,
@@ -230,9 +237,12 @@ export async function competitionControl(
     p_action: action,
     p_stage: stageNo,
     p_config:
-      action === "configure" ? competitionConfig(stageNo!, input.config, true)
+      action === "configure" ? await configurationForCompetition(id(input), stageNo!, input.config)
       : action === "set_a11y_view" ? {
         viewMode: requireString(input.viewMode, "view_mode", 6),
+        viewScope: requireString(input.viewScope, "view_scope", 200),
+      } : action === "set_a11y_vision" ? {
+        enabled: typeof input.enabled === "boolean" ? input.enabled : null,
         viewScope: requireString(input.viewScope, "view_scope", 200),
       } : action === "robot_demo" ? demoControl(input.demo)
       : action === "ceremony" ? {
@@ -305,13 +315,21 @@ export async function competitionState(
             ? s.config.scenarioIds.map(questionReview)
             : s.config.levelIds.map((levelId: string) => ({
                 itemId: levelId,
-                optimalCommands: shortestCommands(ROBOT_LEVELS[levelId]),
+                optimalCommands: shortestCommands(s.config.executionPolicy === "run-only-v1" ? frozenRobotLevel(s.config, levelId) : ROBOT_LEVELS[levelId]),
               }));
       }
+  // Missing-level explanations still use the frozen map, never the public legacy bank.
+  let reviewConfig = state.stages.find((s: { stageNo: number }) => s.stageNo === 2)?.config;
+  if (!reviewConfig && (state.scoreExplanations ?? []).some((e: { robot?: { optimalCommands?: number }[] }) => e.robot?.some(l => l.optimalCommands == null))) {
+    const { data } = await admin().from("competition_stages").select("config").eq("competition_id", id(input)).eq("stage_no", 2).eq("status", "finalized").single();
+    reviewConfig = data?.config;
+  }
   for (const explanation of state.scoreExplanations ?? [])
     for (const level of explanation.robot ?? [])
-      if (level.optimalCommands == null && Object.hasOwn(ROBOT_LEVELS, level.itemId))
-        level.optimalCommands = shortestCommands(ROBOT_LEVELS[level.itemId]).length;
+      if (level.optimalCommands == null) {
+        if (reviewConfig?.executionPolicy === "run-only-v1") level.optimalCommands = shortestCommands(frozenRobotLevel(reviewConfig, level.itemId)).length;
+        else if (Object.hasOwn(ROBOT_LEVELS, level.itemId)) level.optimalCommands = shortestCommands(ROBOT_LEVELS[level.itemId]).length;
+      }
   if (state.tie?.active) state.tie.challenge = tieQuestion(state.tie.attempt);
   return json(state);
 }
@@ -336,7 +354,7 @@ export function verifyCompetitionSubmission(
     };
   }
   if (round.content_version === "competition-v5-1" && (!Array.isArray(input.commands) || input.commands.length === 0)) throw new Error("invalid_commands");
-  const r = competitionRobotScore(item, input.commands);
+  const r = competitionRobotScore(item, input.commands, round.config.executionPolicy === "run-only-v1" ? frozenRobotLevel(round.config, item) : undefined);
   return {
     successful: r.successful,
     score: r.score,

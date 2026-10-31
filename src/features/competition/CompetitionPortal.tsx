@@ -1,3 +1,4 @@
+import { AccessibilityDisplayContext } from "../../lib/accessibilityDisplay";
 import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { ArenaApiError, invokeArena, standaloneMode } from "../../lib/workshop";
@@ -23,13 +24,14 @@ import {
 } from "./api";
 import type {
   Command,
+  RobotExecution,
   CompetitionState,
   Identity,
   MapDefinition,
   Question,
   Stage,
 } from "./types";
-import { isCompetitionId } from "./contracts";
+import { isCompetitionId, isDefinitiveRobotRejection } from "./contracts";
 import { Demo } from "./Demo";
 import { AwardCeremony, CeremonyControls, ScoreBreakdown } from "./V5";
 import { MapPrompt, Prompt, QuestionPlayer, RobotPlayer } from "./Content";
@@ -535,6 +537,15 @@ export default function CompetitionPortal({
       });
     });
   };
+  const setColorblindSim = (enabled: boolean) => {
+    if (identity?.role !== "mc") return;
+    void run(async () => {
+      if (!state?.a11yViewScope || typeof state.a11yColorblindSim !== "boolean") {
+        throw new ArenaApiError("display_sync_unavailable");
+      }
+      await control("set_a11y_vision", { enabled, viewScope: state.a11yViewScope });
+    });
+  };
   const copy = (text: string) =>
     run(async () => {
       await navigator.clipboard.writeText(text);
@@ -590,16 +601,17 @@ export default function CompetitionPortal({
     await refresh();
   };
   const submitRobot = async (item: string, commands: Command[], optimization = false) => {
-    if (!identity || !state) return;
+    if (!identity || !state) throw new Error("forbidden");
     const stage = state.stages.find((s) => s.stageNo === 2);
-    if (!stage?.roundId) return;
+    if (!stage?.roundId) throw new Error("round_not_running");
     const pendingKey = `arena-official-run:${stage.roundId}:${state.own?.teamId ?? identity.teamId}:${item}`;
     const payload = JSON.stringify({ commands, optimization });
     let pending: { payload: string; key: string } | null = null;
     try { pending = JSON.parse(sessionStorage.getItem(pendingKey) ?? "null"); } catch { /* regenerate invalid local retry cache */ }
-    const key = pending?.payload === payload ? pending.key : crypto.randomUUID();
+    if (pending && pending.payload !== payload) throw new Error("pending_official_run");
+    const key = pending?.key ?? crypto.randomUUID();
     sessionStorage.setItem(pendingKey, JSON.stringify({ payload, key }));
-    await invokeArena(
+    const result = await invokeArena<{ accepted: boolean; execution?: RobotExecution }>(
       "arena-submit-robot",
       {
         roundId: stage.roundId,
@@ -610,9 +622,17 @@ export default function CompetitionPortal({
         idempotencyKey: key,
       },
       headers(identity),
-    );
+    ).catch(async (e) => {
+      if (isDefinitiveRobotRejection(e)) {
+        sessionStorage.removeItem(pendingKey);
+        await refresh().catch(() => undefined);
+      }
+      throw e;
+    });
+    if (!result.accepted) throw new Error("submission_failed");
     sessionStorage.removeItem(pendingKey);
-    await refresh();
+    await refresh().catch((e) => setError(message(e)));
+    return result.execution;
   };
   const submitTie = async (answer: string) => {
     if (!identity || !state?.tie) return;
@@ -631,6 +651,11 @@ export default function CompetitionPortal({
   };
 
   return (
+    <AccessibilityDisplayContext.Provider value={{
+      colorblindSim: state?.a11yColorblindSim ?? false,
+      busy,
+      onColorblindSimChange: state?.role === "mc" ? setColorblindSim : undefined,
+    }}>
     <main className="competition-shell">
       <header className="competition-header">
         <a href="/" className="brand">
@@ -1062,9 +1087,13 @@ export default function CompetitionPortal({
                 onAnswer={(item, answer) =>
                   run(() => submitAnswer(item, answer))
                 }
-                onRobot={(item, commands, optimization) =>
-                  run(() => submitRobot(item, commands, optimization))
-                }
+                onRobot={async (item, commands, optimization) => {
+                  if (busyRef.current) throw new Error("busy");
+                  busyRef.current = true; setBusy(true); setError(null);
+                  try { return await submitRobot(item, commands, optimization); }
+                  catch (e) { setError(message(e)); throw e; }
+                  finally { busyRef.current = false; setBusy(false); }
+                }}
               />
             </>
           )}
@@ -1146,6 +1175,7 @@ export default function CompetitionPortal({
         </>
       )}
     </main>
+    </AccessibilityDisplayContext.Provider>
   );
 }
 
@@ -1437,7 +1467,7 @@ export function Participant({
   state: CompetitionState;
   busy: boolean;
   onAnswer: (item: string, answer: string) => Promise<void>;
-  onRobot: (item: string, commands: Command[], optimization?: boolean) => Promise<void>;
+  onRobot: (item: string, commands: Command[], optimization?: boolean) => Promise<RobotExecution | void>;
   viewMode?: "before" | "after";
 }) {
   if (!stage) return null;
@@ -1498,6 +1528,7 @@ export function Participant({
           <RobotPlayer
             key={item.id}
             map={item}
+            pendingRunKey={`arena-official-run:${stage.roundId}:${state.own?.teamId}:${item.id}`}
             busy={busy || closed}
             score={
               state.own?.submissions.find((x) => x.itemId === item.id)?.score

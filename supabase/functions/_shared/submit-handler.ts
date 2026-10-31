@@ -1,3 +1,4 @@
+import { competitionRobotScore, frozenRobotLevel } from "./competition-content.ts";
 import { submitTie, verifyCompetitionSubmission } from "./competition-api.ts";
 import { body, json, requireString } from "./http.ts";
 import { admin, sha256, token } from "./db.ts";
@@ -30,6 +31,13 @@ export async function submit(request: Request, game: "accessibility" | "robot") 
   if (error || !result) {
     const safe = ["forbidden", "round_not_running", "round_content_mismatch", "item_not_in_round", "invalid_idempotency_reuse", "invalid_verified_submission","stage_closed","inactive_challenge","optimization_required","optimization_limit","already_optimal","invalid_optimization"];
     throw new Error(safe.find((code) => error?.message?.includes(code)) ?? "submission_failed");
+  }
+  // No simulator/preview endpoint. Return only this committed run's trace, never the BFS route.
+  if (game === "robot" && ["competition-v2-1", "competition-v5-1"].includes(round.content_version)) {
+    const execution = competitionRobotScore(itemId, input.commands, round.config.executionPolicy === "run-only-v1" ? frozenRobotLevel(round.config, itemId) : undefined);
+    result.accepted = true;
+    result.execution = { trace: execution.trace };
+    if (result.level) { delete result.level.isOptimal; delete result.level.optimalCommands; delete result.level.extraCommands; }
   }
   return json(result, result.verified || result.accepted ? 200 : 422);
 }

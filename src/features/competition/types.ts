@@ -58,6 +58,7 @@ export type CompetitionState = {
   robotLevels?: RobotLevelSummary[];
   scoreExplanations?: ScoreExplanation[];
   demoStage?: number | null;
+  a11yColorblindSim?: boolean;
   a11yViewMode?: "before" | "after";
   a11yViewScope?: string | null;
   joinCode?: string;
@@ -119,7 +120,7 @@ export type RobotLevelSummary = {
   itemId: string; canonicalVersion: string; label?: string; successful: boolean;
   firstCommands: number | null; bestCommands: number | null; optimalCommands?: number | null;
   extraCommands?: number | null; bestBaseScore: number; officialRuns: number;
-  optimizationAttempts: number; penalty: number; finalScore: number; isOptimal: boolean;
+  optimizationAttempts: number; penalty: number; finalScore: number; isOptimal?: boolean;
   history?: { run: number; successful: boolean; commandsUsed: number; baseScore: number; optimization: boolean }[];
 };
 export type RobotDemoState = {
@@ -134,3 +135,5 @@ export type ScoreExplanation = {
   robot: RobotLevelSummary[];
   totals: NonNullable<CompetitionState["leaderboard"]>[number];
 };
+
+export type RobotExecution = { trace: { x: number; y: number; direction: number; blocked: boolean; goal: boolean }[] };

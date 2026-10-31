@@ -54,7 +54,7 @@ test("V5 live teaching -> paid optimization -> private results -> manually revea
         if (endpoint === "arena-submit-robot") {
           expect(role).toBe("team"); expect(input.optimization).toBe(true); expect(input.commands).toEqual(Array(4).fill("forward"));
           if (!seenKeys.has(input.idempotencyKey)) { seenKeys.add(input.idempotencyKey); level = { ...level, bestCommands: 4, bestBaseScore: 100, officialRuns: 2, optimizationAttempts: 1, penalty: 5, finalScore: 95, isOptimal: true }; }
-          return route.fulfill({ json: { accepted: true, verified: true, level, score: 95 } });
+          return route.fulfill({ json: { accepted: true, verified: true, level, score: 95, execution: { trace: simulate(configs[1].maps![0], input.commands) } } });
         }
         if (endpoint !== "arena-get-state") {
           expect(role).toBe("mc"); writes.push(input.action);
@@ -136,9 +136,9 @@ test("V5 live teaching -> paid optimization -> private results -> manually revea
     await expect(team.getByRole("button", { name: "Tối ưu lại", exact: true })).toBeVisible({ timeout: 12000 });
     await team.getByRole("button", { name: "Tối ưu lại", exact: true }).click();
     for (let i = 0; i < 4; i++) await team.getByRole("button", { name: "Đi thẳng", exact: true }).click();
-    await team.getByRole("button", { name: "Từng bước", exact: true }).click();
-    expect(seenKeys.size).toBe(0); // local debug never becomes an official attempt
-    await team.getByRole("button", { name: "Chạy tối ưu chính thức (−5 điểm)", exact: true }).click();
+    await expect(team.getByRole("button", { name: /Từng bước|Tạm dừng|Chạy thử|Đặt lại|Ghost Path/ })).toHaveCount(0);
+    expect(seenKeys.size).toBe(0); // edits never execute or preview
+    await team.getByRole("button", { name: "RUN PROGRAM — Tối ưu (−5 điểm)", exact: true }).click();
     await expect(team.getByRole("region", { name: "Điểm Robot chính thức" })).toContainText("95/100");
     await shot(team, "04-optimization-penalty", team.getByRole("region", { name: "Điểm Robot chính thức" }));
     expect(seenKeys.size).toBe(1);

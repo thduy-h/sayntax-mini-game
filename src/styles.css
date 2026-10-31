@@ -1949,7 +1949,10 @@ select:focus-visible {
 /* Robot Sprite */
 .robot-sprite {
   width: 80%;
-  height: 80%;
+  height: auto;
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
   display: grid;
   place-items: center;
   z-index: 5;
@@ -1957,7 +1960,8 @@ select:focus-visible {
 
 .robot-facing {
   width: 100%;
-  height: 100%;
+  height: auto;
+  aspect-ratio: 1;
   /* Rotation stays on this layer so Motion's layout transform cannot overwrite it. */
 }
 
@@ -1967,8 +1971,9 @@ select:focus-visible {
 
 .robot-head {
   width: 100%;
-  height: 100%;
-  border-radius: 12px;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 20%;
   background: var(--accent);
   border: 2.5px solid #121212;
   position: relative;
@@ -3250,7 +3255,7 @@ select:focus-visible {
 .competition-shell { overflow-wrap:anywhere; }
 .competition-map .board-cell:nth-child(6n) { border-right:1.5px solid #121212; }
 .competition-map .board-cell:nth-last-child(-n+6) { border-bottom:1.5px solid #121212; }
-.competition-map .robot-sprite { width:82%; height:82%; }
+.competition-map .robot-sprite { width:82%; height:auto; aspect-ratio:1; }
 .competition-presentation .competition-options { list-style-type:upper-alpha; }
 .competition-shell .round-results-table { min-width:560px; overflow-wrap:normal; }
 .competition-shell .round-results-table th,.competition-shell .round-results-table td { padding:12px; }

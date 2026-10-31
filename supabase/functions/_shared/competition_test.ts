@@ -77,7 +77,9 @@ Deno.test(
     for (const [id, map] of Object.entries(ROBOT_LEVELS)) {
       const path = shortestCommands(map);
       assert(path.length <= 24);
-      assertEquals(competitionRobotScore(id, path), {
+      const { trace, ...scoring } = competitionRobotScore(id, path);
+      assertEquals(trace.at(-1)?.goal, true);
+      assertEquals(scoring, {
         successful: true,
         score: 100,
         executed: path.length,
@@ -139,7 +141,10 @@ Deno.test(
       "forward",
     ];
     assertEquals(shortestCommands(ROBOT_LEVELS["7"]).length, 12);
-    assertEquals(competitionRobotScore("7", program), {
+    const { trace, ...scoring } = competitionRobotScore("7", program);
+    assertEquals(trace.length, 14);
+    assertEquals(trace.at(-1)?.goal, true);
+    assertEquals(scoring, {
       successful: true,
       score: 92,
       executed: 13,

@@ -16,3 +16,7 @@ def invariant():
  assert sql('select count(*) from (select round_id,team_id,sum(verified_score) score from arena.submissions where verified group by 1,2) a full join arena.team_scores b using(round_id,team_id) where coalesce(a.score,0)<>coalesce(b.score,0)')=='0'
 print('Focused database:',sql('show server_version'),flush=True)
 exec((ROOT/'tests/database/competition_v5.py').read_text())
+
+exec((ROOT / "tests/database/colorblind_sync.py").read_text())
+
+exec((ROOT / "tests/database/robot_run_only.py").read_text())

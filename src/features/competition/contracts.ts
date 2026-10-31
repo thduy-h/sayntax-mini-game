@@ -23,3 +23,9 @@ export function parseCreatedCompetition(
     return null;
   return { competitionId: result.competitionId, mcToken: result.mcToken };
 }
+
+// These errors are returned before an attempt can commit. Transport failures remain ambiguous.
+export function isDefinitiveRobotRejection(error: unknown): boolean {
+  const code = error && typeof error === "object" && "code" in error ? error.code : null;
+  return typeof code === "string" && ["forbidden", "round_not_running", "round_content_mismatch", "item_not_in_round", "invalid_idempotency_reuse", "invalid_verified_submission", "stage_closed", "inactive_challenge", "optimization_required", "optimization_limit", "invalid_optimization", "invalid_commands"].includes(code);
+}

@@ -354,7 +354,7 @@ function fixture() {
           team.robot[input.itemId] ?? 0,
           verified.score,
         );
-        return send({ verified: true, score: 100 });
+        return send({ accepted: true, verified: verified.successful, score: verified.score, execution: { trace: verified.trace } });
       }
       throw new Error(`Unexpected competition endpoint: ${endpoint}`);
     });
@@ -732,18 +732,15 @@ test("mocked eight-team two-stage competition survives closed devices and publis
             exact: true,
           })
           .click();
-      await robot
-        .getByRole("button", { name: "Chạy thử / Tiếp tục", exact: true })
-        .click();
+      await expect(robot.getByRole("button", { name: /Từng bước|Chạy thử|Tạm dừng|Ghost Path/ })).toHaveCount(0);
+      await robot.getByRole("button", { name: "RUN PROGRAM", exact: true }).click();
       await expect(
         robot.getByRole("status").filter({ hasText: "Đã tới đích" }),
       ).toBeVisible({ timeout: 12000 });
-      await robot
-        .getByRole("button", { name: "Gửi chương trình", exact: true })
-        .click();
+
       await expect(
-        robot.getByText("Điểm tốt nhất đã xác minh: 100/100", { exact: false }),
-      ).toBeVisible();
+        robot.getByRole("region", { name: "Điểm Robot chính thức" }),
+      ).toContainText("100/100");
       await expect(
         robot.getByText(/Chuỗi tối ưu|Ghost Path|MỤC TIÊU PAR/),
       ).toHaveCount(0);

@@ -292,29 +292,32 @@ export function shortestCommands(level: RobotLevel): RobotCommand[] {
   }
   throw new Error("invalid_unsolvable_level");
 }
-export function competitionRobotScore(item: string, commands: unknown) {
+export function competitionRobotScore(item: string, commands: unknown, frozenLevel?: RobotLevel) {
   if (
-    !Object.hasOwn(ROBOT_LEVELS, item) ||
+    (!frozenLevel && !Object.hasOwn(ROBOT_LEVELS, item)) ||
     !Array.isArray(commands) ||
     commands.length > 24 ||
     commands.some((c) => !["forward", "left", "right"].includes(c))
   )
     throw new Error("invalid_commands");
-  const level = ROBOT_LEVELS[item];
+  const level = frozenLevel ?? ROBOT_LEVELS[item];
   let { x, y } = level.start;
   let direction = level.initialDirection;
   let executed = 0,
     successful = false;
+  const trace = [{ x, y, direction, blocked: false, goal: false }];
   for (const cmd of commands) {
     executed++;
     if (cmd === "left") direction = (direction + 3) % 4;
     else if (cmd === "right") direction = (direction + 1) % 4;
     else {
-      x += [0, 1, 0, -1][direction];
-      y += [-1, 0, 1, 0][direction];
-      if (x < 0 || x > 5 || y < 0 || y > 5 || level.walls.includes(`${x},${y}`))
-        break;
+      const nx = x + [0, 1, 0, -1][direction], ny = y + [-1, 0, 1, 0][direction];
+      if (nx < 0 || nx > 5 || ny < 0 || ny > 5 || level.walls.includes(`${nx},${ny}`)) {
+        trace.push({ x, y, direction, blocked: true, goal: false }); break;
+      }
+      x = nx; y = ny;
     }
+    trace.push({ x, y, direction, blocked: false, goal: x === level.goal.x && y === level.goal.y });
     if (x === level.goal.x && y === level.goal.y) {
       successful = true;
       break;
@@ -330,6 +333,7 @@ export function competitionRobotScore(item: string, commands: unknown) {
       : 0,
     executed,
     optimalCommands: shortestCommands(level).length,
+    trace,
   };
 }
 
@@ -384,4 +388,41 @@ export function tieAnswer(attempt: number, id: string) {
   const i = ["o1", "o2", "o3"].indexOf(id);
   if (i < 0) throw new Error("invalid_answer");
   return tieQuestions[(attempt - 1) % tieQuestions.length].scores[i];
+}
+
+// Server-only freeze. Public practice banks and the MC demo never import these maps.
+// Geometry is generated once, then persisted with the stage/round; no client seed controls it.
+export function freezeOfficialRobotConfig(input: unknown) {
+  const config = competitionConfig(2, input);
+  const maps = config.maps!.map((map, index) => {
+    for (let attempt = 0; attempt < 2000; attempt++) {
+      const bytes = crypto.getRandomValues(new Uint8Array(64));
+      const start = { x: bytes[0] % 6, y: bytes[1] % 6 }, goal = { x: bytes[2] % 6, y: bytes[3] % 6 };
+      if (start.x === goal.x && start.y === goal.y) continue;
+      const occupied = new Set([`${start.x},${start.y}`, `${goal.x},${goal.y}`]);
+      const walls: string[] = [];
+      for (let k = 5; k < bytes.length - 1 && walls.length < 5 + index * 2; k += 2) {
+        const wall = `${bytes[k] % 6},${bytes[k + 1] % 6}`;
+        if (!occupied.has(wall)) { occupied.add(wall); walls.push(wall); }
+      }
+      if (walls.length !== 5 + index * 2) continue;
+      const candidate = { start, goal, walls, initialDirection: bytes[4] % 4, par: 0 };
+      try {
+        const optimal = shortestCommands(candidate).length;
+        if (optimal < 7 + index * 2 || optimal > 11 + index * 2) continue;
+        // Exact practice layouts are excluded even if a different start is chosen.
+        if (Object.values(ROBOT_LEVELS).some(l => [...l.walls].sort().join(";") === [...walls].sort().join(";"))) continue;
+        return { ...map, start, goal, walls, initialDirection: candidate.initialDirection };
+      } catch { /* reject unreachable candidates */ }
+    }
+    throw new Error("map_generation_failed");
+  });
+  return { levelIds: config.levelIds!, maps, executionPolicy: "run-only-v1" };
+}
+export function frozenRobotLevel(config: Record<string, unknown>, item: string): RobotLevel {
+  const maps = config.maps;
+  const map = Array.isArray(maps) ? maps.find(m => m.id === item) : null;
+  if (!map || map.width !== 6 || map.height !== 6 || !Array.isArray(map.walls)) throw new Error("round_content_mismatch");
+  // All callers read this from the immutable service-role round, never the request.
+  return { start: map.start, goal: map.goal, walls: map.walls, initialDirection: map.initialDirection, par: 0 };
 }

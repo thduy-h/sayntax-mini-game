@@ -36,8 +36,10 @@ Deno.test("V5 demo and ceremony control forwards allowlisted fields, MC hash and
     assert(typeof calls[0].p_hash === "string" && calls[0].p_hash.length === 64);
     await competitionControl(request(), { ...common, action: "ceremony", phase: "ranking", expectedPhase: "intro", winner: "forged" });
     assertEquals(calls[1].p_config, { phase: "ranking", expectedPhase: "intro" });
+    await competitionControl(request(), { ...common, action: "set_a11y_vision", enabled: true, viewScope: "stage:1:0:round", score: 999 });
+    assertEquals(calls[2].p_config, { enabled: true, viewScope: "stage:1:0:round" });
     let rejected = false;
     try { await competitionControl(request(), { ...common, action: "robot_demo", demo: { op: "queue", version: -1 } }); } catch { rejected = true; }
-    assert(rejected); assertEquals(calls.length, 2);
+    assert(rejected); assertEquals(calls.length, 3);
   } finally { globalThis.fetch = original; }
 });

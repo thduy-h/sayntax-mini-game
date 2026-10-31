@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Command, MapDefinition, Question, RobotLevelSummary } from "./types";
+import type { Command, MapDefinition, Question, RobotLevelSummary, RobotExecution } from "./types";
 import { simulate } from "./robotEngine";
+import { isDefinitiveRobotRejection } from "./contracts";
 import { AccessibilityChallengeVisual } from "../../components/AccessibilityChallengeVisual";
 
 export function Prompt({
@@ -206,30 +207,62 @@ export function QuestionPlayer({
     </article>
   );
 }
-export function RobotPlayer({
-  map,
-  onSubmit,
-  busy,
-  score,
-  demo = false,
-  level,
-  strategic = false,
-}: {
-  demo?: boolean;
-  level?: RobotLevelSummary;
-  strategic?: boolean;
-  map: MapDefinition;
-  onSubmit: (commands: Command[], optimization?: boolean) => Promise<void>;
-  busy: boolean;
-  score?: number | null;
+function PracticeRobotPlayer({ map, onSubmit, busy }: {
+  map: MapDefinition; onSubmit: (commands: Command[], optimization?: boolean) => Promise<void>; busy: boolean;
 }) {
-  const [optimizing, setOptimizing] = useState(false);
-  const [commands, setCommands] = useState<Command[]>([]),
-    [step, setStep] = useState(0),
-    [running, setRunning] = useState(false);
-  useEffect(() => { setOptimizing(false); }, [level?.officialRuns]);
+  const [commands, setCommands] = useState<Command[]>([]), [step, setStep] = useState(0), [running, setRunning] = useState(false);
   const trace = useMemo(() => simulate(map, commands), [map, commands]);
   const current = trace[Math.min(step, trace.length - 1)];
+  useEffect(() => {
+    if (!running) return;
+    const timer = window.setTimeout(() => {
+      if (step >= trace.length - 1) setRunning(false); else setStep(step + 1);
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [running, step, trace.length]);
+  const edit = (next: Command[]) => { setRunning(false); setStep(0); setCommands(next); };
+  return <article className="competition-prompt">
+    <h2>{map.name}</h2><p>Luyện tập · 0 XP thi đấu · Ví dụ riêng, không thuộc đề thi.</p>
+    <RobotMap map={map} position={current} direction={current.direction} />
+    <p role="status">Bước {step}/{commands.length} · Hướng {["Bắc", "Đông", "Nam", "Tây"][current.direction]}{current.blocked ? " · Va chạm" : current.goal ? " · Đã tới đích" : ""}</p>
+    <div className="competition-command-list" aria-label="Chương trình robot">{commands.map((cmd, i) => <span key={i}>{i + 1}. {cmd === "forward" ? "↑" : cmd === "left" ? "↶" : "↷"}</span>)}</div>
+    <div className="competition-actions">{(["forward", "left", "right"] as Command[]).map((cmd, i) => <button className="button button-ghost" disabled={running || busy || commands.length >= 24} key={cmd} onClick={() => edit([...commands, cmd])}>{["Đi thẳng", "Rẽ trái", "Rẽ phải"][i]}</button>)}</div>
+    <div className="competition-actions">
+      <button className="button button-primary" disabled={!commands.length || busy} onClick={() => { if (step >= trace.length - 1) setStep(0); setRunning(!running); }}>{running ? "Tạm dừng" : "Chạy thử / Tiếp tục"}</button>
+      <button className="button button-ghost" disabled={running || busy || step >= trace.length - 1} onClick={() => setStep(step + 1)}>Từng bước</button>
+      <button className="button button-ghost" disabled={busy} onClick={() => { setRunning(false); setStep(0); }}>Đặt lại</button>
+      <button className="button button-ghost" disabled={running || busy} onClick={() => edit(commands.slice(0, -1))}>Xóa lệnh cuối</button>
+      <button className="button button-ghost" disabled={running || busy} onClick={() => edit([])}>Xóa hết</button>
+    </div>
+    <button className="button button-primary" disabled={busy || running || !current.goal} onClick={() => void onSubmit(commands)}>So sánh lời giải demo</button>
+    <p>Demo chỉ chạy trên thiết bị, không gửi bài và không có điểm thi đấu. Tới đích rồi bấm So sánh lời giải demo để xem cách tối ưu.</p>
+  </article>;
+}
+
+// All scored routes use this boundary, including legacy competition rooms.
+export function RobotPlayer(props: {
+  demo?: boolean; level?: RobotLevelSummary; strategic?: boolean; map: MapDefinition; pendingRunKey?: string;
+  onSubmit: (commands: Command[], optimization?: boolean) => Promise<RobotExecution | void>;
+  busy: boolean; score?: number | null;
+}) {
+  if (props.demo) return <PracticeRobotPlayer {...props} onSubmit={async (commands, optimization) => { await props.onSubmit(commands, optimization); }} />;
+  return <OfficialRobotPlayer {...props} />;
+}
+function OfficialRobotPlayer({ map, onSubmit, busy, level, score, strategic, pendingRunKey }: Parameters<typeof RobotPlayer>[0]) {
+  const [pendingProgram] = useState(() => {
+    try { return JSON.parse(JSON.parse(sessionStorage.getItem(pendingRunKey ?? "") ?? "null")?.payload ?? "null") as { commands: Command[]; optimization: boolean } | null; }
+    catch { return null; }
+  });
+  const [retryProgram, setRetryProgram] = useState(pendingProgram);
+  const [commands, setCommands] = useState<Command[]>(pendingProgram?.commands ?? []);
+  const [trace, setTrace] = useState<RobotExecution["trace"]>([]);
+  const [step, setStep] = useState(0);
+  const [pending, setPending] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [optimizing, setOptimizing] = useState(pendingProgram?.optimization ?? false);
+  const [error, setError] = useState<string | null>(null);
+  const locked = busy || pending || running;
+  const current = trace[step] ?? { ...map.start, direction: map.initialDirection, blocked: false, goal: false };
   useEffect(() => {
     if (!running) return;
     const timer = window.setTimeout(() => {
@@ -238,112 +271,48 @@ export function RobotPlayer({
     }, 320);
     return () => clearTimeout(timer);
   }, [running, step, trace.length]);
-  const edit = (next: Command[]) => {
-    setRunning(false);
-    setStep(0);
-    setCommands(next);
+  const edit = (next: Command[]) => { if (locked || retryProgram) return; setCommands(next); setTrace([]); setStep(0); };
+  const execute = async () => {
+    if (locked || !commands.length) return;
+    const optimization = retryProgram?.optimization ?? Boolean(level?.successful && optimizing);
+    setPending(true); setError(null);
+    try {
+      // No local simulation: only animate this team's execution after committed RPC acknowledgement.
+      const result = await onSubmit([...commands], optimization);
+      setRetryProgram(null); setOptimizing(false);
+      if (result?.trace.length) { setTrace(result.trace); setStep(0); setRunning(true); }
+    } catch (e) {
+      if (isDefinitiveRobotRejection(e)) {
+        setRetryProgram(null); setOptimizing(false);
+        setError("Backend từ chối lượt chạy. Chưa phát mô phỏng; kiểm tra trạng thái thử thách trước khi thử lại.");
+      } else {
+        setRetryProgram({ commands: [...commands], optimization });
+        setError("Chưa xác nhận lượt chạy. Thử lại cùng chương trình để nhận kết quả, không tính trùng lượt.");
+      }
+    } finally { setPending(false); }
   };
-  return (
-    <article className="competition-prompt">
-      <h2>{map.name}</h2>
-      <p>
-        {demo
-          ? "Luyện tập · 0 XP thi đấu"
-          : strategic ? `Điểm chính thức: ${level?.finalScore ?? 0}/100 · ${level?.officialRuns ?? 0} lượt chạy` : `Điểm tốt nhất đã xác minh: ${score ?? 0}/100`}{" "}
-        · Tối đa 24 lệnh · Chỉnh sửa và debug từng bước không mất điểm.
-      </p>
-      <RobotMap map={map} position={current} direction={current.direction} />
-      <p role="status">
-        Bước {step}/{commands.length} · Hướng{" "}
-        {["Bắc", "Đông", "Nam", "Tây"][current.direction]}
-        {current.blocked ? " · Va chạm" : current.goal ? " · Đã tới đích" : ""}
-      </p>
-      <div className="competition-command-list" aria-label="Chương trình robot">
-        {commands.map((cmd, i) => (
-          <span key={i}>
-            {i + 1}. {cmd === "forward" ? "↑" : cmd === "left" ? "↶" : "↷"}
-          </span>
-        ))}
-      </div>
-      <div className="competition-actions">
-        {(["forward", "left", "right"] as Command[]).map((cmd, i) => (
-          <button
-            className="button button-ghost"
-            disabled={running || busy || commands.length >= 24}
-            key={cmd}
-            onClick={() => edit([...commands, cmd])}
-          >
-            {["Đi thẳng", "Rẽ trái", "Rẽ phải"][i]}
-          </button>
-        ))}
-      </div>
-      <div className="competition-actions">
-        {!strategic && <button
-          className="button button-primary"
-          disabled={!commands.length || busy}
-          onClick={() => {
-            if (step >= trace.length - 1) setStep(0);
-            setRunning(!running);
-          }}
-        >
-          {running ? "Tạm dừng" : "Chạy thử / Tiếp tục"}
-        </button>}
-        <button
-          className="button button-ghost"
-          disabled={running || busy || step >= trace.length - 1}
-          onClick={() => setStep(step + 1)}
-        >
-          Từng bước
-        </button>
-        <button
-          className="button button-ghost"
-          disabled={busy}
-          onClick={() => {
-            setRunning(false);
-            setStep(0);
-          }}
-        >
-          Đặt lại
-        </button>
-        <button
-          className="button button-ghost"
-          disabled={running || busy}
-          onClick={() => edit(commands.slice(0, -1))}
-        >
-          Xóa lệnh cuối
-        </button>
-        <button
-          className="button button-ghost"
-          disabled={running || busy}
-          onClick={() => edit([])}
-        >
-          Xóa hết
-        </button>
-      </div>
-      {strategic ? <section className="robot-official-scoring" aria-label="Điểm Robot chính thức">
-        <p><strong>{level?.finalScore ?? 0}/100</strong> · Điểm nền {level?.bestBaseScore ?? 0} − phí tối ưu {level?.penalty ?? 0}</p>
-        {level?.successful && <>
-          <p>Lời giải đầu: {level.firstCommands} lệnh · Tốt nhất: {level.bestCommands} lệnh · Tối ưu lại {level.optimizationAttempts}/2 lượt.</p>
-          {level.isOptimal ? <p>Đã đạt lời giải tối ưu. Giữ kết quả, không cần trả phí tối ưu thêm.</p>
-            : <button className="button button-ghost" disabled={busy || running || level.optimizationAttempts >= 2 || optimizing} onClick={() => setOptimizing(true)}>Tối ưu lại</button>}
-          {optimizing && <p role="alert">Lượt chạy chính thức tiếp theo trừ 5 điểm, kể cả thất bại. Chỉ chỉnh sửa không mất điểm.</p>}
-        </>}
-        <button className="button button-primary" disabled={busy || running || !commands.length || Boolean(level?.successful && !optimizing)} onClick={() => {
-          setStep(0); setRunning(true);
-          void onSubmit(commands, Boolean(level?.successful && optimizing));
-        }}>{level?.successful ? "Chạy tối ưu chính thức (−5 điểm)" : "Chạy chính thức"}</button>
-        {optimizing && <button className="button button-ghost" disabled={busy || running} onClick={() => setOptimizing(false)}>Giữ lời giải hiện tại</button>}
-      </section> : <button
-        className="button button-primary"
-        disabled={busy || running || !current.goal}
-        onClick={() => void onSubmit(commands)}
-      >{demo ? "So sánh lời giải demo" : "Gửi chương trình"}</button>}
-      <p>
-        {demo
-          ? "Demo chỉ chạy trên thiết bị, không gửi bài và không có điểm thi đấu. Tới đích rồi bấm So sánh lời giải demo để xem cách tối ưu."
-          : strategic ? "Điểm nền hoàn thành 60–100: mỗi lệnh dư trừ 8. Sau thành công đầu tiên, tối đa 2 lượt tối ưu, mỗi lượt trừ 5 kể cả thất bại; điểm cuối có thể còn 50. Thất bại trước thành công đầu không trừ điểm. Không thưởng tốc độ."
-          : "Đạt đích: ít nhất 60 điểm; mỗi lệnh dư trừ 8 điểm; tối đa 100. Không có điểm tốc độ. Lời giải mẫu chỉ mở sau khi chốt phiên."}
-      </p>
-    </article>
-  );
+  return <article className="competition-prompt">
+    <h2>{map.name}</h2>
+    <p>Viết trọn chương trình → RUN PROGRAM → Quan sát kết quả. Tối đa {map.maxCommands ?? 24} lệnh. Mỗi lần chạy được backend ghi nhận.</p>
+    <RobotMap map={map} position={current} direction={current.direction} />
+    <p role="status">{pending ? "Đang xác nhận lượt chạy…" : trace.length ? `Bước ${step}/${trace.length - 1} · ${current.blocked ? "Va chạm" : current.goal ? "Đã tới đích" : running ? "Đang chạy" : "Đã kết thúc"}` : "Chưa chạy chương trình"}</p>
+    <div className="competition-command-list" aria-label="Chương trình robot">{commands.map((cmd, i) => <span key={i}>{i + 1}. {cmd === "forward" ? "↑" : cmd === "left" ? "↶" : "↷"}</span>)}</div>
+    <div className="competition-actions">{(["forward", "left", "right"] as Command[]).map((cmd, i) => <button className="button button-ghost" key={cmd} disabled={locked || Boolean(retryProgram) || commands.length >= (map.maxCommands ?? 24)} onClick={() => edit([...commands, cmd])}>{["Đi thẳng", "Rẽ trái", "Rẽ phải"][i]}</button>)}
+      <button className="button button-ghost" disabled={locked || Boolean(retryProgram) || !commands.length} onClick={() => edit(commands.slice(0, -1))}>Xóa lệnh cuối</button>
+      <button className="button button-ghost" disabled={locked || Boolean(retryProgram) || !commands.length} onClick={() => edit([])}>Xóa hết</button>
+    </div>
+    <section className="robot-official-scoring" aria-label="Điểm Robot chính thức">
+      <p><strong>{level?.finalScore ?? score ?? 0}/100</strong>{strategic && <> · Điểm nền {level?.bestBaseScore ?? 0} − phí tối ưu {level?.penalty ?? 0} · {level?.officialRuns ?? 0} lượt chạy</>}</p>
+      {strategic && level?.successful && <>
+        <p>Lời giải đầu: {level.firstCommands} lệnh · Tốt nhất: {level.bestCommands} lệnh · Tối ưu lại {level.optimizationAttempts}/2 lượt.</p>
+        <button className="button button-ghost" disabled={locked || Boolean(retryProgram) || level.optimizationAttempts >= 2 || optimizing} onClick={() => setOptimizing(true)}>Tối ưu lại</button>
+        {optimizing && <p role="alert">Xác nhận: RUN PROGRAM tiếp theo trừ 5 điểm, kể cả thất bại. Chỉnh sửa không mất điểm. Tối đa 2 lượt tối ưu.</p>}
+      </>}
+      <button className="button button-primary" disabled={locked || !commands.length || Boolean(!retryProgram && strategic && level?.successful && (!optimizing || level.optimizationAttempts >= 2))} onClick={() => void execute()}>{retryProgram ? "RUN PROGRAM — Nhận lại kết quả" : strategic && level?.successful ? "RUN PROGRAM — Tối ưu (−5 điểm)" : "RUN PROGRAM"}</button>
+      {optimizing && <button className="button button-ghost" disabled={locked || Boolean(retryProgram)} onClick={() => setOptimizing(false)}>Giữ lời giải hiện tại</button>}
+    </section>
+    {retryProgram && !error && <p role="alert">Có lượt chạy đang chờ xác nhận. Bấm RUN PROGRAM để nhận lại kết quả; không tính trùng lượt.</p>}
+    {error && <p role="alert">{error}</p>}
+    <p>Thất bại trước thành công đầu không trừ điểm. Điểm nền 60–100; mỗi lệnh dư trừ 8. Sau thành công đầu: tối đa 2 lượt tối ưu, mỗi lượt trừ 5 kể cả thất bại; điểm có thể còn 50. Không thưởng tốc độ. Lời giải tối ưu chỉ mở sau khi chốt phiên.</p>
+  </article>;
 }

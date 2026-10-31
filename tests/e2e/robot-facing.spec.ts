@@ -3,6 +3,10 @@ import { expect, test, type Page } from "@playwright/test";
 async function expectFacing(page: Page, direction: number, position: number) {
   const sprite = page.getByRole("img", { name: /^Robot đang nhìn hướng/ });
   await expect(sprite).toHaveCount(1);
+  const size = await sprite.locator(".robot-head").boundingBox();
+  expect(size).not.toBeNull();
+  expect(Math.abs(size!.width - size!.height)).toBeLessThan(1);
+  expect(size!.width).toBeGreaterThan(20);
   await expect(page.locator(".board-cell").nth(position)).toContainText("▲");
   await expect(sprite.locator(".robot-facing")).toHaveAttribute("data-direction", String(direction));
   const expected = ["matrix(1, 0, 0, 1, 0, 0)", "matrix(0, 1, -1, 0, 0, 0)", "matrix(-1, 0, 0, -1, 0, 0)", "matrix(0, -1, 1, 0, 0, 0)"][direction];

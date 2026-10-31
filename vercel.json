@@ -12,7 +12,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "competition-v5-review": false
+      "competition-v5-review": false,
+      "robot-v5-execution-review": false
     }
   }
 }

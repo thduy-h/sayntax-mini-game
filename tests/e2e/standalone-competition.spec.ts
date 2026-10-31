@@ -27,6 +27,10 @@ test("standalone reuses MC, team and presentation screens without backend calls"
   await page.getByRole('button', {name:'Màn hình đội',exact:true}).click();
   await expect(page.getByRole('heading', {name:'Phiên 2 · Robot Commands'})).toBeVisible();
   await expect(page.getByRole('grid')).toBeVisible();
+  const head = await page.locator('.robot-head').boundingBox();
+  expect(head).not.toBeNull();
+  expect(Math.abs(head!.width - head!.height)).toBeLessThan(1);
+  expect(head!.width).toBeGreaterThan(20);
   await page.screenshot({path:`${directory}/robot.png`, fullPage:true});
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(requests).toEqual([]);

@@ -10,7 +10,7 @@ const IDENTITY_KEY = "sayntax-arena-identity-v1";
 const colors = ["#ff765d", "#8b7bff", "#35c59b", "#f3b63e", "#4ea6ff", "#ec4899", "#8b5cf6", "#14b8a6"];
 
 export class ArenaApiError extends Error {
-  constructor(public code: string) { super(code); }
+  constructor(public code: string, public retryAfterSeconds?: number) { super(code); }
 }
 
 export async function invokeArena<T>(functionName: string, body: Record<string, unknown>, headers: Record<string, string> = {}): Promise<T> {
@@ -18,12 +18,17 @@ export async function invokeArena<T>(functionName: string, body: Record<string, 
   const { data, error } = await supabase.functions.invoke(functionName, { body, headers });
   if (error) {
     let code = error.message;
+    let retryAfterSeconds: number | undefined;
     const context = (error as FunctionsHttpError).context;
     if (context instanceof Response) {
-      const payload = await context.clone().json().catch(() => null) as { error?: string } | null;
+      const payload = await context.clone().json().catch(() => null) as {
+        error?: string; retryAfterSeconds?: number;
+      } | null;
       code = payload?.error ?? code;
+      const wait = Number(payload?.retryAfterSeconds ?? context.headers.get("retry-after"));
+      if (Number.isFinite(wait) && wait > 0) retryAfterSeconds = Math.ceil(wait);
     }
-    throw new ArenaApiError(code);
+    throw new ArenaApiError(code, retryAfterSeconds);
   }
   return data as T;
 }

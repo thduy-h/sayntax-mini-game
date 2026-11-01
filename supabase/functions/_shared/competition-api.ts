@@ -1,6 +1,9 @@
 import { admin, sha256, token } from "./db.ts";
 import { clientAddress, json, requireString } from "./http.ts";
-import { rateLimit } from "./rate.ts";
+import {
+  rateLimit, COMPETITION_JOIN_IP_LIMIT, RECOVERY_IP_LIMIT,
+  RECOVERY_TEAM_LIMIT, RECOVERY_WINDOW_SECONDS,
+} from "./rate.ts";
 import {
   competitionConfig,
   freezeOfficialRobotConfig,
@@ -123,7 +126,7 @@ export async function competitionJoin(
   await rateLimit(
     db,
     `competition-join:${clientAddress(request)}:${code}`,
-    30,
+    COMPETITION_JOIN_IP_LIMIT,
     60,
   );
   const { data: room } = await db
@@ -163,7 +166,7 @@ export async function competitionJoin(
     });
   }
   if (input.action === "request_recovery") {
-    await rateLimit(db, `recovery:${clientAddress(request)}`, 6, 600);
+    await rateLimit(db, `recovery:${clientAddress(request)}`, RECOVERY_IP_LIMIT, RECOVERY_WINDOW_SECONDS);
     const credential = requireString(
       input.recoveryCredential,
       "recovery_credential",
@@ -184,6 +187,14 @@ export async function competitionJoin(
       // Compatible with older clients that already saved a competition team ID.
       targetTeamId = requireString(input.competitionTeamId, "competition_team_id", 36);
     }
+    // A shared public IP should not let one device overwhelm a single team.
+    // This applies after resolving either a registered name or an old UUID.
+    await rateLimit(
+      db,
+      `recovery-team:${room.competition_id}:${targetTeamId}`,
+      RECOVERY_TEAM_LIMIT,
+      RECOVERY_WINDOW_SECONDS,
+    );
     const requestId = await rpc("request_competition_recovery", {
       p_id: room.competition_id,
       p_team: targetTeamId,

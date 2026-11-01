@@ -91,8 +91,9 @@ const errors: Record<string, string> = {
     "Chưa xác định một đội duy nhất. Hãy hoàn thành sudden death trước khi công bố.",
   tie_answers_pending: "Chờ tất cả đội hòa nộp hoặc hết thời hạn sudden death.",
   no_teams: "Cần ít nhất một đội đăng ký trước khi bắt đầu.",
+  competition_busy: "Backend đang bận hoặc chờ khóa dữ liệu. Điểm đã nộp vẫn được giữ; đợi vài giây rồi thử lại thao tác.",
   competition_failed:
-    "Backend Competition V2 chưa sẵn sàng hoặc yêu cầu thất bại. Kiểm tra migration và phiên bản Edge Functions.",
+    "Yêu cầu backend chưa thành công. Điểm đã nộp vẫn được giữ; thử lại sau vài giây.",
   configuration_frozen: "Cấu hình phiên đã được đóng băng.",
   competition_finalized: "Cuộc thi đã công bố kết quả và không thể sửa điểm.",
 };
@@ -1210,6 +1211,8 @@ export function AdminStage({
 
   const content = s.stageNo === 1 ? s.config?.questions : s.config?.maps;
   const totalItems = s.totalItems ?? content?.length;
+  const stageExpired = s.status === "active" && Boolean(s.deadlineAt) &&
+    Date.parse(s.deadlineAt!) <= Date.parse(state.serverNow);
   const registeredTeams = state.teams?.length;
   const synchronized = Boolean(s.progress) && typeof s.itemDeadline === "string" &&
     (registeredTeams === undefined || s.progress?.total === registeredTeams);
@@ -1380,6 +1383,7 @@ export function AdminStage({
       )}
       {s.status === "active" && (
         <>
+          {stageExpired && <p role="alert">Phiên đã hết tổng thời gian thi. Bấm Chốt phiên {s.stageNo} để lưu kết quả hiện có; không thể mở thêm thử thách.</p>}
           <h3>
             Thử thách {s.activeIndex + 1}/
             {totalItems ?? "?"}
@@ -1407,7 +1411,7 @@ export function AdminStage({
           <div className="competition-actions">
             <button
               className="button button-ghost"
-              disabled={busy || !synchronized || Boolean(s.itemFinalizedAt)}
+              disabled={busy || stageExpired || !synchronized || Boolean(s.itemFinalizedAt)}
               onClick={() =>
                 void onControl("close_challenge", {
                   stage: s.stageNo,
@@ -1419,7 +1423,7 @@ export function AdminStage({
             </button>
             <button
               className="button button-primary"
-              disabled={busy || !synchronized || !totalItems || s.activeIndex >= totalItems - 1}
+              disabled={busy || stageExpired || !synchronized || !totalItems || s.activeIndex >= totalItems - 1}
               onClick={() =>
                 void onControl("advance_challenge", {
                   stage: s.stageNo,

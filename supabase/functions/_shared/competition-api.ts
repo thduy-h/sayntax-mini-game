@@ -48,6 +48,7 @@ async function rpc(name: string, args: Record<string, unknown>) {
   const { data, error } = await admin().rpc(name, args);
   if (error)
     throw new Error(
+      ["57014", "55P03", "40P01"].includes(error.code) ? "competition_busy" :
       safeErrors.find((code) => error.message.includes(code)) ??
         (error.code === "23505" ? "team_name_taken" : "competition_failed"),
     );

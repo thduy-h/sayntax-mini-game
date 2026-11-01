@@ -77,3 +77,35 @@ test(`missing or inconsistent backend progress (${JSON.stringify(progress)}) is 
 });
 
 }
+
+test("expired stage at question four permits finalization but never offers question five", async ({ page }) => {
+  const writes: string[] = [];
+  await page.addInitScript(({ id }) => {
+    sessionStorage.setItem(`arena-competition-v2:${id}:mc:mc`, JSON.stringify({ competitionId: id, role: "mc", token: "synthetic-mc" }));
+  }, { id });
+  await page.route("**/functions/v1/**", route => {
+    const input = route.request().postDataJSON();
+    if (!route.request().url().endsWith("arena-get-state")) {
+      writes.push(input.action);
+      return route.fulfill({ status: 409, json: { error: "competition_busy" } });
+    }
+    return route.fulfill({ json: {
+      mode: "competition", role: "mc", serverNow: "2026-11-01T10:11:00Z",
+      competition: { id, name: "Expired stage", status: "STAGE_1_ACTIVE", expiresAt: "2099-01-01" },
+      teams: [{ id: "a", name: "Synthetic" }], leaderboard: [],
+      stages: [{ stageNo: 1, status: "active", activeIndex: 3, totalItems: 6,
+        deadlineAt: "2026-11-01T10:10:00Z", itemDeadline: "2026-11-01T10:09:00Z", itemFinalizedAt: "2026-11-01T10:09:00Z",
+        progress: { total: 1, submitted: 1 }, config: { questions, scenarioIds: questions.map(q => q.id) } }],
+    } });
+  });
+  await page.goto(`/competition/${id}`);
+  await expect(page.getByText(/Phiên đã hết tổng thời gian thi/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Thử thách tiếp theo", exact: true })).toBeDisabled();
+  const finalize = page.getByRole("button", { name: "Chốt phiên 1", exact: true });
+  await expect(finalize).toBeEnabled();
+  page.on("dialog", dialog => dialog.accept());
+  await finalize.click();
+  await expect(page.getByText(/Backend đang bận hoặc chờ khóa dữ liệu/)).toBeVisible();
+  expect(writes).toEqual(["finalize_stage"]);
+  await expect(page.getByText(/V2 chưa sẵn sàng/)).toHaveCount(0);
+});

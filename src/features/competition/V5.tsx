@@ -57,14 +57,13 @@ export function LiveRobotDemo({ state, onAction, busy = false }: {
   </article>;
 }
 
-export function ScoreBreakdown({ explanation }: { explanation: ScoreExplanation }) {
+export function ScoreBreakdown({ explanation, robotOnly = false }: { explanation: ScoreExplanation; robotOnly?: boolean }) {
   const t = explanation.totals;
   return <details className="score-breakdown">
     <summary>Vì sao {explanation.name} được số điểm này?{t ? ` ${Number(t.final100).toFixed(2)}/100` : ""}</summary>
-    <p>Chỉ kết quả đã chốt. Accessibility /600 × 50 + Robot /400 × 50. Chỉ làm tròn khi hiển thị.</p>
-    <h3>Accessibility · {t?.accessibility ?? 0}/600 → {Number(t?.accessibility50 ?? 0).toFixed(2)}/50</h3>
-    <ul>{explanation.accessibility.map(q => <li key={q.itemId}>{q.label}: <strong>{q.score}/{q.maximum} XP</strong></li>)}</ul>
-    <h3>Robot · {t?.robot ?? 0}/400 → {Number(t?.robot50 ?? 0).toFixed(2)}/50</h3>
+    <p>Chỉ kết quả đã chốt. {robotOnly ? "Robot /400 × 100" : "Accessibility /600 × 50 + Robot /400 × 50"}. Chỉ làm tròn khi hiển thị.</p>
+    {!robotOnly && <><h3>Accessibility · {t?.accessibility ?? 0}/600 → {Number(t?.accessibility50 ?? 0).toFixed(2)}/50</h3><ul>{explanation.accessibility.map(q => <li key={q.itemId}>{q.label}: <strong>{q.score}/{q.maximum} XP</strong></li>)}</ul></>}
+    <h3>Robot · {t?.robot ?? 0}/400 → {Number(t?.robot50 ?? 0).toFixed(2)}/{robotOnly ? 100 : 50}</h3>
     <div className="score-level-list">{explanation.robot.map((r, i) => <article key={r.itemId} className="score-level">
       <h4>{r.label ?? `Robot cấp ${i + 1}`} · {r.finalScore}/100</h4>
       <dl>
@@ -101,17 +100,17 @@ export function AwardCeremony({ state }: { state: CompetitionState }) {
   const showRanking = ["ranking", "winner", "explanation", "closing"].includes(phase);
   return <section className={`award-ceremony ceremony-${phase}`} aria-label="Lễ trao giải SAYNTAX">
     <span className="eyebrow">SAYNTAX · GAME ARENA</span>
-    <p className="ceremony-kicker">HAI CHẶNG THỬ THÁCH · MỘT HÀNH TRÌNH</p>
+    <p className="ceremony-kicker">{state.competitionMode === "robot_only" ? "ROBOT COMMANDS · 4 MÀN THỬ THÁCH" : "HAI CHẶNG THỬ THÁCH · MỘT HÀNH TRÌNH"}</p>
     <h1>{phase === "waiting" ? "Hẹn gặp tại lễ trao giải" : phase === "intro" ? "Sẵn sàng cho khoảnh khắc này?" : phase === "ranking" ? "Bảng vàng SAYNTAX" : phase === "closing" ? "Cảm ơn các đội thi!" : "ĐỘI VÔ ĐỊCH"}</h1>
     {!showRanking && <p>Kết quả đã được ghi nhận. MC sẽ công bố vào cuối workshop.</p>}
     {winner && ["winner", "explanation", "closing"].includes(phase) && <div className="champion-announcement">
       <span className="champion-mark" aria-hidden="true">★</span><h2>{winner.name}</h2>
       <strong className="champion-score">{Number(winner.final100).toFixed(2)}<small>/100</small></strong>
-      <p>Accessibility {Number(winner.accessibility50).toFixed(2)}/50 · Robot {Number(winner.robot50).toFixed(2)}/50</p>
+      <p>{state.competitionMode === "robot_only" ? <>Robot {Number(winner.robot50).toFixed(2)}/100</> : <>Accessibility {Number(winner.accessibility50).toFixed(2)}/50 · Robot {Number(winner.robot50).toFixed(2)}/50</>}</p>
     </div>}
     {showRanking && <ol className="ceremony-ranking">{state.leaderboard?.map(t => <li key={t.teamId}>
-      <span>#{t.rank}</span><strong>{t.name}</strong><span>A {Number(t.accessibility50).toFixed(2)} · R {Number(t.robot50).toFixed(2)}</span><b>{Number(t.final100).toFixed(2)}/100</b>
+      <span>#{t.rank}</span><strong>{t.name}</strong><span>{state.competitionMode === "robot_only" ? <>R {Number(t.robot50).toFixed(2)}/100</> : <>A {Number(t.accessibility50).toFixed(2)} · R {Number(t.robot50).toFixed(2)}</>}</span><b>{Number(t.final100).toFixed(2)}/100</b>
     </li>)}</ol>}
-    {phase === "explanation" && state.scoreExplanations?.map(e => <ScoreBreakdown key={e.teamId} explanation={e} />)}
+    {phase === "explanation" && state.scoreExplanations?.map(e => <ScoreBreakdown key={e.teamId} explanation={e} robotOnly={state.competitionMode === "robot_only"} />)}
   </section>;
 }

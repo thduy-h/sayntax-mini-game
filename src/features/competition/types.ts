@@ -20,7 +20,7 @@ export type MapDefinition = {
 };
 export type Stage = {
   stageNo: number;
-  status: "pending" | "active" | "finalized";
+  status: "pending" | "active" | "finalized" | "skipped";
   roundId: string | null;
   roomCode?: string;
   activeIndex: number;
@@ -52,6 +52,7 @@ export type CompetitionState = {
   role: "mc" | "team" | "presentation";
   serverNow: string;
   rulesVersion?: "v5" | "legacy";
+  competitionMode?: "full" | "robot_only";
   resultsState?: string;
   ceremonyPhase?: "waiting" | "intro" | "ranking" | "winner" | "explanation" | "closing";
   robotDemo?: RobotDemoState;

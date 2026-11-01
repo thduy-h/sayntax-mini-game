@@ -14,6 +14,7 @@ import {
   tieQuestion,
 } from "./competition-content.ts";
 import { ROBOT_LEVELS } from "./canonical.ts";
+import { findRecoveryTeamId } from "./recovery-name.ts";
 
 export const randomCapability = () =>
   crypto.randomUUID().replaceAll("-", "") +
@@ -169,9 +170,23 @@ export async function competitionJoin(
       128,
     );
     if (credential.length < 32) throw new Error("invalid_credential");
+    let targetTeamId: string;
+    if (typeof input.teamName === "string") {
+      const teamName = requireString(input.teamName, "team_name", 40);
+      const { data: teams, error: lookupError } = await db
+        .from("competition_teams")
+        .select("id,name")
+        .eq("competition_id", room.competition_id)
+        .limit(9);
+      if (lookupError || !teams) throw new Error("competition_failed");
+      targetTeamId = findRecoveryTeamId(teams, teamName);
+    } else {
+      // Compatible with older clients that already saved a competition team ID.
+      targetTeamId = requireString(input.competitionTeamId, "competition_team_id", 36);
+    }
     const requestId = await rpc("request_competition_recovery", {
       p_id: room.competition_id,
-      p_team: requireString(input.competitionTeamId, "competition_team_id", 36),
+      p_team: targetTeamId,
       p_hash: await sha256(credential),
     });
     return json({ requestId });

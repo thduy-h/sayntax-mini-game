@@ -343,7 +343,7 @@ export default function CompetitionPortal({
     [credential, setCredential] = useState(""),
     [cardCredential, setCardCredential] = useState(""),
     [restore, setRestore] = useState(false),
-    [teamId, setTeamId] = useState(""),
+    [recoveryTeamName, setRecoveryTeamName] = useState(""),
     [recoveryRequest, setRecoveryRequest] = useState("");
   const [presentationUrl, setPresentationUrl] = useState(""),
     [qr, setQr] = useState(""),
@@ -818,21 +818,25 @@ export default function CompetitionPortal({
             </button>
           </form>
           <details>
-            <summary>Mất credential? Yêu cầu MC cấp lại</summary>
+            <summary>Mất credential? Khôi phục bằng tên đội</summary>
             <p>
-              Nhập ID đội trên thẻ đã lưu. MC phải xác minh đội trực tiếp trước
-              khi duyệt. Tên đội không phải mật khẩu.
+              Nhập tên đội đã đăng ký, sau đó đưa mã yêu cầu cho BTC.
+              BTC sẽ đến xác minh trực tiếp và duyệt để bạn vào lại đúng đội cũ,
+              giữ nguyên điểm đã đạt.
             </p>
             <label>
-              ID đội
+              Tên đội đã đăng ký
               <input
-                value={teamId}
-                onChange={(e) => setTeamId(e.target.value)}
+                autoComplete="off"
+                value={recoveryTeamName}
+                maxLength={40}
+                placeholder="Ví dụ: Đội Alpha"
+                onChange={(e) => setRecoveryTeamName(e.target.value)}
               />
             </label>
             <button
               className="button button-ghost"
-              disabled={busy || !teamId || !joinInfo}
+              disabled={busy || recoveryTeamName.trim().length < 2 || !joinInfo}
               onClick={() =>
                 void run(async () => {
                   const next = capability();
@@ -842,7 +846,7 @@ export default function CompetitionPortal({
                       mode: "competition",
                       action: "request_recovery",
                       code: join.code,
-                      competitionTeamId: teamId,
+                      teamName: recoveryTeamName.trim(),
                       recoveryCredential: next,
                     },
                   );
@@ -856,8 +860,9 @@ export default function CompetitionPortal({
             </button>
             {recoveryRequest && (
               <p role="status">
-                Mã yêu cầu: {recoveryRequest}. Đưa mã này cho MC. Sau khi được
-                duyệt, bấm Khôi phục đội.
+                Đã gửi yêu cầu cho đội {recoveryTeamName.trim()}. Mã yêu cầu: {recoveryRequest}.
+                Đưa mã này cho BTC để xác minh trực tiếp. Sau khi BTC duyệt, bấm
+                Khôi phục đội ở biểu mẫu phía trên (credential mới đã được điền sẵn).
               </p>
             )}
           </details>
@@ -1035,7 +1040,7 @@ export default function CompetitionPortal({
                         onClick={() => {
                           if (
                             window.confirm(
-                              "Đã xác minh trực tiếp đội và mã yêu cầu? Duyệt sẽ thu hồi các phiên đội cũ; MC không nhận credential hoặc token đội.",
+                              "Đã đối chiếu tên đội và mã yêu cầu trên điện thoại của đội trực tiếp? Duyệt sẽ thu hồi phiên cũ và giữ nguyên điểm của đội.",
                             )
                           )
                             void run(() =>

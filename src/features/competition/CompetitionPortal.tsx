@@ -142,6 +142,7 @@ function Deadline({
   );
 }
 export function Leaderboard({ state }: { state: CompetitionState }) {
+  const robotOnly = state.competitionMode === "robot_only";
   const final = state.competition.status === "FINALIZED" || state.resultsState === "RESULTS_READY";
   const winner = state.leaderboard?.find(
     (t) => t.teamId === state.competition.winnerTeamId,
@@ -155,8 +156,7 @@ export function Leaderboard({ state }: { state: CompetitionState }) {
           : "Bảng xếp hạng TẠM THỜI · PROVISIONAL"}
       </h2>
       <p>
-        Chỉ tổng hợp phiên đã chốt. Mỗi game đóng góp tối đa 50 điểm; không tính
-        tốc độ.
+        {robotOnly ? "Chỉ thi Robot: điểm Robot /400 × 100, không tính tốc độ." : "Chỉ tổng hợp phiên đã chốt. Mỗi game đóng góp tối đa 50 điểm; không tính tốc độ."}
       </p>
       {winner && <h2 aria-live="polite">🏆 ĐỘI CHIẾN THẮNG: {winner.name}</h2>}
       {/* Mobile card layout — no horizontal scroll */}
@@ -177,12 +177,8 @@ export function Leaderboard({ state }: { state: CompetitionState }) {
                 {state.competition.winnerTeamId === t.teamId ? " 🏆" : ""}
               </div>
               <div className="leaderboard-card-scores">
-                <span title="Accessibility /50">
-                  A: {Number(t.accessibility50).toFixed(1)}/50
-                </span>
-                <span title="Robot /50">
-                  R: {Number(t.robot50).toFixed(1)}/50
-                </span>
+                {!robotOnly && <span title="Accessibility /50">A: {Number(t.accessibility50).toFixed(1)}/50</span>}
+                <span title={robotOnly ? "Robot /100" : "Robot /50"}>R: {Number(t.robot50).toFixed(1)}/{robotOnly ? 100 : 50}</span>
                 <strong title="Tổng /100">
                   {Number(t.final100).toFixed(1)}/100
                 </strong>
@@ -202,8 +198,8 @@ export function Leaderboard({ state }: { state: CompetitionState }) {
           <thead>
             <tr>
               <th>Đội</th>
-              <th>Accessibility /50</th>
-              <th>Robot /50</th>
+              {!robotOnly && <th>Accessibility /50</th>}
+              <th>Robot /{robotOnly ? 100 : 50}</th>
               <th>Tổng /100</th>
               <th>Hạng</th>
             </tr>
@@ -215,7 +211,7 @@ export function Leaderboard({ state }: { state: CompetitionState }) {
                   {t.name}
                   {state.competition.winnerTeamId === t.teamId ? " 🏆" : ""}
                 </th>
-                <td>{Number(t.accessibility50).toFixed(2)}</td>
+                {!robotOnly && <td>{Number(t.accessibility50).toFixed(2)}</td>}
                 <td>{Number(t.robot50).toFixed(2)}</td>
                 <td>{Number(t.final100).toFixed(2)}</td>
                 <td>
@@ -786,7 +782,7 @@ export default function CompetitionPortal({
                 type="checkbox"
                 checked={restore}
                 onChange={(e) => setRestore(e.target.checked)}
-                disabled={stageNo === 2 || joinInfo?.status !== "NOT_STARTED"}
+                disabled={joinInfo?.status === "FINALIZED"}
               />{" "}
               Khôi phục đội đã đăng ký
             </label>
@@ -904,6 +900,24 @@ export default function CompetitionPortal({
                     }
                   }}
                 />
+              )}
+              {state.rulesVersion === "v5" && state.competition.status === "NOT_STARTED" && (
+                <section className="competition-section panel">
+                  <h2>Chơi thẳng Game 2 · Robot Commands</h2>
+                  <p>Bỏ qua Accessibility, giữ các đội đã đăng ký. Robot sẽ chiếm toàn bộ 100 điểm. Đăng ký đội trước khi bỏ qua Game 1.</p>
+                  <button type="button" className="button button-primary"
+                    disabled={busy || (state.teams?.length ?? 0) === 0}
+                    onClick={() => {
+                      if (window.confirm("Bỏ qua Game 1? Giữ nguyên các đội đã đăng ký, đóng đăng ký đội mới và không thể quay lại Game 1.")) {
+                        void run(() => control("skip_stage_1"));
+                      }
+                    }}>
+                    Bỏ qua Game 1 → Chuẩn bị Robot
+                  </button>
+                </section>
+              )}
+              {state.competitionMode === "robot_only" && state.role === "mc" && (
+                <p className="competition-state" role="status">ROBOT-ONLY · Game 1 đã bỏ qua · 100 điểm Robot</p>
               )}
               <div className="competition-stages">
                 {state.stages.map((s) => (
@@ -1126,7 +1140,7 @@ export default function CompetitionPortal({
               )}
               <div className="competition-results" aria-label={state.role === "mc" ? "Kết quả riêng MC" : "Kết quả của đội"}>
                 <Leaderboard state={state} />
-                {state.scoreExplanations?.map(e => <ScoreBreakdown key={e.teamId} explanation={e} />)}
+                {state.scoreExplanations?.map(e => <ScoreBreakdown key={e.teamId} explanation={e} robotOnly={state.competitionMode === "robot_only"} />)}
               </div>
               {state.stages
                 .filter((s) => s.status === "finalized")
@@ -1221,6 +1235,7 @@ export function AdminStage({
     s.stageNo === 1
       ? state.competition.status === "NOT_STARTED"
       : state.competition.status === "STAGE_1_FINALIZED";
+  const optionalRobotDemo = state.competitionMode === "robot_only" && s.stageNo === 2;
   return (
     <section className="panel competition-section">
       <span className="eyebrow accent">
@@ -1228,7 +1243,7 @@ export function AdminStage({
       </span>
       <h2>{s.stageNo === 1 ? "Accessibility Unlock" : "Robot Commands"}</h2>
       <p>
-        Trạng thái: {s.status} ·{" "}
+        Trạng thái: {s.status === "skipped" ? "Đã bỏ qua" : s.status} ·{" "}
         {(totalItems ?? (s.stageNo === 1 ? 6 : 4)) * 100} {s.stageNo === 1 ? "XP" : "điểm"} → 50 điểm
       </p>
       <Deadline
@@ -1309,8 +1324,8 @@ export function AdminStage({
         </button>
         <button
           className="button button-primary"
-          disabled={busy || !allowed || s.status !== "pending" || !demoShown}
-          title={!demoShown ? "Phải hiển thị Demo trước khi bắt đầu phiên thi" : undefined}
+          disabled={busy || !allowed || s.status !== "pending" || (!demoShown && !optionalRobotDemo)}
+          title={!demoShown && !optionalRobotDemo ? "Phải hiển thị Demo trước khi bắt đầu phiên thi" : undefined}
           onClick={() => {
             setLocalDemoShown(false);
             onSetLocalDemoStage?.(null);
@@ -1634,7 +1649,7 @@ export function PresentationJoinPanel({
       )}
 
       <div className="join-panel-persistent-note">
-        <small>✓ Dùng 1 mã QR cố định duy nhất cho cả 2 chặng thi đấu</small>
+        <small>✓ Một mã QR cố định cho phòng thi và khôi phục đội</small>
       </div>
     </aside>
   );
@@ -1670,16 +1685,16 @@ export function PresentationLandingScreen({
           <h2 className="landing-waiting-heading">
             {state.competition.status === "NOT_STARTED"
               ? "Chờ MC mở thử thách"
+              : state.competitionMode === "robot_only" ? "Game 1 đã bỏ qua · Chờ thi Robot"
               : "Phiên đã kết thúc · Chờ hoạt động tiếp theo"}
           </h2>
 
           <h1 className="landing-hero-heading">
-            ĐẤU TRƯỜNG LẬP TRÌNH &amp; THIẾT KẾ TIẾP CẬN
+            {state.competitionMode === "robot_only" ? "ROBOT COMMANDS · THỬ THÁCH LẬP TRÌNH" : "ĐẤU TRƯỜNG LẬP TRÌNH & THIẾT KẾ TIẾP CẬN"}
           </h1>
 
           <p className="landing-intro-text">
-            Chào mừng các đội thi! Hãy chuẩn bị tinh thần bước vào 2 chặng thử thách kịch tính để
-            khẳng định năng lực tối ưu trải nghiệm cho mọi người dùng và chinh phục mê cung thuật toán.
+            {state.competitionMode === "robot_only" ? "Chào mừng các đội thi! Chinh phục 4 mê cung robot bằng tư duy lập trình, debug và tối ưu chuỗi lệnh." : "Chào mừng các đội thi! Hãy chuẩn bị tinh thần bước vào 2 chặng thử thách kịch tính để khẳng định năng lực tối ưu trải nghiệm cho mọi người dùng và chinh phục mê cung thuật toán."}
           </p>
 
           {/* Central Futuristic Hero Showcase Artwork (inspired by original Game Arena) */}
@@ -1715,7 +1730,7 @@ export function PresentationLandingScreen({
           </div>
 
           <div className="landing-cards-grid">
-            <div className="landing-card card-a11y">
+            {state.competitionMode !== "robot_only" && <div className="landing-card card-a11y">
               <div className="card-top-icon">♿</div>
               <div className="card-content">
                 <span className="card-eyebrow">CHẶNG 1 · ACCESSIBILITY UNLOCK</span>
@@ -1727,10 +1742,10 @@ export function PresentationLandingScreen({
                 <div className="card-badge-row">
                   <span className="mini-badge">6 câu hỏi</span>
                   <span className="mini-badge">100 XP / câu</span>
-                  <span className="mini-badge accent-badge">Tối đa 50 XP toàn giải</span>
+                  <span className="mini-badge accent-badge">Tối đa 50 điểm toàn giải</span>
                 </div>
               </div>
-            </div>
+            </div>}
 
             <div className="landing-card card-robot">
               <div className="card-top-icon">🤖</div>
@@ -1744,7 +1759,7 @@ export function PresentationLandingScreen({
                 <div className="card-badge-row">
                   <span className="mini-badge">4 bản đồ</span>
                   <span className="mini-badge">Tối đa 24 lệnh</span>
-                  <span className="mini-badge accent-badge">Tối đa 50 XP toàn giải</span>
+                  <span className="mini-badge accent-badge">Tối đa {state.competitionMode === "robot_only" ? "100" : "50"} điểm toàn giải</span>
                 </div>
               </div>
             </div>
@@ -1752,7 +1767,7 @@ export function PresentationLandingScreen({
 
           <div className="landing-format-banner">
             <span className="format-label">QUY THỨC THI ĐẤU:</span>
-            <span>6 Câu Hỏi A11y + 4 Màn Mê Cung Robot · Tổng Điểm 100 XP (50% A11y + 50% Robot)</span>
+            <span>{state.competitionMode === "robot_only" ? "ROBOT-ONLY · 4 Màn Robot · Robot /400 × 100" : "6 Câu Hỏi A11y + 4 Màn Mê Cung Robot · Tổng Điểm 100 (50% A11y + 50% Robot)"}</span>
           </div>
         </div>
 

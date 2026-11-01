@@ -102,6 +102,12 @@ const errors: Record<string, string> = {
 };
 function message(error: unknown) {
   const code = error instanceof ArenaApiError ? error.code : "request_failed";
+  if (code === "rate_limited" && error instanceof ArenaApiError && error.retryAfterSeconds) {
+    const seconds = error.retryAfterSeconds;
+    return seconds < 60
+      ? `Quá nhiều yêu cầu. Thử lại sau khoảng ${seconds} giây.`
+      : `Quá nhiều yêu cầu. Thử lại sau khoảng ${Math.ceil(seconds / 60)} phút.`;
+  }
   return errors[code] ?? workshopErrorMessage(code);
 }
 

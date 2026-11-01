@@ -66,6 +66,9 @@ const labels = [
   "Điều hướng",
 ];
 const errors: Record<string, string> = {
+  invalid_team_name: "Tên đội không hợp lệ. Hãy nhập tên đã đăng ký (2–40 ký tự).",
+  team_not_found: "Không tìm thấy tên đội trong phòng thi này. Kiểm tra lại tên đã đăng ký hoặc hỏi BTC.",
+  ambiguous_team_name: "Có nhiều tên đội gần giống nhau. Hãy nhập đúng cách viết tên đội lúc đăng ký hoặc nhờ BTC hỗ trợ.",
   display_sync_unavailable: "Backend chưa hỗ trợ đồng bộ Trước/Sau giữa thiết bị. Cần áp dụng bản cập nhật đồng bộ hiển thị.",
   stale_demo_version: "Demo vừa thay đổi từ phiên MC khác. Đã tải lại, hãy thực hiện lại thao tác.",
   optimization_required: "Chọn Tối ưu lại để bắt đầu lượt chạy có phí sau thành công đầu tiên.",
